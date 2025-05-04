@@ -3,9 +3,11 @@ const app = express();
 import sequelize from './src/db.js';
 import gastosRoutes from './src/routes/gastos.routes.js';
 import { errorMiddleware } from './src/middlewares/errorMiddleware.js';
+import logger from './src/utils/logger.js';
+import { requestLogger } from './src/middlewares/requestLogger.js';
 
 app.use(json());
-
+app.use(requestLogger);
 // Rutas
 app.use('/gastos-api', gastosRoutes);
 app.use(errorMiddleware);
@@ -14,13 +16,13 @@ app.use(errorMiddleware);
 const PORT = process.env.PORT || 3000;
 sequelize.sync({ force: false }) // cambia a true si querés reiniciar la DB
   .then(() => {
-    console.log('Base de datos conectada');
+    logger.info('Base de datos conectada');
     app.listen(PORT, () => {
-      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+      logger.info(`Servidor corriendo en http://localhost:${PORT}`);
     });
   })
   .catch(err => {
-    console.error('Error al conectar a la base de datos:', err);
+    logger.error('Error al conectar a la base de datos:', err);
   });
 
   

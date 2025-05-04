@@ -1,7 +1,9 @@
 import { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto, ImportanciaGasto } from '../models/index.js';
+import logger from '../utils/logger.js';
 
 export const crearGasto = async (req, res, next) => {
   try {
+    logger.info('Creando nuevo gasto');
     // Desestructurar el cuerpo de la solicitud
     const { fecha, monto_ars, monto_usd, descripcion, tipo_pago_id, categoria_gasto_id, frecuencia_gasto_id, importancia_gasto_id } = req.body;
 
@@ -16,7 +18,7 @@ export const crearGasto = async (req, res, next) => {
       frecuencia_gasto_id,
       importancia_gasto_id,
     });
-    
+
     return res.status(201).json(nuevoGasto);
 
   } catch (error) {
