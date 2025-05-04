@@ -9,6 +9,7 @@ A simple RESTful API for managing personal expenses, built with Node.js, Express
 - Input validation using Joi
 - Error handling middleware
 - Modular structure with Sequelize ORM
+- Logging using Winson package
 
 ## Tech Stack
 
@@ -16,3 +17,4 @@ A simple RESTful API for managing personal expenses, built with Node.js, Express
 - Express
 - SQLite (via Sequelize)
 - Joi
+- Winston

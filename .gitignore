@@ -2,3 +2,4 @@ node_modules/
 database.sqbpro
 database.sqlite
 .env
+logs/

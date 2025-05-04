@@ -1,4 +1,8 @@
+import logger from '../utils/logger.js'
+
 export function errorMiddleware(err, req, res, next) {
+  //logger.error(`${err.message}`, { stack: err.stack });
+  logger.error(`${err.message}`);
     console.error('Error capturado:', err);
   
     const statusCode = err.status || 500;
@@ -11,4 +15,3 @@ export function errorMiddleware(err, req, res, next) {
       detalles
     });
   }
-  
