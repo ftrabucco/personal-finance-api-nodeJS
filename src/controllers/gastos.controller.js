@@ -1,6 +1,6 @@
-import { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto, ImportanciaGasto } from '../models/index.js';
+import { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto, ImportanciaGasto, sequelize } from '../models/index.js';
 import logger from '../utils/logger.js';
-
+import { Op } from 'sequelize';
 export const crearGasto = async (req, res, next) => {
   try {
     logger.info('Creando nuevo gasto');
@@ -27,7 +27,7 @@ export const crearGasto = async (req, res, next) => {
 };
 
 // Obtener todos los gastos
-export const obtenerGastos = async (req, res) => {
+export const obtenerTodosGastos = async (req, res) => {
   try {
     const gastos = await Gasto.findAll({
 
@@ -45,6 +45,24 @@ export const obtenerGastos = async (req, res) => {
   }
 };
 
+export async function obtenerGastos(req, res, next) {
+  try {
+    const { categoria_gasto_id, importancia_gasto_id, tipo_pago_id, min, max } = req.query;
+
+    const where = {};
+
+    if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
+    if (importancia_gasto_id) where.importancia_gasto_id = importancia_gasto_id;
+    if (tipo_pago_id) where.tipo_pago_id = tipo_pago_id;
+    if (min) where.monto_ars = { ...(where.monto_ars || {}), [Op.gte]: Number(min) };
+    if (max) where.monto_ars = { ...(where.monto_ars || {}), [Op.lte]: Number(max) };
+
+    const gastos = await Gasto.findAll({ where });
+    res.json({ status: 'ok', data: gastos });
+  } catch (err) {
+    next(err);
+  }
+}
 // Obtener un solo gasto por ID
 const obtenerGastoPorId = async (req, res) => {
   try {
@@ -119,6 +137,7 @@ const eliminarGasto = async (req, res) => {
 
 export default {
   crearGasto,
+  obtenerTodosGastos,
   obtenerGastos,
   obtenerGastoPorId,
   actualizarGasto,
