@@ -1,7 +1,7 @@
 import express, { json } from 'express';
 const app = express();
 import sequelize from './src/db.js';
-import gastosRoutes from './src/routes/gastos.routes.js';
+import router from './src/routes/index.routes.js';
 import { errorMiddleware } from './src/middlewares/errorMiddleware.js';
 import logger from './src/utils/logger.js';
 import { requestLogger } from './src/middlewares/requestLogger.js';
@@ -9,7 +9,7 @@ import { requestLogger } from './src/middlewares/requestLogger.js';
 app.use(json());
 app.use(requestLogger);
 // Rutas
-app.use('/gastos-api', gastosRoutes);
+app.use('/gastos-api', router);
 app.use(errorMiddleware);
 
 // Iniciar servidor y sincronizar base de datos
