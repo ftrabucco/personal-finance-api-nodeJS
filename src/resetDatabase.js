@@ -1,4 +1,4 @@
-import { sequelize } from '../models/index.js';
+import { sequelize } from '../src/models/index.js';
 
 async function resetDatabase() {
   try {

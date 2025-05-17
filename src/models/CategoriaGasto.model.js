@@ -4,7 +4,7 @@ export function defineCategoriaGasto(sequelize) {
   return sequelize.define('CategoriaGasto', {
     nombre_categoria: { type: DataTypes.STRING, allowNull: false },
   }, {
-    tableName: 'categoria_gasto',
+    tableName: 'categorias_gasto',
     timestamps: false,
   });
 }
