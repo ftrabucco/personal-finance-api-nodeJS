@@ -1,5 +1,10 @@
 // modelos/seed.js
-import { sequelize, CategoriaGasto, TipoPago, FrecuenciaGasto, ImportanciaGasto } from './index.js';
+import logger from '../utils/logger.js';
+import {
+  sequelize, CategoriaGasto, TipoPago, FrecuenciaGasto, ImportanciaGasto,
+  Compra, DebitoAutomatico, GastoRecurrente, GastoUnico,
+  Tarjeta, Usuario
+} from './index.js';
 
 async function seedInitialData() {
   try {
@@ -27,7 +32,7 @@ async function seedInitialData() {
         { nombre_categoria: 'Vacaciones / Viajes' },
         { nombre_categoria: 'Otros' },
       ]);
-      console.log('Categorías de gasto creadas');
+      logger.info('Categorías de gasto creadas');
     }
 
     // Tipos de Pago
@@ -39,7 +44,7 @@ async function seedInitialData() {
         { nombre: 'Crédito', permite_cuotas: true },
         { nombre: 'Transferencia', permite_cuotas: false }
       ]);
-      console.log('Tipos de pago creados');
+      logger.info('Tipos de pago creados');
     }
 
     // Frecuencia de Gasto
@@ -50,7 +55,7 @@ async function seedInitialData() {
         { nombre_frecuencia: 'Mensual' },
         { nombre_frecuencia: 'Anual' }
       ]);
-      console.log('Frecuencias de gasto creadas');
+      logger.info('Frecuencias de gasto creadas');
     }
 
     // Importancia de Gasto
@@ -62,12 +67,117 @@ async function seedInitialData() {
         { nombre_importancia: 'Prescindible' },
         { nombre_importancia: 'No debería' }
       ]);
-      console.log('Importancias de gasto creadas');
+      logger.info('Importancias de gasto creadas');
     }
 
-    console.log('Seeding finalizado.');
+    // Compras (de ejemplo)
+    const comprasExistentes = await Compra.count();
+    if (comprasExistentes === 0) {
+      await Compra.bulkCreate([
+        {
+          descripcion: 'Televisor Smart 55"',
+          monto_total: 600000,
+          cantidad_cuotas: 12,
+          fecha_compra: new Date('2025-05-12'),
+          categoria_gasto_id: 15, // Compras personales
+          importancia_gasto_id: 2, // Nice to have
+          tipo_pago_id: 2,
+          tarjeta_id: 1
+        }
+      ]);
+      logger.info('Compras creadas');
+    }
+    // Débitos automáticos
+    const debitosExistentes = await DebitoAutomatico.count();
+    if (debitosExistentes === 0) {
+      await DebitoAutomatico.bulkCreate([
+        {
+          descripcion: 'Spotify Premium',
+          monto: 1500,
+          dia_de_pago: 12,
+          categoria_gasto_id: 6, // Suscripciones
+          importancia_gasto_id: 2,
+          frecuencia_gasto_id: 2,
+          tipo_pago_id: 2,
+          tarjeta_id: 1
+        }
+      ]);
+      logger.info('Débitos automáticos creados');
+    }
+
+    // Gastos recurrentes
+    const gastosRecurrentesExistentes = await GastoRecurrente.count();
+    if (gastosRecurrentesExistentes === 0) {
+      await GastoRecurrente.bulkCreate([
+        {
+          descripcion: 'Alquiler mensual',
+          monto: 120000,
+          dia_referencia: 1,
+          frecuencia_gasto_id: 2,
+          categoria_gasto_id: 1, // Alquiler
+          importancia_gasto_id: 1,
+          tipo_pago_id: 2,
+          tarjeta_id: 1
+        }
+      ]);
+      logger.info('Gastos recurrentes creados');
+    }
+
+        const gastosUnicosExistente = await GastoUnico.count();
+    if (gastosUnicosExistente === 0) {
+      await GastoUnico.bulkCreate([
+        {
+          descripcion: 'Arreglo gol, cambio correas',
+          monto: 368000,
+          fecha: new Date('2025-05-14'),
+          categoria_gasto_id: 1, // Alquiler
+          importancia_gasto_id: 1,
+          tipo_pago_id: 4,
+          tarjeta_id: 1
+        }
+      ]);
+      logger.info('Gastos recurrentes creados');
+    }
+
+    // Tarjetas 
+    const tarjetasExistentes = await Tarjeta.count();
+    if (tarjetasExistentes === 0) {
+      await Tarjeta.bulkCreate([
+        {
+          nombre: 'Debito Galicia',
+          tipo: 'debito',
+          banco: 'Galicia',
+          dia_mes_cierre: NULL,
+          dia_mes_vencimiento: NULL,
+          permite_cuotas: false
+        },
+        {
+          nombre: 'Credito Mastercard',
+          tipo: 'debito',
+          banco: 'Galicia',
+          dia_mes_cierre: NULL,
+          dia_mes_vencimiento: NULL,
+          permite_cuotas: true
+        },
+      ]);
+      logger.info('Gastos recurrentes creados');
+    }
+
+    const usuariosExistentes = await Usuario.count();
+    if (usuariosExistentes === 0) {
+      await Tarjeta.bulkCreate([
+        {
+          nombre: 'Fran',
+          email: 'fran@gmail.com',
+          password: '1234'
+        }
+      ]);
+      logger.info('Gastos recurrentes creados');
+    }
+
+    logger.info('Seeding finalizado.');
   } catch (error) {
-    console.error('Error durante el seeding:', error);
+    logger.error('Error durante el seeding:', error);
   } finally {
     await sequelize.close();
   }

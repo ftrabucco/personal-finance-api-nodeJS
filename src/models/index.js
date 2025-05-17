@@ -10,7 +10,7 @@ import { defineDebitoAutomatico } from './DebitoAutomatico.model.js';
 import { defineGastoRecurrente } from './GastoRecurrente.model.js';
 import { defineGastoUnico } from './GastoUnico.model.js';
 import { defineTarjeta } from './Tarjeta.model.js';
-import { defineUsuario } from './Uuario.model.js';
+import { defineUsuario } from './Usuario.model.js';
 
 
 /*
