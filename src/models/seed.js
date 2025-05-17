@@ -70,6 +70,43 @@ async function seedInitialData() {
       logger.info('Importancias de gasto creadas');
     }
 
+        // Tarjetas 
+    const tarjetasExistentes = await Tarjeta.count();
+    if (tarjetasExistentes === 0) {
+      await Tarjeta.bulkCreate([
+        {
+          nombre: 'Debito Galicia',
+          tipo: 'debito',
+          banco: 'Galicia',
+          dia_mes_cierre: null,
+          dia_mes_vencimiento: null,
+          permite_cuotas: false
+        },
+        {
+          nombre: 'Credito Mastercard',
+          tipo: 'debito',
+          banco: 'Galicia',
+          dia_mes_cierre: null,
+          dia_mes_vencimiento: null,
+          permite_cuotas: true
+        },
+      ]);
+      logger.info('Gastos recurrentes creados');
+    }
+
+    // Usuarios
+    const usuariosExistentes = await Usuario.count();
+    if (usuariosExistentes === 0) {
+      await Usuario.bulkCreate([
+        {
+          nombre: 'Fran',
+          email: 'fran@gmail.com',
+          password: '1234'
+        }
+      ]);
+      logger.info('Gastos recurrentes creados');
+    }
+
     // Compras (de ejemplo)
     const comprasExistentes = await Compra.count();
     if (comprasExistentes === 0) {
@@ -134,42 +171,6 @@ async function seedInitialData() {
           importancia_gasto_id: 1,
           tipo_pago_id: 4,
           tarjeta_id: 1
-        }
-      ]);
-      logger.info('Gastos recurrentes creados');
-    }
-
-    // Tarjetas 
-    const tarjetasExistentes = await Tarjeta.count();
-    if (tarjetasExistentes === 0) {
-      await Tarjeta.bulkCreate([
-        {
-          nombre: 'Debito Galicia',
-          tipo: 'debito',
-          banco: 'Galicia',
-          dia_mes_cierre: NULL,
-          dia_mes_vencimiento: NULL,
-          permite_cuotas: false
-        },
-        {
-          nombre: 'Credito Mastercard',
-          tipo: 'debito',
-          banco: 'Galicia',
-          dia_mes_cierre: NULL,
-          dia_mes_vencimiento: NULL,
-          permite_cuotas: true
-        },
-      ]);
-      logger.info('Gastos recurrentes creados');
-    }
-
-    const usuariosExistentes = await Usuario.count();
-    if (usuariosExistentes === 0) {
-      await Tarjeta.bulkCreate([
-        {
-          nombre: 'Fran',
-          email: 'fran@gmail.com',
-          password: '1234'
         }
       ]);
       logger.info('Gastos recurrentes creados');

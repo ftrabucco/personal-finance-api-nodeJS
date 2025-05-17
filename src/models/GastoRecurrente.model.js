@@ -2,6 +2,11 @@ import { DataTypes } from 'sequelize';
 
 export function defineGastoRecurrente(sequelize) {
   return sequelize.define('GastoRecurrente', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
     descripcion: { type: DataTypes.STRING, allowNull: false },
     monto: { type: DataTypes.FLOAT, allowNull: false },
     dia_referencia: { type: DataTypes.INTEGER, allowNull: false }, // Día del mes o semana
