@@ -1,0 +1,30 @@
+<h1>Lista de Compras</h1>
+<a href="/compras/vista/nueva">Agregar nueva compra</a>
+<table border="1" cellpadding="5">
+  <thead>
+    <tr>
+      <th>Descripción</th>
+      <th>Monto total</th>
+      <th>Cuotas</th>
+      <th>Fecha inicio</th>
+      <th>Categoría</th>
+      <th>Importancia</th>
+      <th>Tipo de pago</th>
+      <th>Tarjeta id</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each compras}}
+    <tr>
+      <td>{{descripcion}}</td>
+      <td>{{monto_total}}</td>
+      <td>{{cantidad_cuotas}}</td>
+      <td>{{fecha_compra}}</td>
+      <td>{{categoria_gasto_id}}</td>
+      <td>{{importancia_gasto_id}}</td>
+      <td>{{tipo_pago_id}}</td>
+      <td>{{tarjeta_id}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>

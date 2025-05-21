@@ -5,6 +5,17 @@ import router from './src/routes/index.routes.js';
 import { errorMiddleware } from './src/middlewares/errorMiddleware.js';
 import logger from './src/utils/logger.js';
 import { requestLogger } from './src/middlewares/requestLogger.js';
+import exphbs from 'express-handlebars';
+import path from 'path';
+
+// Configuración para Handlebars
+app.engine('handlebars', exphbs.engine());
+app.set('view engine', 'handlebars');
+app.set('views', path.join(process.cwd(), 'views'));
+
+// Para leer datos de formularios
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 app.use(json());
 app.use(requestLogger);

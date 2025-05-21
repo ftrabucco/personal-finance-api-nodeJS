@@ -1,0 +1,34 @@
+<h1>Nueva Compra</h1>
+<form method="POST" action="/compras/vista/nueva">
+  <label>Descripción: <input type="text" name="descripcion" required /></label><br/>
+  <label>Monto total: <input type="number" name="monto_total" step="0.01" required /></label><br/>
+  <label>Cantidad de cuotas: <input type="number" name="cantidad_cuotas" required /></label><br/>
+  <label>Fecha de inicio: <input type="date" name="fecha_inicio" required /></label><br/>
+
+  <label>Categoría:
+    <select name="categoria_id" required>
+      <option value="1">Hogar</option>
+      <option value="2">Transporte</option>
+      <option value="3">Tecnología</option>
+      <!-- Ajustá según tus datos -->
+    </select>
+  </label><br/>
+
+  <label>Importancia:
+    <select name="importancia_id" required>
+      <option value="1">Esencial</option>
+      <option value="2">Importante</option>
+      <option value="3">Prescindible</option>
+    </select>
+  </label><br/>
+
+  <label>Tipo de pago:
+    <select name="tipo_pago_id" required>
+      <option value="1">Crédito</option>
+      <option value="2">Débito</option>
+      <option value="3">Efectivo</option>
+    </select>
+  </label><br/>
+
+  <button type="submit">Guardar compra</button>
+</form>
