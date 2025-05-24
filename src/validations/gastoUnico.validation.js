@@ -4,8 +4,8 @@ export const createGastoUnicoSchema = Joi.object({
   descripcion: Joi.string().required(),
   monto: Joi.number().positive().required(),
   fecha: Joi.date().required(),
-  categoria_id: Joi.number().integer().required(),
-  importancia_id: Joi.number().integer().required(),
+  categoria_gasto_id: Joi.number().integer().required(),
+  importancia_gasto_id: Joi.number().integer().required(),
   tipo_pago_id: Joi.number().integer().required(),
 });
 

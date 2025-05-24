@@ -2,7 +2,7 @@ import { DataTypes } from 'sequelize';
 
 export function defineUsuario(sequelize) {
   return sequelize.define('Usuario', {
-      id: {
+    usuario_id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
