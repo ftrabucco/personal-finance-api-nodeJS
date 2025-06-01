@@ -1,26 +1,23 @@
-<h1>Nueva Compra</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Editar Gasto Único</h1>
+</div>
 
 <div class="row">
   <div class="col-md-6">
-    <form method="POST" action="/compras/nueva" class="needs-validation" novalidate>
+    <form id="editForm" method="POST" action="/gastos-unicos/{{gasto.id}}?_method=PUT" class="needs-validation" novalidate>
       <div class="mb-3">
         <label class="form-label">Descripción:</label>
-        <input type="text" name="descripcion" class="form-control" required />
+        <input type="text" name="descripcion" class="form-control" value="{{gasto.descripcion}}" required />
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Monto total:</label>
-        <input type="number" name="monto_total" step="0.01" class="form-control" required />
+        <label class="form-label">Monto:</label>
+        <input type="number" name="monto" step="0.01" class="form-control" value="{{gasto.monto}}" required />
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Cantidad de cuotas:</label>
-        <input type="number" name="cantidad_cuotas" class="form-control" required />
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Fecha de compra:</label>
-        <input type="date" name="fecha_compra" class="form-control" required />
+        <label class="form-label">Fecha:</label>
+        <input type="date" name="fecha" class="form-control" value="{{gasto.fecha}}" required />
       </div>
 
       <div class="mb-3">
@@ -28,7 +25,7 @@
         <select name="categoria_gasto_id" class="form-select" required>
           <option value="">Seleccione una categoría</option>
           {{#each categorias}}
-            <option value="{{this.id}}">{{this.nombre_categoria}}</option>
+            <option value="{{this.id}}" {{selected this.id ../gasto.categoria_gasto_id}}>{{this.nombre_categoria}}</option>
           {{/each}}
         </select>
       </div>
@@ -38,7 +35,7 @@
         <select name="importancia_gasto_id" class="form-select" required>
           <option value="">Seleccione una importancia</option>
           {{#each importancias}}
-            <option value="{{this.id}}">{{this.nombre_importancia}}</option>
+            <option value="{{this.id}}" {{selected this.id ../gasto.importancia_gasto_id}}>{{this.nombre_importancia}}</option>
           {{/each}}
         </select>
       </div>
@@ -48,7 +45,7 @@
         <select name="tipo_pago_id" class="form-select" required>
           <option value="">Seleccione un tipo de pago</option>
           {{#each tiposPago}}
-            <option value="{{this.id}}">{{this.nombre}}</option>
+            <option value="{{this.id}}" {{selected this.id ../gasto.tipo_pago_id}}>{{this.nombre}}</option>
           {{/each}}
         </select>
       </div>
@@ -58,15 +55,15 @@
         <select name="tarjeta_id" class="form-select">
           <option value="">Seleccione una tarjeta (opcional)</option>
           {{#each tarjetas}}
-            <option value="{{this.id}}">{{this.nombre}} - {{this.banco}}</option>
+            <option value="{{this.id}}" {{selected this.id ../gasto.tarjeta_id}}>{{this.nombre}} - {{this.banco}}</option>
           {{/each}}
         </select>
       </div>
 
       <div class="mb-3">
-        <button type="submit" class="btn btn-primary">Guardar compra</button>
-        <a href="/compras" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        <a href="/gastos-unicos" class="btn btn-secondary">Cancelar</a>
       </div>
     </form>
   </div>
-</div>
+</div> 

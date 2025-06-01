@@ -1,4 +1,4 @@
-import * as compraService from '../services/compra.service.js';
+import * as compraService from '../../services/compra.service.js';
 
 export async function crearCompra(req, res) {
   try {

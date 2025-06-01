@@ -1,6 +1,6 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1>Lista de Compras</h1>
-  <a href="/compras/nueva" class="btn btn-primary">Nueva Compra</a>
+  <h1>Débitos Automáticos</h1>
+  <a href="/debitos-automaticos/nuevo" class="btn btn-primary">Nuevo Débito Automático</a>
 </div>
 
 <div class="table-responsive">
@@ -9,8 +9,8 @@
       <tr>
         <th>Descripción</th>
         <th class="text-end">Monto</th>
-        <th class="text-center">Cuotas</th>
-        <th>Fecha</th>
+        <th class="text-center">Día de Pago</th>
+        <th>Frecuencia</th>
         <th>Categoría</th>
         <th>Importancia</th>
         <th>Tipo de Pago</th>
@@ -19,26 +19,26 @@
       </tr>
     </thead>
     <tbody>
-      {{#each compras}}
+      {{#each debitos}}
         <tr>
           <td>{{this.descripcion}}</td>
-          <td class="text-end">${{this.monto_total}}</td>
-          <td class="text-center">{{this.cantidad_cuotas}}</td>
-          <td>{{formatDate this.fecha_compra}}</td>
+          <td class="text-end">{{formatMoney this.monto}}</td>
+          <td class="text-center">{{formatDayOfMonth this.dia_de_pago}}</td>
+          <td>{{this.frecuencia.nombre_frecuencia}}</td>
           <td>{{this.categoria.nombre_categoria}}</td>
           <td>{{this.importancia.nombre_importancia}}</td>
           <td>{{this.tipoPago.nombre}}</td>
           <td>{{#if this.tarjeta}}{{this.tarjeta.nombre}}{{else}}-{{/if}}</td>
           <td class="text-end">
             <div class="btn-group btn-group-sm">
-              <a href="/compras/{{this.id}}" class="btn btn-info">
+              <a href="/debitos-automaticos/{{this.id}}" class="btn btn-info">
                 <i class="bi bi-eye"></i> Ver
               </a>
-              <a href="/compras/editar/{{this.id}}" class="btn btn-warning">
+              <a href="/debitos-automaticos/editar/{{this.id}}" class="btn btn-warning">
                 <i class="bi bi-pencil"></i> Editar
               </a>
-              <form action="/compras/{{this.id}}?_method=DELETE" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de eliminar esta compra?')">
+              <form action="/debitos-automaticos/{{this.id}}?_method=DELETE" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de eliminar este débito automático?')">
                   <i class="bi bi-trash"></i> Eliminar
                 </button>
               </form>
@@ -47,9 +47,9 @@
         </tr>
       {{else}}
         <tr>
-          <td colspan="9" class="text-center">No hay compras registradas</td>
+          <td colspan="9" class="text-center">No hay débitos automáticos registrados</td>
         </tr>
       {{/each}}
     </tbody>
   </table>
-</div>
+</div> 

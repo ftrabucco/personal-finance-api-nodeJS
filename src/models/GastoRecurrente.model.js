@@ -9,12 +9,47 @@ export function defineGastoRecurrente(sequelize) {
     },
     descripcion: { type: DataTypes.STRING, allowNull: false },
     monto: { type: DataTypes.FLOAT, allowNull: false },
-    dia_referencia: { type: DataTypes.INTEGER, allowNull: false }, // Día del mes o semana
-    frecuencia_gasto_id: { type: DataTypes.INTEGER, allowNull: false },
-    categoria_gasto_id: { type: DataTypes.INTEGER, allowNull: false },
-    importancia_gasto_id: { type: DataTypes.INTEGER, allowNull: false },
-    tipo_pago_id: { type: DataTypes.INTEGER, allowNull: false },
-    tarjeta_id: { type: DataTypes.INTEGER, allowNull: true }
+    dia_de_pago: { type: DataTypes.INTEGER, allowNull: false }, // Día del mes
+    frecuencia_gasto_id: { 
+      type: DataTypes.INTEGER, 
+      allowNull: false,
+      references: {
+        model: 'frecuencias_gasto',
+        key: 'id'
+      }
+    },
+    categoria_gasto_id: { 
+      type: DataTypes.INTEGER, 
+      allowNull: false,
+      references: {
+        model: 'categorias_gasto',
+        key: 'id'
+      }
+    },
+    importancia_gasto_id: { 
+      type: DataTypes.INTEGER, 
+      allowNull: false,
+      references: {
+        model: 'importancias_gasto',
+        key: 'id'
+      }
+    },
+    tipo_pago_id: { 
+      type: DataTypes.INTEGER, 
+      allowNull: false,
+      references: {
+        model: 'tipos_pago',
+        key: 'id'
+      }
+    },
+    tarjeta_id: { 
+      type: DataTypes.INTEGER, 
+      allowNull: true,
+      references: {
+        model: 'tarjetas',
+        key: 'id'
+      }
+    }
   }, {
     tableName: 'gastos_recurrentes',
     timestamps: false,

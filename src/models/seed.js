@@ -84,14 +84,14 @@ async function seedInitialData() {
         },
         {
           nombre: 'Credito Mastercard',
-          tipo: 'debito',
+          tipo: 'credito',
           banco: 'Galicia',
           dia_mes_cierre: null,
           dia_mes_vencimiento: null,
           permite_cuotas: true
         },
       ]);
-      logger.info('Gastos recurrentes creados');
+      logger.info('Tarjetas creadas');
     }
 
     // Usuarios
@@ -104,7 +104,7 @@ async function seedInitialData() {
           password: '1234'
         }
       ]);
-      logger.info('Gastos recurrentes creados');
+      logger.info('Usuarios creados');
     }
 
     // Compras (de ejemplo)
@@ -137,6 +137,16 @@ async function seedInitialData() {
           frecuencia_gasto_id: 2,
           tipo_pago_id: 2,
           tarjeta_id: 1
+        },
+        {
+          descripcion: 'ARCA Monotributo',
+          monto: 37000,
+          dia_de_pago: 5,
+          categoria_gasto_id: 13, // Impuestos / Servicios públicos
+          importancia_gasto_id: 1,
+          frecuencia_gasto_id: 2,
+          tipo_pago_id: 2,
+          tarjeta_id: 1
         }
       ]);
       logger.info('Débitos automáticos creados');
@@ -149,9 +159,9 @@ async function seedInitialData() {
         {
           descripcion: 'Alquiler mensual',
           monto: 120000,
-          dia_referencia: 1,
+          dia_de_pago: 1,
           frecuencia_gasto_id: 2,
-          categoria_gasto_id: 1, // Alquiler
+          categoria_gasto_id: 1,
           importancia_gasto_id: 1,
           tipo_pago_id: 2,
           tarjeta_id: 1

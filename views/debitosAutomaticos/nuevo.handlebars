@@ -1,26 +1,34 @@
-<h1>Nueva Compra</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Nuevo Débito Automático</h1>
+</div>
 
 <div class="row">
   <div class="col-md-6">
-    <form method="POST" action="/compras/nueva" class="needs-validation" novalidate>
+    <form method="POST" action="/debitos-automaticos/nuevo" class="needs-validation" novalidate>
       <div class="mb-3">
         <label class="form-label">Descripción:</label>
         <input type="text" name="descripcion" class="form-control" required />
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Monto total:</label>
-        <input type="number" name="monto_total" step="0.01" class="form-control" required />
+        <label class="form-label">Monto:</label>
+        <input type="number" name="monto" step="0.01" class="form-control" required />
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Cantidad de cuotas:</label>
-        <input type="number" name="cantidad_cuotas" class="form-control" required />
+        <label class="form-label">Día de pago:</label>
+        <input type="number" name="dia_de_pago" min="1" max="31" class="form-control" required />
+        <div class="form-text">Día del mes en que se realiza el débito</div>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Fecha de compra:</label>
-        <input type="date" name="fecha_compra" class="form-control" required />
+        <label class="form-label">Frecuencia:</label>
+        <select name="frecuencia_gasto_id" class="form-select" required>
+          <option value="">Seleccione una frecuencia</option>
+          {{#each frecuencias}}
+            <option value="{{this.id}}">{{this.nombre_frecuencia}}</option>
+          {{/each}}
+        </select>
       </div>
 
       <div class="mb-3">
@@ -64,9 +72,9 @@
       </div>
 
       <div class="mb-3">
-        <button type="submit" class="btn btn-primary">Guardar compra</button>
-        <a href="/compras" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="/debitos-automaticos" class="btn btn-secondary">Cancelar</a>
       </div>
     </form>
   </div>
-</div>
+</div> 

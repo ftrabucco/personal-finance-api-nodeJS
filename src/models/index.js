@@ -22,9 +22,13 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
 */
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: './database.sqlite'
+  storage: './database.sqlite',
+  logging: console.log // Habilitar logging de SQL
 });
-await sequelize.sync({ alter: true })
+
+console.log('Sincronizando base de datos...');
+await sequelize.sync({ alter: true }); // Quitamos force: true para mantener los datos
+console.log('Base de datos sincronizada.');
 
 // Definimos los modelos
 const models = {

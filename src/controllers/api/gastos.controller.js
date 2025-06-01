@@ -1,5 +1,5 @@
-import { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto, ImportanciaGasto, sequelize } from '../models/index.js';
-import logger from '../utils/logger.js';
+import { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto, ImportanciaGasto, sequelize } from '../../models/index.js';
+import logger from '../../utils/logger.js';
 import { Op } from 'sequelize';
 export const crearGasto = async (req, res, next) => {
   try {
