@@ -1,20 +1,26 @@
-import { sequelize } from '../src/models/index.js';
+import { sequelize } from './models/index.js';
+import logger from './utils/logger.js';
 
 async function resetDatabase() {
   try {
-    console.log('Borrando y recreando la base de datos...');
+    logger.info('Iniciando reset de la base de datos...');
 
-    // Elimina todas las tablas
+    // Cerrar todas las conexiones existentes
+    await sequelize.close();
+    logger.info('Conexiones cerradas.');
+
+    // Eliminar todas las tablas
     await sequelize.drop();
-    console.log('Todas las tablas eliminadas.');
+    logger.info('Todas las tablas eliminadas.');
 
-    // Vuelve a sincronizar el modelo, creando las tablas
+    // Volver a sincronizar el modelo, creando las tablas
     await sequelize.sync({ force: true });
-    console.log('Tablas creadas de nuevo.');
+    logger.info('Tablas recreadas correctamente.');
 
+    logger.info('Reset de base de datos completado exitosamente.');
     process.exit(0);
   } catch (error) {
-    console.error(' Error reseteando la base de datos:', error);
+    logger.error('Error durante el reset de la base de datos:', error);
     process.exit(1);
   }
 }

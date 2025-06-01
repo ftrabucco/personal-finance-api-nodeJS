@@ -42,6 +42,12 @@ export function defineCompra(sequelize) {
         model: 'tarjetas',
         key: 'id'
       }
+    },
+    pendiente_cuotas: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      comment: 'Indica si aún quedan cuotas por generar'
     }
   }, {
     tableName: 'compras',

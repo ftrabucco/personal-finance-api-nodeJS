@@ -194,6 +194,36 @@ export const handleFormEditarGastoRecurrente = async (req, res) => {
       tarjeta_id
     } = req.body;
 
+    // Validar campos requeridos
+    if (!descripcion || !monto || !dia_de_pago || !categoria_gasto_id || !importancia_gasto_id || !frecuencia_gasto_id || !tipo_pago_id) {
+      throw new Error('Todos los campos son requeridos excepto tarjeta');
+    }
+
+    // Validar que los IDs existan antes de actualizar
+    const [categoria, importancia, frecuencia, tipoPago, tarjeta] = await Promise.all([
+      CategoriaGasto.findByPk(categoria_gasto_id),
+      ImportanciaGasto.findByPk(importancia_gasto_id),
+      FrecuenciaGasto.findByPk(frecuencia_gasto_id),
+      TipoPago.findByPk(tipo_pago_id),
+      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
+    ]);
+
+    if (!categoria) {
+      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
+    }
+    if (!importancia) {
+      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
+    }
+    if (!frecuencia) {
+      throw new Error(`La frecuencia con ID ${frecuencia_gasto_id} no existe`);
+    }
+    if (!tipoPago) {
+      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
+    }
+    if (tarjeta_id && !tarjeta) {
+      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
+    }
+
     await gasto.update({
       descripcion,
       monto: parseFloat(monto),
@@ -211,7 +241,7 @@ export const handleFormEditarGastoRecurrente = async (req, res) => {
     logger.error('Error al actualizar gasto recurrente:', { error });
     const refData = await getReferenceData();
     res.render('gastosRecurrentes/editar', {
-      error: 'Error al actualizar el gasto recurrente',
+      error: error.message,
       gasto: { ...req.body, id: req.params.id },
       ...refData
     });

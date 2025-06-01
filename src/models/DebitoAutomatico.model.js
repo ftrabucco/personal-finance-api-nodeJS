@@ -49,9 +49,14 @@ export function defineDebitoAutomatico(sequelize) {
         model: 'tarjetas',
         key: 'id'
       }
+    },
+    activo: { 
+      type: DataTypes.BOOLEAN, 
+      allowNull: false, 
+      defaultValue: true 
     }
   }, {
     tableName: 'debitos_automaticos',
-    timestamps: false,
+    timestamps: true,
   });
 }

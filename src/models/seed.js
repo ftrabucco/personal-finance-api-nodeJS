@@ -8,7 +8,9 @@ import {
 
 async function seedInitialData() {
   try {
-    await sequelize.sync({ alter: true });
+    // Forzar recreación de tablas
+    await sequelize.sync({ force: true });
+    logger.info('Base de datos reiniciada');
 
     // Categorías de Gasto
     const categoriasExistentes = await CategoriaGasto.count();
@@ -70,7 +72,7 @@ async function seedInitialData() {
       logger.info('Importancias de gasto creadas');
     }
 
-        // Tarjetas 
+    // Tarjetas 
     const tarjetasExistentes = await Tarjeta.count();
     if (tarjetasExistentes === 0) {
       await Tarjeta.bulkCreate([
@@ -86,8 +88,8 @@ async function seedInitialData() {
           nombre: 'Credito Mastercard',
           tipo: 'credito',
           banco: 'Galicia',
-          dia_mes_cierre: null,
-          dia_mes_vencimiento: null,
+          dia_mes_cierre: 15,
+          dia_mes_vencimiento: 5,
           permite_cuotas: true
         },
       ]);
@@ -115,15 +117,28 @@ async function seedInitialData() {
           descripcion: 'Televisor Smart 55"',
           monto_total: 600000,
           cantidad_cuotas: 12,
-          fecha_compra: new Date('2025-05-12'),
+          fecha_compra: new Date('2024-03-15'),
           categoria_gasto_id: 15, // Compras personales
           importancia_gasto_id: 2, // Nice to have
-          tipo_pago_id: 2,
-          tarjeta_id: 1
+          tipo_pago_id: 3, // Crédito
+          tarjeta_id: 2,
+          pendiente_cuotas: true
+        },
+        {
+          descripcion: 'Heladera',
+          monto_total: 450000,
+          cantidad_cuotas: 6,
+          fecha_compra: new Date('2024-03-10'),
+          categoria_gasto_id: 8, // Hogar
+          importancia_gasto_id: 1, // Esencial
+          tipo_pago_id: 3, // Crédito
+          tarjeta_id: 2,
+          pendiente_cuotas: true
         }
       ]);
       logger.info('Compras creadas');
     }
+
     // Débitos automáticos
     const debitosExistentes = await DebitoAutomatico.count();
     if (debitosExistentes === 0) {
@@ -133,20 +148,33 @@ async function seedInitialData() {
           monto: 1500,
           dia_de_pago: 12,
           categoria_gasto_id: 6, // Suscripciones
-          importancia_gasto_id: 2,
-          frecuencia_gasto_id: 2,
-          tipo_pago_id: 2,
-          tarjeta_id: 1
+          importancia_gasto_id: 2, // Nice to have
+          frecuencia_gasto_id: 2, // Mensual
+          tipo_pago_id: 2, // Débito
+          tarjeta_id: 1,
+          activo: true
         },
         {
           descripcion: 'ARCA Monotributo',
           monto: 37000,
-          dia_de_pago: 5,
-          categoria_gasto_id: 13, // Impuestos / Servicios públicos
-          importancia_gasto_id: 1,
-          frecuencia_gasto_id: 2,
-          tipo_pago_id: 2,
-          tarjeta_id: 1
+          dia_de_pago: 20,
+          categoria_gasto_id: 13, // Impuestos
+          importancia_gasto_id: 1, // Esencial
+          frecuencia_gasto_id: 2, // Mensual
+          tipo_pago_id: 2, // Débito
+          tarjeta_id: 1,
+          activo: true
+        },
+        {
+          descripcion: 'Netflix',
+          monto: 4000,
+          dia_de_pago: 15,
+          categoria_gasto_id: 6, // Suscripciones
+          importancia_gasto_id: 3, // Prescindible
+          frecuencia_gasto_id: 2, // Mensual
+          tipo_pago_id: 2, // Débito
+          tarjeta_id: 1,
+          activo: true
         }
       ]);
       logger.info('Débitos automáticos creados');
@@ -160,30 +188,50 @@ async function seedInitialData() {
           descripcion: 'Alquiler mensual',
           monto: 120000,
           dia_de_pago: 1,
-          frecuencia_gasto_id: 2,
-          categoria_gasto_id: 1,
-          importancia_gasto_id: 1,
-          tipo_pago_id: 2,
-          tarjeta_id: 1
+          frecuencia_gasto_id: 2, // Mensual
+          categoria_gasto_id: 1, // Alquiler
+          importancia_gasto_id: 1, // Esencial
+          tipo_pago_id: 4, // Transferencia
+          activo: true
+        },
+        {
+          descripcion: 'Expensas',
+          monto: 35000,
+          dia_de_pago: 10,
+          frecuencia_gasto_id: 2, // Mensual
+          categoria_gasto_id: 8, // Hogar
+          importancia_gasto_id: 1, // Esencial
+          tipo_pago_id: 4, // Transferencia
+          activo: true
         }
       ]);
       logger.info('Gastos recurrentes creados');
     }
 
-        const gastosUnicosExistente = await GastoUnico.count();
+    // Gastos únicos
+    const gastosUnicosExistente = await GastoUnico.count();
     if (gastosUnicosExistente === 0) {
       await GastoUnico.bulkCreate([
         {
-          descripcion: 'Arreglo gol, cambio correas',
+          descripcion: 'Arreglo auto, cambio correas',
           monto: 368000,
-          fecha: new Date('2025-05-14'),
-          categoria_gasto_id: 1, // Alquiler
-          importancia_gasto_id: 1,
-          tipo_pago_id: 4,
+          fecha: new Date('2024-03-14'),
+          categoria_gasto_id: 3, // Transporte
+          importancia_gasto_id: 1, // Esencial
+          tipo_pago_id: 4, // Transferencia
           tarjeta_id: 1
+        },
+        {
+          descripcion: 'Regalo cumpleaños mamá',
+          monto: 25000,
+          fecha: new Date('2024-03-18'),
+          categoria_gasto_id: 11, // Regalos
+          importancia_gasto_id: 2, // Nice to have
+          tipo_pago_id: 1, // Efectivo
+          tarjeta_id: null
         }
       ]);
-      logger.info('Gastos recurrentes creados');
+      logger.info('Gastos únicos creados');
     }
 
     logger.info('Seeding finalizado.');

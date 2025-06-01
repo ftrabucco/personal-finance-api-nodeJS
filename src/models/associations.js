@@ -13,10 +13,6 @@ export function setupAssociations(models) {
     Usuario
   } = models;
 
-
-  Gasto.belongsTo(Usuario, { foreignKey: 'importancia_gasto_id' });
-  Usuario.hasMany(Gasto, { foreignKey: 'importancia_gasto_id' });
-
   // Gasto
   Gasto.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPago' });
   TipoPago.hasMany(Gasto, { foreignKey: 'tipo_pago_id', as: 'gastos' });

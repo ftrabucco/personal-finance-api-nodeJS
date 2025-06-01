@@ -1,4 +1,5 @@
 import { GastoUnico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../../models/index.js';
+import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import logger from '../../utils/logger.js';
 
 // Helper function to get reference data for forms
@@ -158,8 +159,10 @@ export const handleFormNuevoGastoUnico = async (req, res) => {
       tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
     });
 
-    logger.info('Gasto único creado:', { id: nuevoGasto.id });
+    // Generar el gasto real inmediatamente
+    await GastoGeneratorService.generateFromGastoUnico(nuevoGasto);
 
+    logger.info('Gasto único creado y gasto real generado:', { id: nuevoGasto.id });
     res.redirect('/gastos-unicos');
   } catch (error) {
     logger.error('Error al crear gasto único:', { error });
@@ -189,6 +192,32 @@ export const handleFormEditarGastoUnico = async (req, res) => {
       tarjeta_id
     } = req.body;
 
+    // Validar campos requeridos
+    if (!descripcion || !monto || !fecha || !categoria_gasto_id || !importancia_gasto_id || !tipo_pago_id) {
+      throw new Error('Todos los campos son requeridos excepto tarjeta');
+    }
+
+    // Validar que los IDs existan antes de actualizar
+    const [categoria, importancia, tipoPago, tarjeta] = await Promise.all([
+      CategoriaGasto.findByPk(categoria_gasto_id),
+      ImportanciaGasto.findByPk(importancia_gasto_id),
+      TipoPago.findByPk(tipo_pago_id),
+      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
+    ]);
+
+    if (!categoria) {
+      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
+    }
+    if (!importancia) {
+      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
+    }
+    if (!tipoPago) {
+      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
+    }
+    if (tarjeta_id && !tarjeta) {
+      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
+    }
+
     await gasto.update({
       descripcion,
       monto: parseFloat(monto),
@@ -200,13 +229,12 @@ export const handleFormEditarGastoUnico = async (req, res) => {
     });
 
     logger.info('Gasto único actualizado:', { id: gasto.id });
-
     res.redirect('/gastos-unicos');
   } catch (error) {
     logger.error('Error al actualizar gasto único:', { error });
     const refData = await getReferenceData();
     res.render('gastosUnicos/editar', {
-      error: 'Error al actualizar el gasto único',
+      error: error.message,
       gasto: { ...req.body, id: req.params.id },
       ...refData
     });

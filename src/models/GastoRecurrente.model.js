@@ -49,9 +49,19 @@ export function defineGastoRecurrente(sequelize) {
         model: 'tarjetas',
         key: 'id'
       }
+    },
+    activo: { 
+      type: DataTypes.BOOLEAN, 
+      allowNull: false, 
+      defaultValue: true 
+    },
+    ultima_fecha_generado: { 
+      type: DataTypes.DATEONLY, 
+      allowNull: true,
+      comment: 'Última fecha en que se generó un gasto a partir de este gasto recurrente'
     }
   }, {
     tableName: 'gastos_recurrentes',
-    timestamps: false,
+    timestamps: true,
   });
 }
