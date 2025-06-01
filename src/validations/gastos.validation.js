@@ -6,8 +6,8 @@ export const gastoSchema = Joi.object({
     monto_usd: Joi.number(),
     descripcion: Joi.string().max(255).required(),
     categoria_gasto_id: Joi.number().integer().positive().required(),
-    frecuencia_gasto_id: Joi.number().integer().positive().required(),
-    tipo_pago_id: Joi.number().integer().positive().required(),
+    frecuencia_gasto_id: Joi.number().integer().positive(),
+    tipo_pago_id: Joi.number().integer().positive(),
     importancia_gasto_id: Joi.number().integer().positive().required()
 })
 

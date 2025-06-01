@@ -7,8 +7,8 @@ import {
     obtenerGastoPorId,
     eliminarGasto,
     actualizarGasto
-} from '../controllers/gastos.controller.js';
-import { validateCreateGastoMiddleware, validateGetGastosMiddleware, validateParamGastoIdMiddleware, validatePutGastoMiddleware } from '../middlewares/validateGastoMiddleware.js';
+} from '../../controllers/api/gastos.controller.js';
+import { validateCreateGastoMiddleware, validateGetGastosMiddleware, validateParamGastoIdMiddleware, validatePutGastoMiddleware } from '../../middlewares/validateGastoMiddleware.js';
 
 router.post('/gasto', validateCreateGastoMiddleware, crearGasto);
 router.put('/gasto/:id', validateParamGastoIdMiddleware, validatePutGastoMiddleware, actualizarGasto);

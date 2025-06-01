@@ -1,0 +1,81 @@
+<h1>Editar Compra</h1>
+
+<div class="row">
+  <div class="col-md-6">
+    <form id="editForm" method="POST" action="/compras/{{compra.id}}?_method=PUT" class="needs-validation" novalidate>
+      
+      <div class="mb-3">
+        <label class="form-label">Descripción:</label>
+        <input type="text" name="descripcion" class="form-control" value="{{compra.descripcion}}" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Monto total:</label>
+        <input type="number" name="monto_total" step="0.01" class="form-control" value="{{compra.monto_total}}" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Cantidad de cuotas:</label>
+        <input type="number" name="cantidad_cuotas" class="form-control" value="{{compra.cantidad_cuotas}}" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Fecha de compra:</label>
+        <input type="date" name="fecha_compra" class="form-control" value="{{compra.fecha_compra}}" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Categoría:</label>
+        <select name="categoria_gasto_id" class="form-select" required>
+          <option value="">Seleccione una categoría</option>
+          {{#each categorias}}
+            <option value="{{this.id}}" {{#if (eq this.id ../compra.categoria_gasto_id)}}selected{{/if}}>
+              {{this.nombre_categoria}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Importancia:</label>
+        <select name="importancia_gasto_id" class="form-select" required>
+          <option value="">Seleccione una importancia</option>
+          {{#each importancias}}
+            <option value="{{this.id}}" {{#if (eq this.id ../compra.importancia_gasto_id)}}selected{{/if}}>
+              {{this.nombre_importancia}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Tipo de pago:</label>
+        <select name="tipo_pago_id" class="form-select" required>
+          <option value="">Seleccione un tipo de pago</option>
+          {{#each tiposPago}}
+            <option value="{{this.id}}" {{#if (eq this.id ../compra.tipo_pago_id)}}selected{{/if}}>
+              {{this.nombre}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Tarjeta:</label>
+        <select name="tarjeta_id" class="form-select">
+          <option value="">Seleccione una tarjeta (opcional)</option>
+          {{#each tarjetas}}
+            <option value="{{this.id}}" {{#if (eq this.id ../compra.tarjeta_id)}}selected{{/if}}>
+              {{this.nombre}} - {{this.banco}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        <a href="/compras" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div> 

@@ -5,6 +5,13 @@ import { defineCategoriaGasto } from './CategoriaGasto.model.js';
 import { defineFrecuenciaGasto } from './FrecuenciaGasto.model.js';
 import { defineImportanciaGasto } from './ImportanciaGasto.model.js';
 import { setupAssociations } from './associations.js';
+import { defineCompra } from './Compra.model.js';
+import { defineDebitoAutomatico } from './DebitoAutomatico.model.js';
+import { defineGastoRecurrente } from './GastoRecurrente.model.js';
+import { defineGastoUnico } from './GastoUnico.model.js';
+import { defineTarjeta } from './Tarjeta.model.js';
+import { defineUsuario } from './Usuario.model.js';
+
 
 /*
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
@@ -15,9 +22,13 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
 */
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: './database.sqlite'
+  storage: './database.sqlite',
+  logging: console.log // Habilitar logging de SQL
 });
-await sequelize.sync({ alter: true })
+
+console.log('Sincronizando base de datos...');
+await sequelize.sync({ alter: true }); // Quitamos force: true para mantener los datos
+console.log('Base de datos sincronizada.');
 
 // Definimos los modelos
 const models = {
@@ -26,10 +37,19 @@ const models = {
   CategoriaGasto: defineCategoriaGasto(sequelize),
   FrecuenciaGasto: defineFrecuenciaGasto(sequelize),
   ImportanciaGasto: defineImportanciaGasto(sequelize),
+  Compra : defineCompra(sequelize),
+  DebitoAutomatico : defineDebitoAutomatico(sequelize),
+  GastoRecurrente : defineGastoRecurrente(sequelize),
+  GastoUnico : defineGastoUnico(sequelize),
+  Tarjeta : defineTarjeta(sequelize),
+  Usuario : defineUsuario(sequelize),
 };
 
 // Relacionamos los modelos
 setupAssociations(models);
 
 export { sequelize };
-export const { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto, ImportanciaGasto } = models;
+export const { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto,
+   ImportanciaGasto, Compra, DebitoAutomatico, GastoRecurrente,
+   GastoUnico, Tarjeta, Usuario
+ } = models;

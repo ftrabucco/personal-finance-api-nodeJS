@@ -6,15 +6,19 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
-    "reset-db": "node ./src/scripts/resetDatabase.js",
+    "reset-db": "node ./src/resetDatabase.js",
+    "seed-db": "node ./src/models/seed.js",
     "dev": "nodemon app.js"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "app_finanzas_v1": "file:",
     "express": "^5.1.0",
+    "express-handlebars": "^8.0.3",
     "joi": "^17.13.3",
+    "method-override": "^3.0.0",
     "mongoose": "^8.13.3",
     "nodemon": "^3.1.10",
     "sequelize": "^6.37.7",
