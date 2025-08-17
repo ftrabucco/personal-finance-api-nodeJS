@@ -183,14 +183,12 @@ export class GastoController extends BaseController {
 // Crear instancia del controlador
 const gastoController = new GastoController();
 
-// Exportar métodos del controlador
-export const {
-  getAll: obtenerTodosGastos,
-  getById: obtenerGastoPorId,
-  create: crearGasto,
-  update: actualizarGasto,
-  delete: eliminarGasto,
-  getWithFilters: obtenerGastosConFiltros,
-  getSummary: obtenerResumenGastos,
-  generatePendingGastos: generarGastosPendientes
-} = gastoController; 
+// Exportar métodos del controlador con el contexto correcto
+export const obtenerTodosGastos = gastoController.getAll.bind(gastoController);
+export const obtenerGastoPorId = gastoController.getById.bind(gastoController);
+export const crearGasto = gastoController.create.bind(gastoController);
+export const actualizarGasto = gastoController.update.bind(gastoController);
+export const eliminarGasto = gastoController.delete.bind(gastoController);
+export const obtenerGastosConFiltros = gastoController.getWithFilters.bind(gastoController);
+export const obtenerResumenGastos = gastoController.getSummary.bind(gastoController);
+export const generarGastosPendientes = gastoController.generatePendingGastos.bind(gastoController); 
