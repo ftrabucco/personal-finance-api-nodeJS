@@ -124,11 +124,9 @@ export class GastoRecurrenteController extends BaseController {
 // Crear instancia del controlador
 const gastoRecurrenteController = new GastoRecurrenteController();
 
-// Exportar métodos del controlador
-export const {
-  getAll: obtenerGastosRecurrentes,
-  getById: obtenerGastoRecurrentePorId,
-  create: crearGastoRecurrente,
-  update: actualizarGastoRecurrente,
-  delete: eliminarGastoRecurrente
-} = gastoRecurrenteController;
+// Exportar métodos del controlador con el contexto correcto
+export const obtenerGastosRecurrentes = gastoRecurrenteController.getAll.bind(gastoRecurrenteController);
+export const obtenerGastoRecurrentePorId = gastoRecurrenteController.getById.bind(gastoRecurrenteController);
+export const crearGastoRecurrente = gastoRecurrenteController.create.bind(gastoRecurrenteController);
+export const actualizarGastoRecurrente = gastoRecurrenteController.update.bind(gastoRecurrenteController);
+export const eliminarGastoRecurrente = gastoRecurrenteController.delete.bind(gastoRecurrenteController);

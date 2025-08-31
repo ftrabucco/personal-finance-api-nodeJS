@@ -39,7 +39,7 @@ export class CompraController extends BaseController {
       if (!this.validateCompraFields(req.body)) {
         return res.status(400).json({ 
           error: 'Campos inválidos',
-          details: 'Los campos monto y fecha son requeridos' 
+          details: 'Los campos monto_total y fecha_compra son requeridos' 
         });
       }
 
@@ -109,7 +109,7 @@ export class CompraController extends BaseController {
 
   // Validaciones específicas de Compra
   validateCompraFields(data) {
-    return data.monto && data.fecha;
+    return data.monto_total && data.fecha_compra;
   }
 
   validateCuotasUpdate(newCuotas, compra) {
@@ -124,11 +124,9 @@ export class CompraController extends BaseController {
 // Crear instancia del controlador
 const compraController = new CompraController();
 
-// Exportar métodos del controlador
-export const {
-  getAll: obtenerCompras,
-  getById: obtenerCompraPorId,
-  create: crearCompra,
-  update: actualizarCompra,
-  delete: eliminarCompra
-} = compraController; 
+// Exportar métodos del controlador con el contexto correcto
+export const obtenerCompras = compraController.getAll.bind(compraController);
+export const obtenerCompraPorId = compraController.getById.bind(compraController);
+export const crearCompra = compraController.create.bind(compraController);
+export const actualizarCompra = compraController.update.bind(compraController);
+export const eliminarCompra = compraController.delete.bind(compraController); 

@@ -125,11 +125,9 @@ export class DebitoAutomaticoController extends BaseController {
 // Crear instancia del controlador
 const debitoAutomaticoController = new DebitoAutomaticoController();
 
-// Exportar métodos del controlador
-export const {
-  getAll: obtenerDebitosAutomaticos,
-  getById: obtenerDebitoAutomaticoPorId,
-  create: crearDebitoAutomatico,
-  update: actualizarDebitoAutomatico,
-  delete: eliminarDebitoAutomatico
-} = debitoAutomaticoController;
+// Exportar métodos del controlador con el contexto correcto
+export const obtenerDebitosAutomaticos = debitoAutomaticoController.getAll.bind(debitoAutomaticoController);
+export const obtenerDebitoAutomaticoPorId = debitoAutomaticoController.getById.bind(debitoAutomaticoController);
+export const crearDebitoAutomatico = debitoAutomaticoController.create.bind(debitoAutomaticoController);
+export const actualizarDebitoAutomatico = debitoAutomaticoController.update.bind(debitoAutomaticoController);
+export const eliminarDebitoAutomatico = debitoAutomaticoController.delete.bind(debitoAutomaticoController);

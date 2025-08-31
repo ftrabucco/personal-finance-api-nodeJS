@@ -147,11 +147,9 @@ export class GastoUnicoController extends BaseController {
 // Crear instancia del controlador
 const gastoUnicoController = new GastoUnicoController();
 
-// Exportar métodos del controlador
-export const {
-  getAll: obtenerGastosUnicos,
-  getById: obtenerGastoUnicoPorId,
-  create: crearGastoUnico,
-  update: actualizarGastoUnico,
-  delete: eliminarGastoUnico
-} = gastoUnicoController;
+// Exportar métodos del controlador con el contexto correcto
+export const obtenerGastosUnicos = gastoUnicoController.getAll.bind(gastoUnicoController);
+export const obtenerGastoUnicoPorId = gastoUnicoController.getById.bind(gastoUnicoController);
+export const crearGastoUnico = gastoUnicoController.create.bind(gastoUnicoController);
+export const actualizarGastoUnico = gastoUnicoController.update.bind(gastoUnicoController);
+export const eliminarGastoUnico = gastoUnicoController.delete.bind(gastoUnicoController);
