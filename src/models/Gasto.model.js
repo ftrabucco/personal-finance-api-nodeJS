@@ -4,10 +4,42 @@ import { DataTypes } from 'sequelize';
 
 export function defineGasto(sequelize) {
   return sequelize.define('Gasto', {
-    fecha: { type: DataTypes.DATEONLY, allowNull: false },
-    monto_ars: { type: DataTypes.FLOAT },
-    monto_usd: { type: DataTypes.FLOAT },
-    descripcion: { type: DataTypes.STRING },
+    fecha: { 
+      type: DataTypes.DATEONLY, 
+      allowNull: false,
+      validate: {
+        isDate: true,
+        notFuture(value) {
+          if (new Date(value) > new Date()) {
+            throw new Error('La fecha no puede ser futura');
+          }
+        }
+      }
+    },
+    monto_ars: { 
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      validate: {
+        min: 0.01,
+        isDecimal: true
+      }
+    },
+    monto_usd: { 
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      validate: {
+        min: 0.01,
+        isDecimal: true
+      }
+    },
+    descripcion: { 
+      type: DataTypes.STRING(255), 
+      allowNull: false,
+      validate: {
+        notEmpty: true,
+        len: [3, 255]
+      }
+    },
     categoria_gasto_id: { 
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -32,8 +64,26 @@ export function defineGasto(sequelize) {
         key: 'id'
       }
     },
-    cantidad_cuotas_totales: { type: DataTypes.INTEGER, allowNull: true },
-    cantidad_cuotas_pagadas: { type: DataTypes.INTEGER, allowNull: true },
+    cantidad_cuotas_totales: { 
+      type: DataTypes.INTEGER, 
+      allowNull: true,
+      validate: {
+        min: 1,
+        max: 60
+      }
+    },
+    cantidad_cuotas_pagadas: { 
+      type: DataTypes.INTEGER, 
+      allowNull: true,
+      validate: {
+        min: 0,
+        isValidCuotaPagada(value) {
+          if (value && this.cantidad_cuotas_totales && value > this.cantidad_cuotas_totales) {
+            throw new Error('Las cuotas pagadas no pueden exceder las cuotas totales');
+          }
+        }
+      }
+    },
     tipo_pago_id: { 
       type: DataTypes.INTEGER,
       allowNull: true,

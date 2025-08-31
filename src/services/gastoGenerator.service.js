@@ -1,9 +1,11 @@
 import { Op } from 'sequelize';
 import { GastoRecurrente, DebitoAutomatico, Compra, GastoUnico, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../models/index.js';
+import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
 
 export class GastoGeneratorService {
   static async generateFromGastoUnico(gastoUnico) {
+    const transaction = await sequelize.transaction();
     try {
       // Crear gasto directamente desde gasto único
       const gasto = await Gasto.create({
@@ -16,18 +18,27 @@ export class GastoGeneratorService {
         tarjeta_id: gastoUnico.tarjeta_id,
         tipo_origen: 'unico',
         id_origen: gastoUnico.id
-      });
+      }, { transaction });
 
+      // Marcar como procesado
+      await gastoUnico.update({ procesado: true }, { transaction });
+
+      await transaction.commit();
       logger.info('Gasto generado desde gasto único:', { id: gasto.id, origen_id: gastoUnico.id });
       return gasto;
     } catch (error) {
+      await transaction.rollback();
       logger.error('Error al generar gasto desde gasto único:', { error, gastoUnico_id: gastoUnico.id });
       throw error;
     }
   }
 
   static async generateFromCompra(compra) {
+    const transaction = await sequelize.transaction();
     try {
+      const today = new Date();
+      const hoy = today.toISOString().split('T')[0];
+
       // Validate that all required foreign keys exist
       const missingKeys = [];
       if (!compra.categoria_gasto_id) missingKeys.push('categoria_gasto_id');
@@ -35,6 +46,7 @@ export class GastoGeneratorService {
       if (!compra.tipo_pago_id) missingKeys.push('tipo_pago_id');
       
       if (missingKeys.length > 0) {
+        await transaction.rollback();
         const error = new Error(`Missing required foreign keys: ${missingKeys.join(', ')}`);
         logger.error('Foreign key validation failed:', { 
           compra_id: compra.id,
@@ -44,10 +56,18 @@ export class GastoGeneratorService {
         throw error;
       }
 
-      // Si la compra no tiene cuotas, tratarla como gasto único
+      // Si la compra no tiene cuotas, solo generar si es la fecha de compra
       if (!compra.cantidad_cuotas || compra.cantidad_cuotas === 1) {
+        const fechaCompra = compra.fecha_compra;
+        
+        // Solo generar si hoy es la fecha de compra
+        if (fechaCompra !== hoy) {
+          await transaction.rollback();
+          return null;
+        }
+
         const gasto = await Gasto.create({
-          fecha: compra.fecha_compra,
+          fecha: hoy,
           monto_ars: compra.monto_total,
           descripcion: compra.descripcion,
           categoria_gasto_id: compra.categoria_gasto_id,
@@ -58,40 +78,64 @@ export class GastoGeneratorService {
           id_origen: compra.id,
           cantidad_cuotas_totales: 1,
           cantidad_cuotas_pagadas: 1
-        });
+        }, { transaction });
 
         // Marcar la compra como completada
-        await compra.update({ pendiente_cuotas: false });
+        await compra.update({ pendiente_cuotas: false }, { transaction });
 
+        await transaction.commit();
         logger.info('Gasto generado desde compra sin cuotas:', { id: gasto.id, origen_id: compra.id });
         return gasto;
       }
 
-      // Verificar si ya existen gastos para esta compra
+      // Para compras en cuotas, verificar si hoy toca alguna cuota
       const gastosExistentes = await Gasto.count({
         where: {
           tipo_origen: 'compra',
           id_origen: compra.id
-        }
+        },
+        transaction
       });
 
-      // Si ya se generaron todas las cuotas, marcar como completada y no hacer nada más
+      // Si ya se generaron todas las cuotas, marcar como completada
       if (gastosExistentes >= compra.cantidad_cuotas) {
-        await compra.update({ pendiente_cuotas: false });
+        await compra.update({ pendiente_cuotas: false }, { transaction });
+        await transaction.commit();
         logger.info('Todas las cuotas ya fueron generadas para la compra:', { compra_id: compra.id });
         return null;
       }
 
-      // Calcular monto por cuota
-      const montoPorCuota = compra.monto_total / compra.cantidad_cuotas;
+      // Calcular la fecha de la próxima cuota que debería generarse
+      const fechaCompra = new Date(compra.fecha_compra);
+      const fechaProximaCuota = new Date(fechaCompra);
+      
+      // Agregar meses según el número de cuotas ya generadas
+      const targetMonth = fechaCompra.getMonth() + gastosExistentes;
+      const targetYear = fechaCompra.getFullYear() + Math.floor(targetMonth / 12);
+      const finalMonth = targetMonth % 12;
+      
+      fechaProximaCuota.setFullYear(targetYear);
+      fechaProximaCuota.setMonth(finalMonth);
+      
+      // Si el día original no existe en el mes destino, usar el último día del mes
+      const lastDayOfMonth = new Date(targetYear, finalMonth + 1, 0).getDate();
+      const targetDay = Math.min(fechaCompra.getDate(), lastDayOfMonth);
+      fechaProximaCuota.setDate(targetDay);
 
-      // Calcular fecha de la cuota
-      const fechaCuota = new Date(compra.fecha_compra);
-      fechaCuota.setMonth(fechaCuota.getMonth() + gastosExistentes);
+      const fechaProximaCuotaStr = fechaProximaCuota.toISOString().split('T')[0];
 
-      // Generar la siguiente cuota
+      // Solo generar si hoy es la fecha de la próxima cuota
+      if (hoy !== fechaProximaCuotaStr) {
+        await transaction.rollback();
+        return null;
+      }
+
+      // Calcular monto por cuota (redondeado a 2 decimales)
+      const montoPorCuota = Math.round((compra.monto_total / compra.cantidad_cuotas) * 100) / 100;
+
+      // Generar el gasto de la cuota que vence hoy
       const gasto = await Gasto.create({
-        fecha: fechaCuota,
+        fecha: hoy, // Siempre usar la fecha actual
         monto_ars: montoPorCuota,
         descripcion: `${compra.descripcion} (Cuota ${gastosExistentes + 1}/${compra.cantidad_cuotas})`,
         categoria_gasto_id: compra.categoria_gasto_id,
@@ -102,22 +146,26 @@ export class GastoGeneratorService {
         id_origen: compra.id,
         cantidad_cuotas_totales: compra.cantidad_cuotas,
         cantidad_cuotas_pagadas: gastosExistentes + 1
-      });
+      }, { transaction });
 
       // Si esta fue la última cuota, marcar como completada
       if (gastosExistentes + 1 >= compra.cantidad_cuotas) {
-        await compra.update({ pendiente_cuotas: false });
+        await compra.update({ pendiente_cuotas: false }, { transaction });
       }
 
+      await transaction.commit();
       logger.info('Gasto generado desde compra en cuotas:', { 
         id: gasto.id, 
         origen_id: compra.id,
         cuota: gastosExistentes + 1,
         total_cuotas: compra.cantidad_cuotas,
-        fecha: fechaCuota
+        fecha_vencimiento_original: fechaProximaCuotaStr,
+        fecha_gasto: hoy,
+        monto: montoPorCuota
       });
       return gasto;
     } catch (error) {
+      await transaction.rollback();
       logger.error('Error al generar gasto desde compra:', { 
         error, 
         compra_id: compra.id,
@@ -128,19 +176,65 @@ export class GastoGeneratorService {
   }
 
   static async generateFromGastoRecurrente(gastoRecurrente) {
+    const transaction = await sequelize.transaction();
     try {
       const today = new Date();
       const diaHoy = today.getDate();
+      const hoy = today.toISOString().split('T')[0];
 
-      // Si no es el día de pago o ya se generó hoy, no hacer nada
-      if (diaHoy !== gastoRecurrente.dia_de_pago || 
-          (gastoRecurrente.ultima_fecha_generado && 
-           gastoRecurrente.ultima_fecha_generado === today.toISOString().split('T')[0])) {
+      // Verificar si es el día de pago
+      if (diaHoy !== gastoRecurrente.dia_de_pago) {
+        await transaction.rollback();
         return null;
       }
 
+      // Si ya se generó hoy, no hacer nada
+      if (gastoRecurrente.ultima_fecha_generado === hoy) {
+        await transaction.rollback();
+        return null;
+      }
+
+      // Verificar si debe generar según la frecuencia
+      if (gastoRecurrente.ultima_fecha_generado) {
+        const ultimaFecha = new Date(gastoRecurrente.ultima_fecha_generado);
+        const diasTranscurridos = Math.floor((today - ultimaFecha) / (1000 * 60 * 60 * 24));
+        
+        // Obtener información de frecuencia (asumiendo que existe una relación)
+        const frecuencia = gastoRecurrente.frecuencia;
+        let diasRequeridos = 30; // Default mensual
+        
+        if (frecuencia) {
+          switch (frecuencia.nombre?.toLowerCase()) {
+            case 'semanal':
+              diasRequeridos = 7;
+              break;
+            case 'quincenal':
+              diasRequeridos = 15;
+              break;
+            case 'mensual':
+              diasRequeridos = 30;
+              break;
+            case 'bimestral':
+              diasRequeridos = 60;
+              break;
+            case 'trimestral':
+              diasRequeridos = 90;
+              break;
+            case 'anual':
+              diasRequeridos = 365;
+              break;
+          }
+        }
+
+        // Si no ha pasado suficiente tiempo, no generar
+        if (diasTranscurridos < diasRequeridos) {
+          await transaction.rollback();
+          return null;
+        }
+      }
+
       const gasto = await Gasto.create({
-        fecha: today,
+        fecha: hoy,
         monto_ars: gastoRecurrente.monto,
         descripcion: gastoRecurrente.descripcion,
         categoria_gasto_id: gastoRecurrente.categoria_gasto_id,
@@ -150,52 +244,89 @@ export class GastoGeneratorService {
         tarjeta_id: gastoRecurrente.tarjeta_id,
         tipo_origen: 'recurrente',
         id_origen: gastoRecurrente.id
-      });
+      }, { transaction });
 
       // Actualizar última fecha de generación
       await gastoRecurrente.update({
-        ultima_fecha_generado: today
-      });
+        ultima_fecha_generado: hoy
+      }, { transaction });
 
-      logger.info('Gasto generado desde gasto recurrente:', { id: gasto.id, origen_id: gastoRecurrente.id });
+      await transaction.commit();
+      logger.info('Gasto generado desde gasto recurrente:', { 
+        id: gasto.id, 
+        origen_id: gastoRecurrente.id,
+        frecuencia: gastoRecurrente.frecuencia?.nombre,
+        fecha: hoy
+      });
       return gasto;
     } catch (error) {
+      await transaction.rollback();
       logger.error('Error al generar gasto desde gasto recurrente:', { error, gastoRecurrente_id: gastoRecurrente.id });
       throw error;
     }
   }
 
   static async generateFromDebitoAutomatico(debitoAutomatico) {
+    const transaction = await sequelize.transaction();
     try {
       const today = new Date();
       const diaHoy = today.getDate();
+      const mesActual = today.getMonth();
+      const anioActual = today.getFullYear();
+      const hoy = today.toISOString().split('T')[0];
 
-      // Si no es el día de pago, no hacer nada
-      if (diaHoy !== debitoAutomatico.dia_de_pago) {
+      // Calcular el día efectivo de pago para este mes
+      // Si el día de pago es mayor que los días del mes actual, usar el último día
+      const ultimoDiaDelMes = new Date(anioActual, mesActual + 1, 0).getDate();
+      const diaEfectivoPago = Math.min(debitoAutomatico.dia_de_pago, ultimoDiaDelMes);
+
+      // Verificar si es el día de pago
+      if (diaHoy !== diaEfectivoPago) {
+        await transaction.rollback();
         return null;
       }
 
-      // Verificar si ya existe un gasto para este débito en el mes actual
-      const primerDiaMes = new Date(today.getFullYear(), today.getMonth(), 1);
-      const ultimoDiaMes = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      
-      const gastoExistente = await Gasto.findOne({
-        where: {
-          tipo_origen: 'debito',
-          id_origen: debitoAutomatico.id,
-          fecha: {
-            [Op.between]: [primerDiaMes, ultimoDiaMes]
+      // Si ya se generó este mes, no hacer nada
+      if (debitoAutomatico.ultimo_mes_generado === mesActual && 
+          debitoAutomatico.ultimo_anio_generado === anioActual) {
+        await transaction.rollback();
+        return null;
+      }
+
+      // Verificar frecuencia para débitos no mensuales
+      if (debitoAutomatico.frecuencia_gasto_id) {
+        // Obtener información de frecuencia
+        const frecuencia = await FrecuenciaGasto.findByPk(debitoAutomatico.frecuencia_gasto_id, { transaction });
+        
+        if (frecuencia && frecuencia.nombre?.toLowerCase() !== 'mensual') {
+          // Para frecuencias no mensuales, verificar si debe generar
+          if (debitoAutomatico.ultimo_mes_generado !== null && debitoAutomatico.ultimo_anio_generado !== null) {
+            const ultimaFecha = new Date(debitoAutomatico.ultimo_anio_generado, debitoAutomatico.ultimo_mes_generado, 1);
+            const mesesTranscurridos = (anioActual - ultimaFecha.getFullYear()) * 12 + (mesActual - ultimaFecha.getMonth());
+            
+            let mesesRequeridos = 1; // Default mensual
+            switch (frecuencia.nombre?.toLowerCase()) {
+              case 'bimestral':
+                mesesRequeridos = 2;
+                break;
+              case 'trimestral':
+                mesesRequeridos = 3;
+                break;
+              case 'anual':
+                mesesRequeridos = 12;
+                break;
+            }
+            
+            if (mesesTranscurridos < mesesRequeridos) {
+              await transaction.rollback();
+              return null;
+            }
           }
         }
-      });
-
-      if (gastoExistente) {
-        logger.info('Ya existe un gasto para este débito automático en el mes actual:', { debito_id: debitoAutomatico.id });
-        return null;
       }
 
       const gasto = await Gasto.create({
-        fecha: today,
+        fecha: hoy,
         monto_ars: debitoAutomatico.monto,
         descripcion: debitoAutomatico.descripcion,
         categoria_gasto_id: debitoAutomatico.categoria_gasto_id,
@@ -203,19 +334,33 @@ export class GastoGeneratorService {
         frecuencia_gasto_id: debitoAutomatico.frecuencia_gasto_id,
         tipo_pago_id: debitoAutomatico.tipo_pago_id,
         tarjeta_id: debitoAutomatico.tarjeta_id,
-        tipo_origen: 'debito',
+        tipo_origen: 'debito_automatico',
         id_origen: debitoAutomatico.id
-      });
+      }, { transaction });
 
-      logger.info('Gasto generado desde débito automático:', { id: gasto.id, origen_id: debitoAutomatico.id });
+      // Actualizar último mes y año de generación
+      await debitoAutomatico.update({
+        ultimo_mes_generado: mesActual,
+        ultimo_anio_generado: anioActual
+      }, { transaction });
+
+      await transaction.commit();
+      logger.info('Gasto generado desde débito automático:', { 
+        id: gasto.id, 
+        origen_id: debitoAutomatico.id,
+        dia_efectivo_pago: diaEfectivoPago,
+        mes: mesActual,
+        anio: anioActual
+      });
       return gasto;
     } catch (error) {
+      await transaction.rollback();
       logger.error('Error al generar gasto desde débito automático:', { error, debitoAutomatico_id: debitoAutomatico.id });
       throw error;
     }
   }
 
-  static async generateAllPendingGastos() {
+  static async generatePendingExpenses() {
     const results = {
       success: [],
       errors: []
@@ -305,7 +450,6 @@ export class GastoGeneratorService {
           const gasto = await this.generateFromGastoUnico(gastoUnico);
           if (gasto) {
             results.success.push({ type: 'unico', id: gasto.id });
-            await gastoUnico.update({ procesado: true });
           }
         } catch (error) {
           results.errors.push({ type: 'unico', id: gastoUnico.id, error: error.message });

@@ -12,23 +12,22 @@ import { defineGastoUnico } from './GastoUnico.model.js';
 import { defineTarjeta } from './Tarjeta.model.js';
 import { defineUsuario } from './Usuario.model.js';
 
-
-/*
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-  host: process.env.DB_HOST,
-  dialect: 'postgres', // o el que uses
-  logging: false,
-});
-*/
+// Configuración para PostgreSQL
 const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: './database.sqlite',
-  logging: console.log // Habilitar logging de SQL
+  dialect: 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'finanzas_personal',
+  username: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres123',
+  schema: 'finanzas',
+  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  define: {
+    timestamps: true,
+    underscored: true,
+    schema: 'finanzas'
+  }
 });
-
-console.log('Sincronizando base de datos...');
-await sequelize.sync({ alter: true }); // Quitamos force: true para mantener los datos
-console.log('Base de datos sincronizada.');
 
 // Definimos los modelos
 const models = {
@@ -37,19 +36,28 @@ const models = {
   CategoriaGasto: defineCategoriaGasto(sequelize),
   FrecuenciaGasto: defineFrecuenciaGasto(sequelize),
   ImportanciaGasto: defineImportanciaGasto(sequelize),
-  Compra : defineCompra(sequelize),
-  DebitoAutomatico : defineDebitoAutomatico(sequelize),
-  GastoRecurrente : defineGastoRecurrente(sequelize),
-  GastoUnico : defineGastoUnico(sequelize),
-  Tarjeta : defineTarjeta(sequelize),
-  Usuario : defineUsuario(sequelize),
+  Compra: defineCompra(sequelize),
+  DebitoAutomatico: defineDebitoAutomatico(sequelize),
+  GastoRecurrente: defineGastoRecurrente(sequelize),
+  GastoUnico: defineGastoUnico(sequelize),
+  Tarjeta: defineTarjeta(sequelize),
+  Usuario: defineUsuario(sequelize),
 };
 
 // Relacionamos los modelos
 setupAssociations(models);
 
 export { sequelize };
-export const { Gasto, TipoPago, CategoriaGasto, FrecuenciaGasto,
-   ImportanciaGasto, Compra, DebitoAutomatico, GastoRecurrente,
-   GastoUnico, Tarjeta, Usuario
- } = models;
+export const { 
+  Gasto, 
+  TipoPago, 
+  CategoriaGasto, 
+  FrecuenciaGasto,
+  ImportanciaGasto, 
+  Compra, 
+  DebitoAutomatico, 
+  GastoRecurrente,
+  GastoUnico, 
+  Tarjeta, 
+  Usuario 
+} = models;

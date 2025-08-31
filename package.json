@@ -4,25 +4,39 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "test:debug": "node --inspect-brk --experimental-vm-modules node_modules/.bin/jest --runInBand",
+    "test:setup": "cp env.test .env.test && npm run docker:up && sleep 30 && npm run seed-db:test",
     "start": "node app.js",
-    "reset-db": "node ./src/resetDatabase.js",
-    "seed-db": "node ./src/models/seed.js",
-    "dev": "nodemon app.js"
+    "reset-db": "docker-compose down -v && docker-compose up -d",
+    "seed-db": "node ./src/db/seed.js",
+    "seed-db:test": "NODE_ENV=test node ./src/db/seed.js",
+    "dev": "nodemon app.js",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:restart": "docker-compose restart",
+    "db:migrate": "node ./src/db/migrate.js"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "app_finanzas_v1": "file:",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "express-handlebars": "^8.0.3",
     "joi": "^17.13.3",
     "method-override": "^3.0.0",
-    "mongoose": "^8.13.3",
     "nodemon": "^3.1.10",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7",
-    "sqlite3": "^5.1.7",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "jest": "^30.0.5",
+    "supertest": "^7.1.4"
   }
 }

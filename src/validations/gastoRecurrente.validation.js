@@ -3,17 +3,25 @@ import Joi from 'joi';
 export const createGastoRecurrenteSchema = Joi.object({
   descripcion: Joi.string().required(),
   monto: Joi.number().positive().required(),
-  frecuencia: Joi.string().valid('mensual', 'semanal', 'diaria').required(),
-  categoria_id: Joi.number().integer().required(),
-  importancia_id: Joi.number().integer().required(),
-  tipo_pago_id: Joi.number().integer().required(),
+  dia_de_pago: Joi.number().integer().min(1).max(31).required(),
+  fecha_inicio: Joi.date().iso().required(),
+  frecuencia_gasto_id: Joi.number().integer().positive().required(),
+  categoria_gasto_id: Joi.number().integer().positive().required(),
+  importancia_gasto_id: Joi.number().integer().positive().required(),
+  tipo_pago_id: Joi.number().integer().positive().required(),
+  tarjeta_id: Joi.number().integer().positive().optional(),
+  activo: Joi.boolean().default(true)
 });
 
 export const updateGastoRecurrenteSchema = Joi.object({
   descripcion: Joi.string(),
   monto: Joi.number().positive(),
-  frecuencia: Joi.string().valid('mensual', 'semanal', 'diaria'),
-  categoria_id: Joi.number().integer(),
-  importancia_id: Joi.number().integer(),
-  tipo_pago_id: Joi.number().integer(),
+  dia_de_pago: Joi.number().integer().min(1).max(31),
+  fecha_inicio: Joi.date().iso(),
+  frecuencia_gasto_id: Joi.number().integer().positive(),
+  categoria_gasto_id: Joi.number().integer().positive(),
+  importancia_gasto_id: Joi.number().integer().positive(),
+  tipo_pago_id: Joi.number().integer().positive(),
+  tarjeta_id: Joi.number().integer().positive(),
+  activo: Joi.boolean()
 });

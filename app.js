@@ -1,6 +1,6 @@
 import express, { json } from 'express';
 const app = express();
-import sequelize from './src/db.js';
+import { connectDatabase } from './src/db/postgres.js';
 import apiRouter from './src/routes/api/index.routes.js';
 import viewRouter from './src/routes/views/index.routes.js';
 import { errorMiddleware } from './src/middlewares/errorMiddleware.js';
@@ -40,17 +40,24 @@ app.use('/', viewRouter);
 
 app.use(errorMiddleware);
 
-// Iniciar servidor y sincronizar base de datos
+// Iniciar servidor y conectar a PostgreSQL
 const PORT = process.env.PORT || 3030;
-sequelize.sync({ force: false }) // cambia a true si querés reiniciar la DB
-  .then(() => {
-    logger.info('Base de datos conectada');
+
+async function startServer() {
+  try {
+    // Conectar a PostgreSQL
+    await connectDatabase();
+    
+    // Iniciar servidor
     app.listen(PORT, () => {
       logger.info(`Servidor corriendo en http://localhost:${PORT}`);
     });
-  })
-  .catch(err => {
-    logger.error('Error al conectar a la base de datos:', err);
-  });
+  } catch (error) {
+    logger.error('Error al iniciar el servidor:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
   

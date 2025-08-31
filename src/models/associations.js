@@ -29,6 +29,9 @@ export function setupAssociations(models) {
   Gasto.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(Gasto, { foreignKey: 'usuario_id', as: 'gastos' });
 
+  Gasto.belongsTo(Tarjeta, { foreignKey: 'tarjeta_id', as: 'tarjeta' });
+  Tarjeta.hasMany(Gasto, { foreignKey: 'tarjeta_id', as: 'gastos' });
+
   // Compra
   Compra.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPago' });
   TipoPago.hasMany(Compra, { foreignKey: 'tipo_pago_id', as: 'compras' });
