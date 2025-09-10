@@ -10,6 +10,8 @@ import exphbs from 'express-handlebars';
 import path from 'path';
 import { helpers } from './src/utils/handlebars.helpers.js';
 import methodOverride from 'method-override';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
 
 // Configuración para Handlebars
 const hbs = exphbs.create({
@@ -31,6 +33,10 @@ app.use(methodOverride('_method'));
 
 app.use(json());
 app.use(requestLogger);
+
+// Configuración Swagger
+const swaggerDocument = YAML.load('./memoria/swagger_gastos.yaml');
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // API Routes (JSON endpoints)
 app.use('/api', apiRouter);

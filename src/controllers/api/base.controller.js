@@ -1,4 +1,5 @@
 import logger from '../../utils/logger.js';
+import { sendError, sendSuccess, sendValidationError } from '../../utils/responseHelper.js';
 
 export class BaseController {
   constructor(model, modelName) {
@@ -26,13 +27,10 @@ export class BaseController {
       const items = await this.model.findAll({
         include: this.getIncludes()
       });
-      return res.json(items);
+      return sendSuccess(res, items);
     } catch (error) {
       logger.error(`Error al obtener ${this.modelName}:`, { error });
-      return res.status(500).json({ 
-        error: `Error al obtener ${this.modelName}`,
-        details: error.message 
-      });
+      return sendError(res, 500, `Error al obtener ${this.modelName}`, error.message);
     }
   }
 
@@ -44,18 +42,13 @@ export class BaseController {
       });
       
       if (!item) {
-        return res.status(404).json({ 
-          error: `${this.modelName} no encontrado` 
-        });
+        return sendError(res, 404, `${this.modelName} no encontrado`);
       }
       
-      return res.json(item);
+      return sendSuccess(res, item);
     } catch (error) {
       logger.error(`Error al obtener ${this.modelName}:`, { error });
-      return res.status(500).json({ 
-        error: `Error al obtener ${this.modelName}`,
-        details: error.message 
-      });
+      return sendError(res, 500, `Error al obtener ${this.modelName}`, error.message);
     }
   }
 
@@ -71,13 +64,10 @@ export class BaseController {
       const item = await this.model.create(req.body);
       logger.info(`${this.modelName} creado:`, { id: item.id });
       
-      return res.status(201).json(item);
+      return sendSuccess(res, item, 201);
     } catch (error) {
       logger.error(`Error al crear ${this.modelName}:`, { error });
-      return res.status(500).json({ 
-        error: `Error al crear ${this.modelName}`,
-        details: error.message 
-      });
+      return sendError(res, 500, `Error al crear ${this.modelName}`, error.message);
     }
   }
 
@@ -86,27 +76,22 @@ export class BaseController {
     try {
       const item = await this.model.findByPk(req.params.id);
       if (!item) {
-        return res.status(404).json({ 
-          error: `${this.modelName} no encontrado` 
-        });
+        return sendError(res, 404, `${this.modelName} no encontrado`);
       }
 
       // Validar IDs existentes
       const validationErrors = await this.validateExistingIds(req.body, this.getRelationships());
       if (validationErrors.length > 0) {
-        return res.status(400).json({ errors: validationErrors });
+        return sendValidationError(res, validationErrors);
       }
 
       await item.update(req.body);
       logger.info(`${this.modelName} actualizado:`, { id: item.id });
       
-      return res.json(item);
+      return sendSuccess(res, item);
     } catch (error) {
       logger.error(`Error al actualizar ${this.modelName}:`, { error });
-      return res.status(500).json({ 
-        error: `Error al actualizar ${this.modelName}`,
-        details: error.message 
-      });
+      return sendError(res, 500, `Error al actualizar ${this.modelName}`, error.message);
     }
   }
 
@@ -123,15 +108,10 @@ export class BaseController {
       await item.destroy();
       logger.info(`${this.modelName} eliminado:`, { id: req.params.id });
       
-      return res.json({ 
-        message: `${this.modelName} eliminado correctamente` 
-      });
+      return sendSuccess(res, { message: `${this.modelName} eliminado correctamente` });
     } catch (error) {
       logger.error(`Error al eliminar ${this.modelName}:`, { error });
-      return res.status(500).json({ 
-        error: `Error al eliminar ${this.modelName}`,
-        details: error.message 
-      });
+      return sendError(res, 500, `Error al eliminar ${this.modelName}`, error.message);
     }
   }
 
