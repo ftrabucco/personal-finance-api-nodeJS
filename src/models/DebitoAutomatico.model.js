@@ -8,8 +8,14 @@ export function defineDebitoAutomatico(sequelize) {
       autoIncrement: true,
     },
     descripcion: { type: DataTypes.STRING, allowNull: false },
-    monto: { type: DataTypes.FLOAT, allowNull: false },
-    dia_de_pago: { type: DataTypes.INTEGER, allowNull: false }, // Día del mes que se debita
+    monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    dia_de_pago: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1, max: 31 } }, // Día del mes que se debita
+    mes_de_pago: { 
+      type: DataTypes.INTEGER, 
+      allowNull: true,
+      validate: { min: 1, max: 12 },
+      comment: 'Mes de pago para débitos anuales (1-12). Null para otras frecuencias'
+    },
     categoria_gasto_id: { 
       type: DataTypes.INTEGER, 
       allowNull: false,
@@ -54,6 +60,11 @@ export function defineDebitoAutomatico(sequelize) {
       type: DataTypes.BOOLEAN, 
       allowNull: false, 
       defaultValue: true 
+    },
+    ultima_fecha_generado: { 
+      type: DataTypes.DATEONLY, 
+      allowNull: true,
+      comment: 'Última fecha en que se generó un gasto a partir de este débito automático'
     }
   }, {
     tableName: 'debitos_automaticos',

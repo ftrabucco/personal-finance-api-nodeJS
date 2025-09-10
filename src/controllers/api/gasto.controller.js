@@ -3,6 +3,7 @@ import { Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaG
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
+import { sendError, sendSuccess, sendPaginatedSuccess } from '../../utils/responseHelper.js';
 
 export class GastoController extends BaseController {
   constructor() {
@@ -32,19 +33,31 @@ export class GastoController extends BaseController {
   // Método para generar todos los gastos pendientes
   async generatePendingGastos(req, res) {
     try {
-      const results = await GastoGeneratorService.generateAllPendingGastos();
-      logger.info('Generación de gastos completada', { results });
+      logger.info('Iniciando generación automática de gastos pendientes...');
+      const results = await GastoGeneratorService.generatePendingExpenses();
       
-      return res.json({
-        message: 'Generación de gastos completada',
-        results
-      });
+      const summary = {
+        total_generated: results.success.length,
+        total_errors: results.errors.length,
+        breakdown: {
+          recurrentes: results.success.filter(r => r.type === 'recurrente').length,
+          debitos: results.success.filter(r => r.type === 'debito').length,
+          compras: results.success.filter(r => r.type === 'compra').length,
+          unicos: results.success.filter(r => r.type === 'unico').length
+        }
+      };
+
+      logger.info('Generación de gastos completada exitosamente', { summary });
+      
+      const responseData = {
+        summary,
+        details: results
+      };
+
+      return sendSuccess(res, responseData, 200, 'Generación de gastos completada exitosamente');
     } catch (error) {
-      logger.error('Error en la generación de gastos:', { error });
-      return res.status(500).json({
-        error: 'Error al generar gastos',
-        details: error.message
-      });
+      logger.error('Error en la generación automática de gastos:', { error });
+      return sendError(res, 500, 'Error al generar gastos pendientes', error.message);
     }
   }
 
@@ -61,7 +74,11 @@ export class GastoController extends BaseController {
         monto_min_ars,
         monto_max_ars,
         monto_min_usd,
-        monto_max_usd
+        monto_max_usd,
+        limit,
+        offset = 0,
+        orderBy = 'fecha',
+        orderDirection = 'DESC'
       } = req.query;
 
       const where = {};
@@ -93,19 +110,33 @@ export class GastoController extends BaseController {
         if (monto_max_usd) where.monto_usd[Op.lte] = Number(monto_max_usd);
       }
 
-      const gastos = await this.model.findAll({
+      const queryOptions = {
         where,
         include: this.getIncludes(),
-        order: [['fecha', 'DESC']]
-      });
+        order: [[orderBy, orderDirection]]
+      };
 
-      return res.json(gastos);
+      if (limit) {
+        queryOptions.limit = parseInt(limit);
+        queryOptions.offset = parseInt(offset);
+        
+        const gastos = await this.model.findAndCountAll(queryOptions);
+        const pagination = {
+          total: gastos.count,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasNext: parseInt(offset) + parseInt(limit) < gastos.count,
+          hasPrev: parseInt(offset) > 0
+        };
+        
+        return sendPaginatedSuccess(res, gastos.rows, pagination);
+      } else {
+        const gastos = await this.model.findAll(queryOptions);
+        return sendSuccess(res, gastos);
+      }
     } catch (error) {
       logger.error('Error al obtener gastos con filtros:', { error });
-      return res.status(500).json({
-        error: 'Error al obtener gastos',
-        details: error.message
-      });
+      return sendError(res, 500, 'Error al obtener gastos', error.message);
     }
   }
 
@@ -168,19 +199,18 @@ export class GastoController extends BaseController {
         offset: parseInt(offset)
       });
 
-      return res.json({
-        gastos: gastos.rows,
+      const pagination = {
         total: gastos.count,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        filtros_aplicados: req.body
-      });
+        hasNext: parseInt(offset) + parseInt(limit) < gastos.count,
+        hasPrev: parseInt(offset) > 0
+      };
+
+      return sendPaginatedSuccess(res, gastos.rows, pagination);
     } catch (error) {
       logger.error('Error en búsqueda de gastos:', { error });
-      return res.status(500).json({
-        error: 'Error en búsqueda de gastos',
-        details: error.message
-      });
+      return sendError(res, 500, 'Error en búsqueda de gastos', error.message);
     }
   }
 
@@ -268,13 +298,10 @@ export class GastoController extends BaseController {
         resumen.por_tipo_pago[tipoKey].cantidad++;
       });
 
-      return res.json(resumen);
+      return sendSuccess(res, resumen);
     } catch (error) {
       logger.error('Error al obtener resumen de gastos:', { error });
-      return res.status(500).json({
-        error: 'Error al obtener resumen de gastos',
-        details: error.message
-      });
+      return sendError(res, 500, 'Error al obtener resumen de gastos', error.message);
     }
   }
 }

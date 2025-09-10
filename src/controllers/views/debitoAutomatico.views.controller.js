@@ -1,5 +1,50 @@
 import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
+import { DebitoAutomaticoController } from '../api/debitoAutomatico.controller.js';
 import logger from '../../utils/logger.js';
+
+// Instancia del API controller para reutilizar lógica de business rules
+const apiController = new DebitoAutomaticoController();
+
+// Helper para capturar respuestas del API controller
+function createMockResponse() {
+  let result = {};
+  return {
+    status: (code) => ({
+      json: (data) => { result = { status: code, data }; return result; }
+    }),
+    json: (data) => { result = { status: 200, data }; return result; },
+    getResult: () => result
+  };
+}
+
+// Helper para limpiar datos del formulario antes de enviar al API
+function cleanFormData(body) {
+  const cleaned = { ...body };
+  
+  // Convertir strings vacíos a null para campos opcionales
+  if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
+    cleaned.tarjeta_id = null;
+  }
+  if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
+    cleaned.mes_de_pago = null;
+  }
+  
+  // Asegurar tipos numéricos correctos
+  if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
+  if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
+  if (cleaned.mes_de_pago) cleaned.mes_de_pago = parseInt(cleaned.mes_de_pago);
+  if (cleaned.categoria_gasto_id) cleaned.categoria_gasto_id = parseInt(cleaned.categoria_gasto_id);
+  if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
+  if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
+  if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
+  if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
+  
+  // Manejar checkbox de activo
+  if (cleaned.activo === 'on') cleaned.activo = true;
+  if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
+  
+  return cleaned;
+}
 
 // Helper function to get reference data for forms
 async function getReferenceData() {
@@ -97,65 +142,19 @@ export const renderFormEditarDebitoAutomatico = async (req, res) => {
 
 export const handleFormNuevoDebitoAutomatico = async (req, res) => {
   try {
-    const {
-      descripcion,
-      monto,
-      dia_de_pago,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      frecuencia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    } = req.body;
-
-    logger.debug('Datos recibidos:', {
-      descripcion,
-      monto,
-      dia_de_pago,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      frecuencia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    });
-
-    // Validar que los IDs existan antes de crear
-    const [categoria, importancia, frecuencia, tipoPago, tarjeta] = await Promise.all([
-      CategoriaGasto.findByPk(categoria_gasto_id),
-      ImportanciaGasto.findByPk(importancia_gasto_id),
-      FrecuenciaGasto.findByPk(frecuencia_gasto_id),
-      TipoPago.findByPk(tipo_pago_id),
-      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
-    ]);
-
-    if (!categoria) {
-      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
+    // Limpiar datos del formulario
+    const cleanData = cleanFormData(req.body);
+    
+    // Usar el API controller para crear el débito automático
+    const mockRes = createMockResponse();
+    await apiController.create({ body: cleanData }, mockRes);
+    const result = mockRes.getResult();
+    
+    if (result.status !== 201) {
+      throw new Error(result.data.message || 'Error al crear débito automático');
     }
-    if (!importancia) {
-      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
-    }
-    if (!frecuencia) {
-      throw new Error(`La frecuencia con ID ${frecuencia_gasto_id} no existe`);
-    }
-    if (!tipoPago) {
-      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
-    }
-    if (tarjeta_id && !tarjeta) {
-      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
-    }
-
-    const nuevoDebito = await DebitoAutomatico.create({
-      descripcion,
-      monto: parseFloat(monto),
-      dia_de_pago: parseInt(dia_de_pago),
-      categoria_gasto_id: parseInt(categoria_gasto_id),
-      importancia_gasto_id: parseInt(importancia_gasto_id),
-      frecuencia_gasto_id: parseInt(frecuencia_gasto_id),
-      tipo_pago_id: parseInt(tipo_pago_id),
-      tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
-    });
-
-    logger.info('Débito automático creado:', { id: nuevoDebito.id });
+    
+    logger.info('Débito automático creado desde vista:', { id: result.data.debitoAutomatico.id });
     res.redirect('/debitos-automaticos');
   } catch (error) {
     logger.error('Error al crear débito automático:', { error });
@@ -163,71 +162,26 @@ export const handleFormNuevoDebitoAutomatico = async (req, res) => {
     res.render('debitosAutomaticos/nuevo', {
       ...refData,
       error: error.message,
-      formData: req.body // Mantener los datos del formulario
+      formData: req.body
     });
   }
 };
 
 export const handleFormEditarDebitoAutomatico = async (req, res) => {
   try {
-    const debito = await DebitoAutomatico.findByPk(req.params.id);
-    if (!debito) {
-      return res.status(404).send('Débito automático no encontrado');
+    // Limpiar datos del formulario
+    const cleanData = cleanFormData(req.body);
+    
+    // Usar el API controller para actualizar el débito automático
+    const mockRes = createMockResponse();
+    await apiController.update({ params: req.params, body: cleanData }, mockRes);
+    const result = mockRes.getResult();
+    
+    if (result.status >= 400) {
+      throw new Error(result.data.message || 'Error al actualizar débito automático');
     }
-
-    const {
-      descripcion,
-      monto,
-      dia_de_pago,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      frecuencia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    } = req.body;
-
-    // Validar campos requeridos
-    if (!descripcion || !monto || !dia_de_pago || !categoria_gasto_id || !importancia_gasto_id || !frecuencia_gasto_id || !tipo_pago_id) {
-      throw new Error('Todos los campos son requeridos excepto tarjeta');
-    }
-
-    // Validar que los IDs existan antes de actualizar
-    const [categoria, importancia, frecuencia, tipoPago, tarjeta] = await Promise.all([
-      CategoriaGasto.findByPk(categoria_gasto_id),
-      ImportanciaGasto.findByPk(importancia_gasto_id),
-      FrecuenciaGasto.findByPk(frecuencia_gasto_id),
-      TipoPago.findByPk(tipo_pago_id),
-      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
-    ]);
-
-    if (!categoria) {
-      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
-    }
-    if (!importancia) {
-      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
-    }
-    if (!frecuencia) {
-      throw new Error(`La frecuencia con ID ${frecuencia_gasto_id} no existe`);
-    }
-    if (!tipoPago) {
-      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
-    }
-    if (tarjeta_id && !tarjeta) {
-      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
-    }
-
-    await debito.update({
-      descripcion,
-      monto: parseFloat(monto),
-      dia_de_pago: parseInt(dia_de_pago),
-      categoria_gasto_id: parseInt(categoria_gasto_id),
-      importancia_gasto_id: parseInt(importancia_gasto_id),
-      frecuencia_gasto_id: parseInt(frecuencia_gasto_id),
-      tipo_pago_id: parseInt(tipo_pago_id),
-      tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
-    });
-
-    logger.info('Débito automático actualizado:', { id: debito.id });
+    
+    logger.info('Débito automático actualizado desde vista:', { id: req.params.id });
     res.redirect('/debitos-automaticos');
   } catch (error) {
     logger.error('Error al actualizar débito automático:', { error });
@@ -242,12 +196,16 @@ export const handleFormEditarDebitoAutomatico = async (req, res) => {
 
 export const handleDeleteDebitoAutomatico = async (req, res) => {
   try {
-    const debito = await DebitoAutomatico.findByPk(req.params.id);
-    if (!debito) {
-      return res.status(404).send('Débito automático no encontrado');
+    // Usar el API controller para eliminar el débito automático
+    const mockRes = createMockResponse();
+    await apiController.delete({ params: req.params }, mockRes);
+    const result = mockRes.getResult();
+    
+    if (result.status >= 400) {
+      throw new Error(result.data.message || 'Error al eliminar débito automático');
     }
-    await debito.destroy();
-    logger.info('Débito automático eliminado:', { id: req.params.id });
+    
+    logger.info('Débito automático eliminado desde vista:', { id: req.params.id });
     res.redirect('/debitos-automaticos');
   } catch (error) {
     logger.error('Error al eliminar débito automático:', { error });

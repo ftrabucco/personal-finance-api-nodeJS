@@ -11,6 +11,12 @@ const sequelize = new Sequelize({
   password: process.env.DB_PASSWORD || 'postgres123',
   schema: 'finanzas',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  timezone: '-03:00', // Asegura que las fechas se manejen en la zona horaria de Argentina
+  dialectOptions: {
+    useUTC: false, // No usar UTC para las fechas
+    dateStrings: true, // Usar cadenas de fecha en lugar de objetos Date
+    typeCast: true // Permitir el casteo de tipos
+  },
   pool: {
     max: 5,
     min: 0,
@@ -20,7 +26,9 @@ const sequelize = new Sequelize({
   define: {
     timestamps: true,
     underscored: true,
-    schema: 'finanzas'
+    schema: 'finanzas',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
   }
 });
 

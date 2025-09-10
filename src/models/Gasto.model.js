@@ -67,6 +67,8 @@ export function defineGasto(sequelize) {
     cantidad_cuotas_totales: { 
       type: DataTypes.INTEGER, 
       allowNull: true,
+      defaultValue: null,
+      comment: 'Número total de cuotas para gastos a plazos',
       validate: {
         min: 1,
         max: 60
@@ -75,6 +77,8 @@ export function defineGasto(sequelize) {
     cantidad_cuotas_pagadas: { 
       type: DataTypes.INTEGER, 
       allowNull: true,
+      defaultValue: null,
+      comment: 'Número de cuotas ya pagadas para gastos a plazos',
       validate: {
         min: 0,
         isValidCuotaPagada(value) {
@@ -109,8 +113,9 @@ export function defineGasto(sequelize) {
       }
     },
     tipo_origen: { 
-      type: DataTypes.ENUM('recurrente', 'debito', 'compra', 'unico'),
-      allowNull: false 
+      type: DataTypes.ENUM('recurrente', 'debito_automatico', 'compra', 'unico'),
+      allowNull: false,
+      comment: 'Tipo de origen del gasto (recurrente, debito_automatico, compra, unico)'
     },
     id_origen: { 
       type: DataTypes.INTEGER,

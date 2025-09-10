@@ -1,4 +1,5 @@
 import { Op } from 'sequelize';
+import moment from 'moment-timezone';
 import { GastoRecurrente, DebitoAutomatico, Compra, GastoUnico, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../models/index.js';
 import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
@@ -7,9 +8,12 @@ export class GastoGeneratorService {
   static async generateFromGastoUnico(gastoUnico) {
     const transaction = await sequelize.transaction();
     try {
-      // Crear gasto directamente desde gasto único
+      // Usar la fecha ya formateada del gasto único (YYYY-MM-DD)
+      const fechaParaBD = new Date(gastoUnico.fecha).toISOString().split('T')[0];
+      
+      // Crear gasto directamente desde gasto único con la fecha formateada
       const gasto = await Gasto.create({
-        fecha: gastoUnico.fecha,
+        fecha: fechaParaBD,
         monto_ars: gastoUnico.monto,
         descripcion: gastoUnico.descripcion,
         categoria_gasto_id: gastoUnico.categoria_gasto_id,
@@ -18,7 +22,11 @@ export class GastoGeneratorService {
         tarjeta_id: gastoUnico.tarjeta_id,
         tipo_origen: 'unico',
         id_origen: gastoUnico.id
-      }, { transaction });
+      }, { 
+        transaction,
+        // Especificar campos para evitar problemas con Sequelize
+        fields: ['fecha', 'monto_ars', 'descripcion', 'categoria_gasto_id', 'importancia_gasto_id', 'tipo_pago_id', 'tarjeta_id', 'tipo_origen', 'id_origen']
+      });
 
       // Marcar como procesado
       await gastoUnico.update({ procesado: true }, { transaction });
@@ -56,18 +64,76 @@ export class GastoGeneratorService {
         throw error;
       }
 
-      // Si la compra no tiene cuotas, solo generar si es la fecha de compra
+      // Para compras de 1 cuota: diferentes lógicas según el tipo de pago
       if (!compra.cantidad_cuotas || compra.cantidad_cuotas === 1) {
-        const fechaCompra = compra.fecha_compra;
-        
-        // Solo generar si hoy es la fecha de compra
-        if (fechaCompra !== hoy) {
+        // Obtener información del tipo de pago y tarjeta
+        const tipoPago = compra.tipoPago || 
+          await TipoPago.findByPk(compra.tipo_pago_id, { transaction });
+        const tarjeta = compra.tarjeta || 
+          (compra.tarjeta_id ? await Tarjeta.findByPk(compra.tarjeta_id, { transaction }) : null);
+
+        let fechaGasto;
+        let debeGenerar = false;
+
+        // Determinar fecha de generación según tipo de pago
+        if (tipoPago?.nombre?.toLowerCase() === 'crédito' && tarjeta?.tipo === 'credito') {
+          // TARJETA DE CRÉDITO: generar en fecha de vencimiento
+          if (!tarjeta.dia_vencimiento) {
+            logger.error('Tarjeta de crédito sin día de vencimiento configurado:', { tarjeta_id: tarjeta.id });
+            await transaction.rollback();
+            return null;
+          }
+
+          // Calcular próxima fecha de vencimiento después de la compra
+          const fechaCompra = new Date(compra.fecha_compra);
+          const mesCompra = fechaCompra.getMonth();
+          const anioCompra = fechaCompra.getFullYear();
+          
+          // Si la compra es después del día de vencimiento, vence el mes siguiente
+          let mesVencimiento = mesCompra;
+          let anioVencimiento = anioCompra;
+          
+          if (fechaCompra.getDate() > tarjeta.dia_vencimiento) {
+            mesVencimiento += 1;
+            if (mesVencimiento > 11) {
+              mesVencimiento = 0;
+              anioVencimiento += 1;
+            }
+          }
+
+          const fechaVencimiento = new Date(anioVencimiento, mesVencimiento, tarjeta.dia_vencimiento);
+          fechaGasto = fechaVencimiento.toISOString().split('T')[0];
+          
+          // Solo generar si hoy es la fecha de vencimiento
+          debeGenerar = (hoy === fechaGasto);
+          
+          logger.debug('Compra con tarjeta de crédito:', {
+            compra_id: compra.id,
+            fecha_compra: compra.fecha_compra,
+            fecha_vencimiento: fechaGasto,
+            debe_generar: debeGenerar
+          });
+
+        } else {
+          // EFECTIVO/DÉBITO/TRANSFERENCIA: generar inmediatamente en fecha de compra
+          fechaGasto = compra.fecha_compra;
+          debeGenerar = (hoy === fechaGasto);
+          
+          logger.debug('Compra con pago inmediato:', {
+            compra_id: compra.id,
+            tipo_pago: tipoPago?.nombre,
+            fecha_compra: compra.fecha_compra,
+            debe_generar: debeGenerar
+          });
+        }
+
+        if (!debeGenerar) {
           await transaction.rollback();
           return null;
         }
 
         const gasto = await Gasto.create({
-          fecha: hoy,
+          fecha: fechaGasto,
           monto_ars: compra.monto_total,
           descripcion: compra.descripcion,
           categoria_gasto_id: compra.categoria_gasto_id,
@@ -84,7 +150,13 @@ export class GastoGeneratorService {
         await compra.update({ pendiente_cuotas: false }, { transaction });
 
         await transaction.commit();
-        logger.info('Gasto generado desde compra sin cuotas:', { id: gasto.id, origen_id: compra.id });
+        logger.info('Gasto generado desde compra de 1 cuota:', { 
+          id: gasto.id, 
+          origen_id: compra.id,
+          tipo_pago: tipoPago?.nombre,
+          fecha_gasto: fechaGasto,
+          es_credito: tipoPago?.nombre?.toLowerCase() === 'crédito'
+        });
         return gasto;
       }
 
@@ -178,14 +250,34 @@ export class GastoGeneratorService {
   static async generateFromGastoRecurrente(gastoRecurrente) {
     const transaction = await sequelize.transaction();
     try {
-      const today = new Date();
-      const diaHoy = today.getDate();
-      const hoy = today.toISOString().split('T')[0];
-
-      // Verificar si es el día de pago
-      if (diaHoy !== gastoRecurrente.dia_de_pago) {
+      if (!gastoRecurrente.activo) {
         await transaction.rollback();
         return null;
+      }
+
+      const today = new Date();
+      const diaHoy = today.getDate();
+      const mesHoy = today.getMonth() + 1; // getMonth() returns 0-11, we need 1-12
+      const hoy = today.toISOString().split('T')[0];
+
+      // Obtener información de frecuencia
+      const frecuencia = gastoRecurrente.frecuencia;
+      const nombreFrecuencia = frecuencia?.nombre?.toLowerCase() || 'mensual';
+
+      // Verificar día de pago según frecuencia
+      if (nombreFrecuencia === 'anual') {
+        // Para anual: verificar día Y mes específicos
+        if (diaHoy !== gastoRecurrente.dia_de_pago || 
+            mesHoy !== gastoRecurrente.mes_de_pago) {
+          await transaction.rollback();
+          return null;
+        }
+      } else {
+        // Para otras frecuencias: verificar solo día del mes
+        if (diaHoy !== gastoRecurrente.dia_de_pago) {
+          await transaction.rollback();
+          return null;
+        }
       }
 
       // Si ya se generó hoy, no hacer nada
@@ -194,42 +286,76 @@ export class GastoGeneratorService {
         return null;
       }
 
-      // Verificar si debe generar según la frecuencia
+      // Verificar si debe generar según la frecuencia y última fecha
       if (gastoRecurrente.ultima_fecha_generado) {
         const ultimaFecha = new Date(gastoRecurrente.ultima_fecha_generado);
-        const diasTranscurridos = Math.floor((today - ultimaFecha) / (1000 * 60 * 60 * 24));
         
-        // Obtener información de frecuencia (asumiendo que existe una relación)
-        const frecuencia = gastoRecurrente.frecuencia;
-        let diasRequeridos = 30; // Default mensual
-        
-        if (frecuencia) {
-          switch (frecuencia.nombre?.toLowerCase()) {
-            case 'semanal':
-              diasRequeridos = 7;
-              break;
-            case 'quincenal':
-              diasRequeridos = 15;
-              break;
-            case 'mensual':
-              diasRequeridos = 30;
-              break;
-            case 'bimestral':
-              diasRequeridos = 60;
-              break;
-            case 'trimestral':
-              diasRequeridos = 90;
-              break;
-            case 'anual':
-              diasRequeridos = 365;
-              break;
-          }
-        }
-
-        // Si no ha pasado suficiente tiempo, no generar
-        if (diasTranscurridos < diasRequeridos) {
-          await transaction.rollback();
-          return null;
+        switch (nombreFrecuencia) {
+          case 'semanal':
+            // Cada 7 días en el día específico de la semana
+            const diasTranscurridos = Math.floor((today - ultimaFecha) / (1000 * 60 * 60 * 24));
+            if (diasTranscurridos < 7) {
+              await transaction.rollback();
+              return null;
+            }
+            break;
+            
+          case 'quincenal':
+            // Cada 15 días
+            const diasQuincenal = Math.floor((today - ultimaFecha) / (1000 * 60 * 60 * 24));
+            if (diasQuincenal < 15) {
+              await transaction.rollback();
+              return null;
+            }
+            break;
+            
+          case 'mensual':
+            // Mismo día cada mes
+            const yaGeneradoEsteMes = ultimaFecha.getFullYear() === today.getFullYear() && 
+                                     ultimaFecha.getMonth() === today.getMonth();
+            if (yaGeneradoEsteMes) {
+              await transaction.rollback();
+              return null;
+            }
+            break;
+            
+          case 'bimestral':
+            // Cada 2 meses
+            const mesesBimestral = (today.getFullYear() - ultimaFecha.getFullYear()) * 12 + 
+                                  (today.getMonth() - ultimaFecha.getMonth());
+            if (mesesBimestral < 2) {
+              await transaction.rollback();
+              return null;
+            }
+            break;
+            
+          case 'trimestral':
+            // Cada 3 meses
+            const mesesTrimestral = (today.getFullYear() - ultimaFecha.getFullYear()) * 12 + 
+                                   (today.getMonth() - ultimaFecha.getMonth());
+            if (mesesTrimestral < 3) {
+              await transaction.rollback();
+              return null;
+            }
+            break;
+            
+          case 'anual':
+            // Mismo día y mes cada año
+            const yaGeneradoEsteAnio = ultimaFecha.getFullYear() === today.getFullYear();
+            if (yaGeneradoEsteAnio) {
+              await transaction.rollback();
+              return null;
+            }
+            break;
+            
+          default:
+            // Default mensual
+            const yaGeneradoMensual = ultimaFecha.getFullYear() === today.getFullYear() && 
+                                     ultimaFecha.getMonth() === today.getMonth();
+            if (yaGeneradoMensual) {
+              await transaction.rollback();
+              return null;
+            }
         }
       }
 
@@ -269,64 +395,98 @@ export class GastoGeneratorService {
   static async generateFromDebitoAutomatico(debitoAutomatico) {
     const transaction = await sequelize.transaction();
     try {
-      const today = new Date();
-      const diaHoy = today.getDate();
-      const mesActual = today.getMonth();
-      const anioActual = today.getFullYear();
-      const hoy = today.toISOString().split('T')[0];
+      // Configurar fecha de hoy en timezone Argentina
+      const today = moment().tz('America/Argentina/Buenos_Aires');
+      const diaHoy = today.date();
+      const mesHoy = today.month() + 1; // moment() months son 0-indexed
+      const anioHoy = today.year();
+      const fechaParaBD = today.format('YYYY-MM-DD');
 
-      // Calcular el día efectivo de pago para este mes
-      // Si el día de pago es mayor que los días del mes actual, usar el último día
-      const ultimoDiaDelMes = new Date(anioActual, mesActual + 1, 0).getDate();
-      const diaEfectivoPago = Math.min(debitoAutomatico.dia_de_pago, ultimoDiaDelMes);
+      logger.debug('Generando desde débito automático:', { 
+        debitoAutomatico_id: debitoAutomatico.id,
+        dia_hoy: diaHoy, 
+        mes_hoy: mesHoy,
+        dia_de_pago: debitoAutomatico.dia_de_pago,
+        mes_de_pago: debitoAutomatico.mes_de_pago
+      });
 
-      // Verificar si es el día de pago
-      if (diaHoy !== diaEfectivoPago) {
+      // Verificar si está activo
+      if (!debitoAutomatico.activo) {
+        logger.debug('Débito automático inactivo, no se genera gasto');
         await transaction.rollback();
         return null;
       }
 
-      // Si ya se generó este mes, no hacer nada
-      if (debitoAutomatico.ultimo_mes_generado === mesActual && 
-          debitoAutomatico.ultimo_anio_generado === anioActual) {
+      // Obtener información de frecuencia
+      const frecuencia = debitoAutomatico.frecuencia || 
+        await FrecuenciaGasto.findByPk(debitoAutomatico.frecuencia_gasto_id, { transaction });
+      
+      if (!frecuencia) {
+        logger.error('No se encontró información de frecuencia para débito automático:', { id: debitoAutomatico.id });
         await transaction.rollback();
         return null;
       }
 
-      // Verificar frecuencia para débitos no mensuales
-      if (debitoAutomatico.frecuencia_gasto_id) {
-        // Obtener información de frecuencia
-        const frecuencia = await FrecuenciaGasto.findByPk(debitoAutomatico.frecuencia_gasto_id, { transaction });
-        
-        if (frecuencia && frecuencia.nombre?.toLowerCase() !== 'mensual') {
-          // Para frecuencias no mensuales, verificar si debe generar
-          if (debitoAutomatico.ultimo_mes_generado !== null && debitoAutomatico.ultimo_anio_generado !== null) {
-            const ultimaFecha = new Date(debitoAutomatico.ultimo_anio_generado, debitoAutomatico.ultimo_mes_generado, 1);
-            const mesesTranscurridos = (anioActual - ultimaFecha.getFullYear()) * 12 + (mesActual - ultimaFecha.getMonth());
-            
-            let mesesRequeridos = 1; // Default mensual
-            switch (frecuencia.nombre?.toLowerCase()) {
-              case 'bimestral':
-                mesesRequeridos = 2;
-                break;
-              case 'trimestral':
-                mesesRequeridos = 3;
-                break;
-              case 'anual':
-                mesesRequeridos = 12;
-                break;
-            }
-            
-            if (mesesTranscurridos < mesesRequeridos) {
-              await transaction.rollback();
-              return null;
-            }
+      const nombreFrecuencia = frecuencia.nombre_frecuencia?.toLowerCase();
+      
+      // Verificar si debe generar según el tipo de frecuencia
+      let debeGenerar = false;
+      
+      switch (nombreFrecuencia) {
+        case 'semanal':
+          // Para semanal, calcular si es el día correcto de la semana
+          const diaSemanaPago = (debitoAutomatico.dia_de_pago % 7); // 1=lunes, 0=domingo
+          const diaSemanHoy = today.day(); // moment: 0=domingo, 1=lunes, etc.
+          debeGenerar = (diaSemanHoy === diaSemanaPago);
+          break;
+          
+        case 'mensual':
+          // Para mensual, verificar día del mes
+          const ultimoDiaDelMes = today.endOf('month').date();
+          const diaEfectivoPago = Math.min(debitoAutomatico.dia_de_pago, ultimoDiaDelMes);
+          debeGenerar = (diaHoy === diaEfectivoPago);
+          break;
+          
+        case 'anual':
+          // Para anual, debe coincidir día Y mes
+          if (!debitoAutomatico.mes_de_pago) {
+            logger.error('Débito automático anual requiere mes_de_pago:', { id: debitoAutomatico.id });
+            await transaction.rollback();
+            return null;
           }
-        }
+          
+          const ultimoDiaDelMesAnual = moment().month(debitoAutomatico.mes_de_pago - 1).endOf('month').date();
+          const diaEfectivoPagoAnual = Math.min(debitoAutomatico.dia_de_pago, ultimoDiaDelMesAnual);
+          
+          if (diaHoy !== diaEfectivoPagoAnual || mesHoy !== debitoAutomatico.mes_de_pago) {
+            await transaction.rollback();
+            return null;
+          }
+          debeGenerar = true;
+          break;
+          
+        default:
+          logger.error('Tipo de frecuencia no soportado:', { frecuencia: nombreFrecuencia });
+          await transaction.rollback();
+          return null;
       }
 
+      if (!debeGenerar) {
+        logger.debug('No es el momento de generar para este débito automático');
+        await transaction.rollback();
+        return null;
+      }
+
+      // Verificar si ya se generó hoy (evitar duplicados)
+      if (debitoAutomatico.ultima_fecha_generado === fechaParaBD) {
+        logger.debug('Ya se generó hoy para este débito automático');
+        await transaction.rollback();
+        return null;
+      }
+
+      // Crear el gasto real
       const gasto = await Gasto.create({
-        fecha: hoy,
+        fecha: fechaParaBD,
         monto_ars: debitoAutomatico.monto,
         descripcion: debitoAutomatico.descripcion,
         categoria_gasto_id: debitoAutomatico.categoria_gasto_id,
@@ -338,10 +498,9 @@ export class GastoGeneratorService {
         id_origen: debitoAutomatico.id
       }, { transaction });
 
-      // Actualizar último mes y año de generación
+      // Actualizar última fecha de generación
       await debitoAutomatico.update({
-        ultimo_mes_generado: mesActual,
-        ultimo_anio_generado: anioActual
+        ultima_fecha_generado: fechaParaBD
       }, { transaction });
 
       await transaction.commit();
@@ -409,13 +568,10 @@ export class GastoGeneratorService {
         }
       }
 
-      // Procesar solo compras pendientes de cuotas
+      // Procesar solo compras pendientes (incluye 1 cuota y múltiples cuotas)
       const compras = await Compra.findAll({
         where: {
-          pendiente_cuotas: true,
-          cantidad_cuotas: {
-            [Op.gt]: 1
-          }
+          pendiente_cuotas: true
         },
         include: [
           { model: CategoriaGasto, as: 'categoria' },

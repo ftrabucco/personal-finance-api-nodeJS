@@ -1,0 +1,166 @@
+<div class="row mb-4">
+  <div class="col-12">
+    <h1>Panel de Control - {{mesActual}}</h1>
+  </div>
+</div>
+
+<!-- Resumen Financiero -->
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card text-white bg-primary mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Gastos del Mes</h5>
+        <h2 class="card-text">${{totalGastos}}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Próximos Vencimientos</h5>
+        <h2 class="card-text">{{proximosVencimientos.length}}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-white bg-info mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Categorías</h5>
+        <h2 class="card-text">{{totalCategorias}}</h2>
+        <p class="card-text small mb-0">
+          <small>{{datosGrafico.length}} con gastos este mes</small>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gráfico de Gastos por Categoría -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5>Distribución de Gastos por Categoría</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="gastosChart" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Próximos Vencimientos -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5>Próximos Vencimientos</h5>
+      </div>
+      <div class="card-body">
+        {{#if proximosVencimientos.length}}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Descripción</th>
+                  <th>Monto</th>
+                  <th>Fecha Vencimiento</th>
+                  <th>Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each proximosVencimientos}}
+                  <tr>
+                    <td>{{this.descripcion}}</td>
+                    <td>${{this.monto_ars}}</td>
+                    <td>{{this.fecha_vencimiento}}</td>
+                    <td>{{this.tipo}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </div>
+        {{else}}
+          <div class="alert alert-info">No hay vencimientos próximos.</div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Script para el gráfico -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('gastosChart').getContext('2d');
+    let datosGrafico;
+    
+    try {
+      // Intentar parsear los datos del gráfico
+      datosGrafico = typeof {{{datosGrafico}}} === 'string' 
+        ? JSON.parse({{{datosGrafico}}}) 
+        : {{{datosGrafico}}};
+      
+      // Asegurarse de que datosGrafico sea un array
+      if (!Array.isArray(datosGrafico)) {
+        console.error('Los datos del gráfico no son un array:', datosGrafico);
+        datosGrafico = [];
+      }
+    } catch (error) {
+      console.error('Error al procesar los datos del gráfico:', error);
+      datosGrafico = [];
+    }
+    
+    if (datosGrafico && datosGrafico.length > 0) {
+      // Asegurarse de que los montos sean números
+      const chartData = datosGrafico.map(item => ({
+        categoria: item.categoria || 'Sin categoría',
+        monto: parseFloat(item.monto) || 0
+      })).filter(item => item.monto > 0);
+      
+      if (chartData.length === 0) {
+        console.warn('No hay datos válidos para mostrar en el gráfico');
+        document.getElementById('gastosChart').parentNode.innerHTML = 
+          '<div class="alert alert-info">No hay datos de gastos para mostrar.</div>';
+        return;
+      }
+      
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: chartData.map(item => item.categoria),
+          datasets: [{
+            data: chartData.map(item => item.monto),
+            backgroundColor: [
+              '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+              '#5a5c69', '#858796', '#5a5c69', '#e74a3b', '#f6c23e'
+            ],
+            hoverBackgroundColor: ['#2e59d9', '#17a673', '#2c9faf'],
+            hoverBorderColor: 'rgba(234, 236, 244, 1)',
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw || 0;
+                  const total = context.dataset.data.reduce((a, b) => a + parseFloat(b), 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${label}: $${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        },
+      });
+    } else {
+      document.getElementById('gastosChart').parentNode.innerHTML = 
+        '<div class="alert alert-info">No hay datos de gastos para mostrar.</div>';
+    }
+  });
+</script>

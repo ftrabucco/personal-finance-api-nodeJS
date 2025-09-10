@@ -8,7 +8,7 @@ export function defineGastoUnico(sequelize) {
             autoIncrement: true,
         },
         descripcion: { type: DataTypes.STRING, allowNull: false },
-        monto: { type: DataTypes.FLOAT, allowNull: false },
+        monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
         fecha: { type: DataTypes.DATEONLY, allowNull: false },
         categoria_gasto_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'categorias_gasto', key: 'id' } },
         importancia_gasto_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'importancias_gasto', key: 'id' } },

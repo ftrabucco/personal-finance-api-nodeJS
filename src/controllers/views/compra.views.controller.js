@@ -1,5 +1,45 @@
 import { Compra, CategoriaGasto, ImportanciaGasto, Tarjeta, TipoPago } from '../../models/index.js';
+import { CompraController } from '../api/compra.controller.js';
 import logger from '../../utils/logger.js';
+
+// Instancia del API controller para reutilizar lógica de business rules
+const apiController = new CompraController();
+
+// Helper para capturar respuestas del API controller
+function createMockResponse() {
+  let result = {};
+  return {
+    status: (code) => ({
+      json: (data) => { result = { status: code, data }; return result; }
+    }),
+    json: (data) => { result = { status: 200, data }; return result; },
+    getResult: () => result
+  };
+}
+
+// Helper para limpiar datos del formulario antes de enviar al API
+function cleanFormData(body) {
+  const cleaned = { ...body };
+  
+  // Convertir strings vacíos a null para campos opcionales
+  if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
+    cleaned.tarjeta_id = null;
+  }
+  
+  // Asegurar tipos numéricos correctos
+  if (cleaned.monto_total) cleaned.monto_total = parseFloat(cleaned.monto_total);
+  if (cleaned.cantidad_cuotas) cleaned.cantidad_cuotas = parseInt(cleaned.cantidad_cuotas) || 1;
+  if (cleaned.categoria_gasto_id) cleaned.categoria_gasto_id = parseInt(cleaned.categoria_gasto_id);
+  if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
+  if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
+  if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
+  
+  // Manejar checkbox de pendiente_cuotas
+  if (cleaned.pendiente_cuotas === 'on') cleaned.pendiente_cuotas = true;
+  if (cleaned.pendiente_cuotas === '' || cleaned.pendiente_cuotas === undefined || cleaned.pendiente_cuotas === 'off') cleaned.pendiente_cuotas = false;
+  
+  return cleaned;
+}
 
 // Helper function to get reference data for forms
 async function getReferenceData() {
@@ -93,55 +133,19 @@ export const renderFormEditarCompra = async (req, res) => {
 
 export const handleFormNuevaCompra = async (req, res) => {
   try {
-    const {
-      descripcion,
-      monto_total,
-      cantidad_cuotas,
-      fecha_compra,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    } = req.body;
-
-    // Validar campos requeridos
-    if (!descripcion || !monto_total || !fecha_compra || !categoria_gasto_id || !importancia_gasto_id || !tipo_pago_id) {
-      throw new Error('Todos los campos son requeridos excepto tarjeta');
+    // Limpiar datos del formulario
+    const cleanData = cleanFormData(req.body);
+    
+    // Usar el API controller para crear la compra
+    const mockRes = createMockResponse();
+    await apiController.create({ body: cleanData }, mockRes);
+    const result = mockRes.getResult();
+    
+    if (result.status !== 201) {
+      throw new Error(result.data.message || 'Error al crear compra');
     }
-
-    // Validar que los IDs existan antes de crear
-    const [categoria, importancia, tipoPago, tarjeta] = await Promise.all([
-      CategoriaGasto.findByPk(categoria_gasto_id),
-      ImportanciaGasto.findByPk(importancia_gasto_id),
-      TipoPago.findByPk(tipo_pago_id),
-      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
-    ]);
-
-    if (!categoria) {
-      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
-    }
-    if (!importancia) {
-      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
-    }
-    if (!tipoPago) {
-      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
-    }
-    if (tarjeta_id && !tarjeta) {
-      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
-    }
-
-    const nuevaCompra = await Compra.create({
-      descripcion,
-      monto_total: parseFloat(monto_total),
-      cantidad_cuotas: parseInt(cantidad_cuotas || 1),
-      fecha_compra,
-      categoria_gasto_id: parseInt(categoria_gasto_id),
-      importancia_gasto_id: parseInt(importancia_gasto_id),
-      tipo_pago_id: parseInt(tipo_pago_id),
-      tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
-    });
-
-    logger.info('Compra creada:', { id: nuevaCompra.id });
+    
+    logger.info('Compra creada desde vista:', { id: result.data.compra.id });
     res.redirect('/compras');
   } catch (error) {
     logger.error('Error al crear compra:', { error });
@@ -156,60 +160,19 @@ export const handleFormNuevaCompra = async (req, res) => {
 
 export const handleFormEditarCompra = async (req, res) => {
   try {
-    const compra = await Compra.findByPk(req.params.id);
-    if (!compra) {
-      return res.status(404).send('Compra no encontrada');
+    // Limpiar datos del formulario
+    const cleanData = cleanFormData(req.body);
+    
+    // Usar el API controller para actualizar la compra
+    const mockRes = createMockResponse();
+    await apiController.update({ params: req.params, body: cleanData }, mockRes);
+    const result = mockRes.getResult();
+    
+    if (result.status >= 400) {
+      throw new Error(result.data.message || 'Error al actualizar compra');
     }
-
-    const {
-      descripcion,
-      monto_total,
-      cantidad_cuotas,
-      fecha_compra,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    } = req.body;
-
-    // Validar campos requeridos
-    if (!descripcion || !monto_total || !fecha_compra || !categoria_gasto_id || !importancia_gasto_id || !tipo_pago_id) {
-      throw new Error('Todos los campos son requeridos excepto tarjeta');
-    }
-
-    // Validar que los IDs existan antes de actualizar
-    const [categoria, importancia, tipoPago, tarjeta] = await Promise.all([
-      CategoriaGasto.findByPk(categoria_gasto_id),
-      ImportanciaGasto.findByPk(importancia_gasto_id),
-      TipoPago.findByPk(tipo_pago_id),
-      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
-    ]);
-
-    if (!categoria) {
-      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
-    }
-    if (!importancia) {
-      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
-    }
-    if (!tipoPago) {
-      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
-    }
-    if (tarjeta_id && !tarjeta) {
-      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
-    }
-
-    await compra.update({
-      descripcion,
-      monto_total: parseFloat(monto_total),
-      cantidad_cuotas: parseInt(cantidad_cuotas || 1),
-      fecha_compra,
-      categoria_gasto_id: parseInt(categoria_gasto_id),
-      importancia_gasto_id: parseInt(importancia_gasto_id),
-      tipo_pago_id: parseInt(tipo_pago_id),
-      tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
-    });
-
-    logger.info('Compra actualizada:', { id: compra.id });
+    
+    logger.info('Compra actualizada desde vista:', { id: req.params.id });
     res.redirect('/compras');
   } catch (error) {
     logger.error('Error al actualizar compra:', { error });
@@ -224,12 +187,16 @@ export const handleFormEditarCompra = async (req, res) => {
 
 export const handleDeleteCompra = async (req, res) => {
   try {
-    const compra = await Compra.findByPk(req.params.id);
-    if (!compra) {
-      return res.status(404).send('Compra no encontrada');
+    // Usar el API controller para eliminar la compra
+    const mockRes = createMockResponse();
+    await apiController.delete({ params: req.params }, mockRes);
+    const result = mockRes.getResult();
+    
+    if (result.status >= 400) {
+      throw new Error(result.data.message || 'Error al eliminar compra');
     }
-    await compra.destroy();
-    logger.info('Compra eliminada:', { id: req.params.id });
+    
+    logger.info('Compra eliminada desde vista:', { id: req.params.id });
     res.redirect('/compras');
   } catch (error) {
     logger.error('Error al eliminar compra:', { error });
