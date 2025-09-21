@@ -264,55 +264,55 @@ class FinanzasApiMCPServer {
       gastos: {
         base: '/api/gastos',
         endpoints: [
-          'GET /api/gastos/all - Obtener todos los gastos sin filtros',
-          'GET /api/gastos - Obtener gastos con filtros opcionales y paginación inteligente',
-          'GET /api/gastos/summary - Resumen de gastos por período',
-          'GET /api/gastos/generate - Ejecutar job de generación',
-          'GET /api/gastos/:id - Obtener gasto por ID',
-          'POST /api/gastos - Crear nuevo gasto',
-          'POST /api/gastos/search - Búsqueda avanzada con paginación',
-          'PUT /api/gastos/:id - Actualizar gasto',
-          'DELETE /api/gastos/:id - Eliminar gasto'
+          '✅ GET /api/gastos - Obtener gastos con filtros opcionales y paginación inteligente',
+          '✅ GET /api/gastos/summary - Resumen de gastos por período',
+          '✅ GET /api/gastos/generate - Ejecutar job de generación',
+          '✅ GET /api/gastos/:id - Obtener gasto por ID',
+          '✅ POST /api/gastos - Crear nuevo gasto',
+          '✅ PUT /api/gastos/:id - Actualizar gasto',
+          '✅ DELETE /api/gastos/:id - Eliminar gasto',
+          '❌ GET /api/gastos/all - NO IMPLEMENTADO (endpoint documentado pero no disponible)',
+          '❌ POST /api/gastos/search - NO IMPLEMENTADO (lógica existe, ruta no)'
         ]
       },
       gastos_unicos: {
         base: '/api/gastos-unicos',
         endpoints: [
-          'GET /api/gastos-unicos - Obtener gastos únicos con filtros opcionales y paginación inteligente',
-          'GET /api/gastos-unicos/:id - Obtener gasto único por ID',
-          'POST /api/gastos-unicos - Crear nuevo gasto único',
-          'PUT /api/gastos-unicos/:id - Actualizar gasto único',
-          'DELETE /api/gastos-unicos/:id - Eliminar gasto único'
+          '✅ GET /api/gastos-unicos - Obtener gastos únicos con filtros opcionales y paginación inteligente',
+          '✅ GET /api/gastos-unicos/:id - Obtener gasto único por ID',
+          '✅ POST /api/gastos-unicos - Crear nuevo gasto único',
+          '✅ PUT /api/gastos-unicos/:id - Actualizar gasto único',
+          '✅ DELETE /api/gastos-unicos/:id - Eliminar gasto único'
         ]
       },
       compras: {
         base: '/api/compras',
         endpoints: [
-          'GET /api/compras - Obtener compras con filtros opcionales y paginación inteligente',
-          'GET /api/compras/:id - Obtener compra por ID',
-          'POST /api/compras - Crear nueva compra',
-          'PUT /api/compras/:id - Actualizar compra',
-          'DELETE /api/compras/:id - Eliminar compra'
+          '✅ GET /api/compras - Obtener compras con filtros opcionales y paginación inteligente',
+          '✅ GET /api/compras/:id - Obtener compra por ID',
+          '✅ POST /api/compras - Crear nueva compra',
+          '✅ PUT /api/compras/:id - Actualizar compra',
+          '✅ DELETE /api/compras/:id - Eliminar compra'
         ]
       },
       gastos_recurrentes: {
         base: '/api/gastos-recurrentes',
         endpoints: [
-          'GET /api/gastos-recurrentes - Obtener gastos recurrentes con filtros opcionales y paginación inteligente',
-          'GET /api/gastos-recurrentes/:id - Obtener por ID',
-          'POST /api/gastos-recurrentes - Crear gasto recurrente',
-          'PUT /api/gastos-recurrentes/:id - Actualizar',
-          'DELETE /api/gastos-recurrentes/:id - Eliminar'
+          '✅ GET /api/gastos-recurrentes - Obtener gastos recurrentes con filtros opcionales y paginación inteligente',
+          '✅ GET /api/gastos-recurrentes/:id - Obtener por ID',
+          '✅ POST /api/gastos-recurrentes - Crear gasto recurrente',
+          '✅ PUT /api/gastos-recurrentes/:id - Actualizar',
+          '✅ DELETE /api/gastos-recurrentes/:id - Eliminar'
         ]
       },
       debitos_automaticos: {
         base: '/api/debitos-automaticos',
         endpoints: [
-          'GET /api/debitos-automaticos - Obtener débitos automáticos con filtros opcionales y paginación inteligente',
-          'GET /api/debitos-automaticos/:id - Obtener por ID',
-          'POST /api/debitos-automaticos - Crear débito automático',
-          'PUT /api/debitos-automaticos/:id - Actualizar',
-          'DELETE /api/debitos-automaticos/:id - Eliminar'
+          '✅ GET /api/debitos-automaticos - Obtener débitos automáticos con filtros opcionales y paginación inteligente',
+          '✅ GET /api/debitos-automaticos/:id - Obtener por ID',
+          '✅ POST /api/debitos-automaticos - Crear débito automático',
+          '✅ PUT /api/debitos-automaticos/:id - Actualizar',
+          '✅ DELETE /api/debitos-automaticos/:id - Eliminar'
         ]
       }
     };

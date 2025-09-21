@@ -2,60 +2,36 @@
 
 Este documento describe el comportamiento completo de los endpoints de la API `/api/gastos` después de la estandarización implementada.
 
-## 📋 Resumen de Endpoints
+## 📋 Resumen de Endpoints (Estado Real)
 
-| Endpoint | Método | Propósito | Respuesta |
-|----------|---------|-----------|-----------|
-| `/api/gastos/all` | GET | Obtener todos los gastos sin filtros | Lista completa |
-| `/api/gastos` | GET | Obtener gastos con filtros opcionales y paginación | Lista filtrada |
-| `/api/gastos/:id` | GET | Obtener un gasto específico | Gasto individual |
-| `/api/gastos/search` | POST | Búsquedas complejas con paginación | Lista paginada |
-| `/api/gastos/summary` | GET | Estadísticas agregadas por período | Resumen estadístico |
-| `/api/gastos/generate` | GET | Generar gastos pendientes | Resultado de generación |
-| `/api/gastos` | POST | Crear nuevo gasto | Gasto creado |
-| `/api/gastos/:id` | PUT | Actualizar gasto existente | Gasto actualizado |
-| `/api/gastos/:id` | DELETE | Eliminar gasto | Confirmación |
+| Endpoint | Método | Propósito | Estado | Respuesta |
+|----------|---------|-----------|--------|-----------|
+| `/api/gastos` | GET | Obtener gastos con filtros opcionales y paginación | ✅ IMPLEMENTADO | Lista filtrada |
+| `/api/gastos/:id` | GET | Obtener un gasto específico | ✅ IMPLEMENTADO | Gasto individual |
+| `/api/gastos/summary` | GET | Estadísticas agregadas por período | ✅ IMPLEMENTADO | Resumen estadístico |
+| `/api/gastos/generate` | GET | Generar gastos pendientes | ✅ IMPLEMENTADO | Resultado de generación |
+| `/api/gastos` | POST | Crear nuevo gasto | ✅ IMPLEMENTADO | Gasto creado |
+| `/api/gastos/:id` | PUT | Actualizar gasto existente | ✅ IMPLEMENTADO | Gasto actualizado |
+| `/api/gastos/:id` | DELETE | Eliminar gasto | ✅ IMPLEMENTADO | Confirmación |
+| `/api/gastos/all` | GET | Obtener todos los gastos sin filtros | ❌ NO IMPLEMENTADO | - |
+| `/api/gastos/search` | POST | Búsquedas complejas con paginación | ❌ NO IMPLEMENTADO* | - |
+
+> *Nota: La lógica de búsqueda existe en el controlador pero no está expuesta en las rutas.
 
 ---
 
 ## 🔍 Detalle de Endpoints
 
-### 1. GET `/api/gastos/all`
-**Propósito:** Obtener todos los gastos sin aplicar filtros ni paginación.
+### ❌ Endpoints No Implementados
 
-**Parámetros:** Ninguno
+Los siguientes endpoints están documentados pero **NO están implementados** en el código actual:
 
-**Respuesta:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "fecha": "2024-01-14",
-      "monto_ars": "500.00",
-      "monto_usd": null,
-      "descripcion": "Reparación auto",
-      "categoria": {...},
-      "importancia": {...},
-      "tipoPago": {...}
-    }
-  ],
-  "meta": {
-    "total": 150,
-    "type": "collection"
-  }
-}
-```
-
-**Casos de uso:**
-- Dashboard inicial con todos los gastos
-- Exportación completa de datos
-- Vista general sin restricciones
+- `GET /api/gastos/all` - Obtener todos los gastos sin filtros
+- `POST /api/gastos/search` - Búsquedas complejas (lógica existe, ruta no)
 
 ---
 
-### 2. GET `/api/gastos`
+### 1. GET `/api/gastos`
 **Propósito:** Obtener gastos con filtros opcionales y paginación inteligente.
 
 **Parámetros de Query:**
@@ -127,7 +103,7 @@ GET /api/gastos?monto_min_ars=100&monto_max_ars=1000&orderBy=fecha
 
 ---
 
-### 3. GET `/api/gastos/:id`
+### 2. GET `/api/gastos/:id`
 **Propósito:** Obtener un gasto específico con todas sus relaciones.
 
 **Parámetros:**
@@ -164,57 +140,7 @@ GET /api/gastos?monto_min_ars=100&monto_max_ars=1000&orderBy=fecha
 
 ---
 
-### 4. POST `/api/gastos/search`
-**Propósito:** Búsquedas complejas con filtros avanzados y paginación obligatoria.
-
-**Cuerpo de la petición:**
-```json
-{
-  "categoria_gasto_id": 5,
-  "importancia_gasto_id": 1,
-  "frecuencia_gasto_id": null,
-  "tipo_pago_id": 3,
-  "tarjeta_id": 2,
-  "fecha_desde": "2024-01-01",
-  "fecha_hasta": "2024-12-31",
-  "monto_min_ars": 100,
-  "monto_max_ars": 5000,
-  "monto_min_usd": 10,
-  "monto_max_usd": 500,
-  "limit": 20,
-  "offset": 0,
-  "orderBy": "fecha",
-  "orderDirection": "DESC"
-}
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "data": [...],
-  "meta": {
-    "total": 63,
-    "type": "collection",
-    "pagination": {
-      "limit": 20,
-      "offset": 0,
-      "hasNext": true,
-      "hasPrev": false
-    }
-  }
-}
-```
-
-**Casos de uso:**
-- Búsquedas desde formularios complejos
-- Filtros avanzados con múltiples criterios
-- Aplicaciones SPA con estado de búsqueda
-- Búsquedas guardadas/favoritas
-
----
-
-### 5. GET `/api/gastos/summary`
+### 4. GET `/api/gastos/summary`
 **Propósito:** Obtener estadísticas agregadas y resúmenes por período.
 
 **Parámetros de Query:**
@@ -279,7 +205,7 @@ GET /api/gastos/summary?fecha_desde=2024-10-01&fecha_hasta=2024-12-31
 
 ---
 
-### 6. GET `/api/gastos/generate`
+### 5. GET `/api/gastos/generate`
 **Propósito:** Ejecutar la generación automática de gastos pendientes.
 
 **Parámetros:** Ninguno
@@ -319,7 +245,7 @@ GET /api/gastos/summary?fecha_desde=2024-10-01&fecha_hasta=2024-12-31
 
 ---
 
-### 7. POST `/api/gastos`
+### 6. POST `/api/gastos`
 **Propósito:** Crear un nuevo gasto en la tabla principal.
 
 **Validación del cuerpo:**
@@ -349,7 +275,7 @@ GET /api/gastos/summary?fecha_desde=2024-10-01&fecha_hasta=2024-12-31
 
 ---
 
-### 8. PUT `/api/gastos/:id` & DELETE `/api/gastos/:id`
+### 7. PUT `/api/gastos/:id` & DELETE `/api/gastos/:id`
 **Propósito:** Actualizar o eliminar gastos existentes.
 
 **Comportamiento:**
@@ -421,10 +347,10 @@ GET /api/gastos/summary?fecha_desde=2024-10-01&fecha_hasta=2024-12-31
 16. **Crear gasto con IDs inexistentes** - `POST /api/gastos {categoria_gasto_id: 999}`
 
 ### Pruebas de Rendimiento
-17. **Consulta sin límite** - `/api/gastos/all`
+17. **Consulta sin límite** - `/api/gastos` (sin parámetro limit)
 18. **Paginación con offset alto** - `/api/gastos?limit=10&offset=10000`
 19. **Múltiples filtros simultáneos** - Combinación de todos los filtros
-20. **Búsqueda compleja con resultados grandes** - `POST /api/gastos/search`
+20. **Consulta con resumen de datos grandes** - `/api/gastos/summary` con rangos amplios
 
 ### Pruebas de Consistencia
 21. **Verificar estructura de respuesta** - Todos los endpoints devuelven formato estándar
@@ -432,3 +358,29 @@ GET /api/gastos/summary?fecha_desde=2024-10-01&fecha_hasta=2024-12-31
 23. **Verificar paginación** - `hasNext/hasPrev` calculados correctamente  
 24. **Verificar timestamps** - Errores incluyen timestamp válido
 25. **Verificar relaciones** - Objetos relacionados incluidos correctamente
+
+---
+
+## 💡 Recomendaciones para Validar Gastos Generados
+
+### Para validar que se generó el gasto real después de crear un gasto único:
+
+**✅ Recomendado:** `GET /api/gastos/:id` (Más específico)
+```javascript
+// 1. Crear gasto único
+const gastoUnicoResponse = await POST('/api/gastos-unicos', data);
+const gastoRealId = gastoUnicoResponse.data.gasto.id;
+
+// 2. Validar que el gasto real existe
+const gastoReal = await GET(`/api/gastos/${gastoRealId}`);
+assert(gastoReal.data.tipo_origen === 'gasto_unico');
+assert(gastoReal.data.descripcion === data.descripcion);
+```
+
+**⚠️ Alternativo:** `GET /api/gastos` con filtros (Más robusta pero menos eficiente)
+```javascript
+// Buscar gastos que vengan de este gasto único específico
+const gastos = await GET(`/api/gastos?fecha_desde=${data.fecha}&fecha_hasta=${data.fecha}&categoria_gasto_id=${data.categoria_gasto_id}`);
+const gastoEncontrado = gastos.data.find(g => g.descripcion === data.descripcion);
+assert(gastoEncontrado !== undefined);
+```

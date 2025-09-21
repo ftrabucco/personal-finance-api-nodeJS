@@ -13,6 +13,39 @@ export const helpers = {
     return a === b;
   },
   
+  // Helpers de comparación
+  gte: function(a, b) {
+    return a >= b;
+  },
+  
+  gt: function(a, b) {
+    return a > b;
+  },
+  
+  lte: function(a, b) {
+    return a <= b;
+  },
+  
+  lt: function(a, b) {
+    return a < b;
+  },
+  
+  // Helper para verificar si string contiene otro string
+  contains: function(str, search) {
+    if (!str || !search) return false;
+    return str.toLowerCase().includes(search.toLowerCase());
+  },
+  
+  // Helper para dividir
+  div: function(a, b) {
+    return parseFloat(a) / parseFloat(b);
+  },
+  
+  // Helper para JSON
+  JSON: function(obj) {
+    return JSON.stringify(obj);
+  },
+  
   formatMoney: function(amount) {
     if (!amount) return '$0,00';
     return new Intl.NumberFormat('es-AR', {

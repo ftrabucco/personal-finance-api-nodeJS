@@ -117,25 +117,41 @@ export const renderDashboard = async (req, res) => {
       });
       
       // Calcular próximos vencimientos para gastos recurrentes
+      console.log(`Total gastos recurrentes activos encontrados: ${allGastosRecurrentes.length}`);
+      
       gastosRecurrentes = allGastosRecurrentes.map(gasto => {
         const diaPago = gasto.dia_de_pago;
+        console.log(`Procesando gasto recurrente: ${gasto.descripcion}, día de pago: ${diaPago}`);
+        
+        if (!diaPago || diaPago < 1 || diaPago > 31) {
+          console.warn(`Gasto recurrente con día de pago inválido: ${gasto.descripcion}, día: ${diaPago}`);
+          return null;
+        }
+        
         let proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth(), diaPago);
         
         if (hoy.getDate() > diaPago) {
           proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth() + 1, diaPago);
         }
         
-        return {
+        const item = {
           ...gasto,
-          tipo: 'recurrente',
+          tipo: 'gasto recurrente',
           fecha_vencimiento: format(proximoVencimiento, 'dd/MM/yyyy'),
           fecha_comparacion: format(proximoVencimiento, 'yyyy-MM-dd'),
           monto_ars: gasto.monto || 0,
           descripcion: gasto.descripcion || 'Gasto recurrente'
         };
+        
+        console.log(`Gasto recurrente procesado: ${item.descripcion}, vencimiento: ${item.fecha_vencimiento}`);
+        return item;
       }).filter(gasto => {
+        if (!gasto) return false;
+        
         const fechaValida = gasto.fecha_comparacion >= format(hoy, 'yyyy-MM-dd') && 
                           gasto.fecha_comparacion <= format(proximoMes, 'yyyy-MM-dd');
+        
+        console.log(`Filtro fecha - Gasto: ${gasto.descripcion}, Fecha: ${gasto.fecha_comparacion}, Válido: ${fechaValida}`);
         return fechaValida;
       }).sort((a, b) => a.fecha_comparacion.localeCompare(b.fecha_comparacion))
         .slice(0, 5);
@@ -158,15 +174,24 @@ export const renderDashboard = async (req, res) => {
       console.log('Débitos automáticos encontrados:', JSON.stringify(debitosRaw, null, 2));
       
       // Calcular próximos vencimientos para débitos automáticos
+      console.log(`Total débitos automáticos encontrados: ${debitosRaw.length}`);
+      
       debitos = debitosRaw.map(debito => {
         const diaPago = debito.dia_de_pago;
+        console.log(`Procesando débito automático: ${debito.descripcion}, día de pago: ${diaPago}`);
+        
+        if (!diaPago || diaPago < 1 || diaPago > 31) {
+          console.warn(`Débito automático con día de pago inválido: ${debito.descripcion}, día: ${diaPago}`);
+          return null;
+        }
+        
         let proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth(), diaPago);
         
         if (hoy.getDate() > diaPago) {
           proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth() + 1, diaPago);
         }
         
-        return {
+        const item = {
           ...debito,
           tipo: 'débito automático',
           fecha_vencimiento: format(proximoVencimiento, 'dd/MM/yyyy'),
@@ -174,9 +199,16 @@ export const renderDashboard = async (req, res) => {
           monto_ars: debito.monto || 0,
           descripcion: debito.descripcion || 'Débito automático'
         };
+        
+        console.log(`Débito automático procesado: ${item.descripcion}, vencimiento: ${item.fecha_vencimiento}`);
+        return item;
       }).filter(debito => {
+        if (!debito) return false;
+        
         const fechaValida = debito.fecha_comparacion >= format(hoy, 'yyyy-MM-dd') && 
                           debito.fecha_comparacion <= format(proximoMes, 'yyyy-MM-dd');
+        
+        console.log(`Filtro fecha - Débito: ${debito.descripcion}, Fecha: ${debito.fecha_comparacion}, Válido: ${fechaValida}`);
         return fechaValida;
       }).sort((a, b) => a.fecha_comparacion.localeCompare(b.fecha_comparacion))
         .slice(0, 5);
@@ -272,32 +304,36 @@ export const renderDashboard = async (req, res) => {
     // Log para depuración
     console.log('Débitos antes de combinar:', JSON.stringify(debitos, null, 2));
     
-    // Asegurar que cada tipo de pago tenga el tipo correcto
-    const comprasConTipo = comprasProcesadas.map(compra => ({
-      ...compra,
-      tipo: 'compra', // Mantener como 'compra' para identificación
-      monto_ars: compra.monto_ars || '0.00' // Ya está formateado en el procesamiento anterior
-    }));
-
-    const gastosRecurrentesConTipo = gastosRecurrentes.map(gasto => ({
-      ...gasto,
-      tipo: 'gasto recurrente',
-      monto_ars: parseFloat(gasto.monto_ars || 0).toFixed(2)
-    }));
-
-    const debitosConTipo = debitos.map(debito => ({
-      ...debito,
-      tipo: 'débito automático',
-      monto_ars: parseFloat(debito.monto_ars || 0).toFixed(2)
-    }));
-
     // Combinar y ordenar todos los vencimientos
-    const todosLosVencimientos = [
-      ...comprasConTipo,
-      ...gastosRecurrentesConTipo,
-      ...debitosConTipo
-    ].sort((a, b) => a.fecha_comparacion.localeCompare(b.fecha_comparacion))
-     .slice(0, 5);
+    const todosLosItems = [
+      ...comprasProcesadas.map(compra => ({
+        ...compra,
+        tipo: 'compra',
+        monto_ars: compra.monto_ars || '0.00'
+      })),
+      ...gastosRecurrentes.map(gasto => ({
+        ...gasto,
+        monto_ars: parseFloat(gasto.monto_ars || 0).toFixed(2)
+      })),
+      ...debitos.map(debito => ({
+        ...debito,
+        monto_ars: parseFloat(debito.monto_ars || 0).toFixed(2)
+      }))
+    ];
+    
+    console.log(`Items antes del sort: ${todosLosItems.length}`);
+    todosLosItems.forEach(item => {
+      console.log(`- ${item.tipo}: ${item.descripcion} - ${item.fecha_comparacion} (${item.fecha_vencimiento})`);
+    });
+    
+    const todosLosVencimientos = todosLosItems
+      .sort((a, b) => a.fecha_comparacion.localeCompare(b.fecha_comparacion))
+      .slice(0, 5);
+    
+    console.log(`Items después del sort y slice: ${todosLosVencimientos.length}`);
+    todosLosVencimientos.forEach(item => {
+      console.log(`- ${item.tipo}: ${item.descripcion} - ${item.fecha_comparacion} (${item.fecha_vencimiento})`);
+    });
     
     console.log(`Total de vencimientos próximos: ${todosLosVencimientos.length}`);
     
@@ -342,8 +378,11 @@ export const renderDashboard = async (req, res) => {
     
     console.log('Datos para el gráfico:', JSON.stringify(gastosGrafico, null, 2));
     
-    // Obtener el total de categorías
+    // Obtener el total de categorías existentes
     const totalCategorias = await sequelize.models.CategoriaGasto.count();
+    
+    // Contar categorías con gastos este mes (no enviar el array completo como length)
+    const categoriasConGastos = gastosGrafico.length;
     
     // Debug: Log the upcoming payments data
     console.log('Próximos vencimientos para la vista:', JSON.stringify(todosLosVencimientos.map(v => ({
@@ -362,7 +401,9 @@ export const renderDashboard = async (req, res) => {
       totalGastos: totalGastos ? totalGastos.toFixed(2) : '0.00',
       proximosVencimientos: todosLosVencimientos,
       datosGrafico: JSON.stringify(gastosGrafico),
-      totalCategorias: totalCategorias
+      totalCategorias: totalCategorias,
+      categoriasConGastos: categoriasConGastos,
+      totalTransacciones: gastos.length
     });
     
   } catch (error) {

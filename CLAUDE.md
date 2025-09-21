@@ -26,6 +26,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run mcp:http` - Start MCP server with HTTP transport (for RestAssured)
 - `npm run mcp:dev` - Start MCP server in development mode with auto-reload
 
+### API Documentation (Swagger/OpenAPI)
+- **URL**: http://localhost:3030/api-docs
+- **File**: `/memoria/swagger_gastos.yaml`
+- **Setup**: Automatically enabled when running `npm run dev`
+- **Requirements**: Main server must be running on port 3030
+
 ## Architecture Overview
 
 This is a personal finance API built with Node.js, Express, and PostgreSQL. The application follows an MVC architecture with clear separation of concerns.

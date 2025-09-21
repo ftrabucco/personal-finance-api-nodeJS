@@ -1,0 +1,421 @@
+{
+  "api_info": {
+    "base_url": "http://localhost:3030",
+    "mcp_url": "http://localhost:3031",
+    "description": "Test scenarios for Personal Finance API - RestAssured Integration"
+  },
+  "test_categories": {
+    "smart_pagination": {
+      "description": "Tests for smart pagination feature (no limit = all results, with limit = paginated)",
+      "scenarios": [
+        {
+          "name": "get_all_gastos_unicos_without_pagination",
+          "endpoint": "GET /api/gastos-unicos",
+          "description": "Should return all gastos únicos without pagination metadata",
+          "expected": {
+            "status": 200,
+            "response_structure": {
+              "success": true,
+              "data": "array",
+              "meta": {
+                "total": "number",
+                "type": "collection"
+              }
+            },
+            "assertions": [
+              "response.success == true",
+              "response.data.size() > 0",
+              "response.meta.total == response.data.size()",
+              "response.meta.pagination == null"
+            ]
+          }
+        },
+        {
+          "name": "get_gastos_unicos_with_pagination",
+          "endpoint": "GET /api/gastos-unicos?limit=5&offset=10",
+          "description": "Should return paginated gastos únicos with metadata",
+          "expected": {
+            "status": 200,
+            "response_structure": {
+              "success": true,
+              "data": "array[max:5]",
+              "meta": {
+                "total": "number",
+                "type": "collection",
+                "pagination": {
+                  "limit": 5,
+                  "offset": 10,
+                  "hasNext": "boolean",
+                  "hasPrev": true
+                }
+              }
+            },
+            "assertions": [
+              "response.success == true",
+              "response.data.size() <= 5",
+              "response.meta.pagination.limit == 5",
+              "response.meta.pagination.offset == 10",
+              "response.meta.pagination.hasPrev == true"
+            ]
+          }
+        }
+      ]
+    },
+    "crud_operations": {
+      "description": "Complete CRUD operations for all entities",
+      "scenarios": [
+        {
+          "name": "create_gasto_unico_basic",
+          "endpoint": "POST /api/gastos-unicos",
+          "description": "Create a basic gasto único",
+          "payload": {
+            "descripcion": "Test gasto único RestAssured",
+            "monto": 2500.50,
+            "fecha": "2025-01-15",
+            "categoria_gasto_id": 2,
+            "importancia_gasto_id": 1,
+            "tipo_pago_id": 1,
+            "procesado": false
+          },
+          "expected": {
+            "status": 201,
+            "response_structure": {
+              "success": true,
+              "data": {
+                "gastoUnico": "object",
+                "gasto": "object"
+              }
+            },
+            "assertions": [
+              "response.success == true",
+              "response.data.gastoUnico.descripcion == 'Test gasto único RestAssured'",
+              "response.data.gastoUnico.monto == '2500.50'",
+              "response.data.gastoUnico.procesado == false",
+              "response.data.gasto != null"
+            ]
+          },
+          "cleanup": {
+            "delete_endpoint": "DELETE /api/gastos-unicos/{id}",
+            "id_field": "response.data.gastoUnico.id"
+          }
+        },
+        {
+          "name": "create_compra_en_cuotas",
+          "endpoint": "POST /api/compras",
+          "description": "Create a purchase with installments",
+          "payload": {
+            "descripcion": "Compra en cuotas RestAssured",
+            "monto_total": 12000,
+            "cantidad_cuotas": 6,
+            "fecha_compra": "2025-01-15",
+            "categoria_gasto_id": 3,
+            "importancia_gasto_id": 2,
+            "tipo_pago_id": 3,
+            "tarjeta_id": 1
+          },
+          "expected": {
+            "status": 201,
+            "response_structure": {
+              "success": true,
+              "data": "object"
+            },
+            "assertions": [
+              "response.success == true",
+              "response.data.descripcion == 'Compra en cuotas RestAssured'",
+              "response.data.cantidad_cuotas == 6",
+              "response.data.pendiente_cuotas == true"
+            ]
+          }
+        }
+      ]
+    },
+    "filtering_and_search": {
+      "description": "Test filtering capabilities",
+      "scenarios": [
+        {
+          "name": "filter_gastos_unicos_by_category",
+          "endpoint": "GET /api/gastos-unicos?categoria_gasto_id=2&limit=10",
+          "description": "Filter gastos únicos by category",
+          "expected": {
+            "status": 200,
+            "assertions": [
+              "response.success == true",
+              "response.data.every { it.categoria_gasto_id == 2 }",
+              "response.meta.pagination.limit == 10"
+            ]
+          }
+        },
+        {
+          "name": "filter_gastos_unicos_by_date_range",
+          "endpoint": "GET /api/gastos-unicos?fecha_desde=2025-01-01&fecha_hasta=2025-01-31",
+          "description": "Filter gastos únicos by date range",
+          "expected": {
+            "status": 200,
+            "assertions": [
+              "response.success == true",
+              "response.data.every { Date.parse('yyyy-MM-dd', it.fecha) >= Date.parse('yyyy-MM-dd', '2025-01-01') }",
+              "response.data.every { Date.parse('yyyy-MM-dd', it.fecha) <= Date.parse('yyyy-MM-dd', '2025-01-31') }"
+            ]
+          }
+        },
+        {
+          "name": "filter_compras_pendientes",
+          "endpoint": "GET /api/compras?pendiente_cuotas=true&limit=5",
+          "description": "Filter purchases with pending installments",
+          "expected": {
+            "status": 200,
+            "assertions": [
+              "response.success == true",
+              "response.data.every { it.pendiente_cuotas == true }",
+              "response.data.size() <= 5"
+            ]
+          }
+        }
+      ]
+    },
+    "business_logic": {
+      "description": "Test business logic and rules",
+      "scenarios": [
+        {
+          "name": "gasto_unico_creates_real_gasto",
+          "endpoint": "POST /api/gastos-unicos",
+          "description": "Creating gasto único should also create a real gasto",
+          "payload": {
+            "descripcion": "Test business logic",
+            "monto": 1500,
+            "fecha": "2025-01-20",
+            "categoria_gasto_id": 1,
+            "importancia_gasto_id": 1,
+            "tipo_pago_id": 1,
+            "procesado": false
+          },
+          "expected": {
+            "status": 201,
+            "assertions": [
+              "response.success == true",
+              "response.data.gastoUnico != null",
+              "response.data.gasto != null",
+              "response.data.gasto.monto_ars == '1500.00'",
+              "response.data.gasto.tipo_origen == 'gasto_unico'"
+            ]
+          },
+          "follow_up_tests": [
+            {
+              "name": "verify_gasto_exists",
+              "endpoint": "GET /api/gastos/{gasto_id}",
+              "description": "Verify the real gasto was created",
+              "id_source": "response.data.gasto.id",
+              "expected": {
+                "status": 200,
+                "assertions": [
+                  "response.success == true",
+                  "response.data.descripcion == 'Test business logic'"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "compra_efectivo_generates_immediate_gasto",
+          "endpoint": "POST /api/compras",
+          "description": "Cash purchase (1 installment) should generate immediate gasto",
+          "payload": {
+            "descripcion": "Compra efectivo inmediata",
+            "monto_total": 800,
+            "cantidad_cuotas": 1,
+            "fecha_compra": "2025-01-20",
+            "categoria_gasto_id": 2,
+            "importancia_gasto_id": 1,
+            "tipo_pago_id": 1
+          },
+          "expected": {
+            "status": 201,
+            "assertions": [
+              "response.success == true",
+              "response.data.pendiente_cuotas == true"
+            ]
+          }
+        }
+      ]
+    },
+    "validation_tests": {
+      "description": "Test input validation and error handling",
+      "scenarios": [
+        {
+          "name": "create_gasto_unico_missing_required_fields",
+          "endpoint": "POST /api/gastos-unicos",
+          "description": "Should fail when required fields are missing",
+          "payload": {
+            "descripcion": "Test incompleto"
+          },
+          "expected": {
+            "status": 400,
+            "response_structure": {
+              "success": false,
+              "error": "string"
+            },
+            "assertions": [
+              "response.success == false",
+              "response.error.contains('requerido') || response.error.contains('required')"
+            ]
+          }
+        },
+        {
+          "name": "create_gasto_unico_invalid_date",
+          "endpoint": "POST /api/gastos-unicos",
+          "description": "Should fail with invalid date format",
+          "payload": {
+            "descripcion": "Test fecha inválida",
+            "monto": 1000,
+            "fecha": "invalid-date",
+            "categoria_gasto_id": 1,
+            "importancia_gasto_id": 1,
+            "tipo_pago_id": 1
+          },
+          "expected": {
+            "status": 400,
+            "assertions": [
+              "response.success == false"
+            ]
+          }
+        },
+        {
+          "name": "get_nonexistent_gasto_unico",
+          "endpoint": "GET /api/gastos-unicos/99999",
+          "description": "Should return 404 for non-existent gasto único",
+          "expected": {
+            "status": 404,
+            "assertions": [
+              "response.success == false",
+              "response.error.contains('no encontrado') || response.error.contains('not found')"
+            ]
+          }
+        }
+      ]
+    },
+    "performance_tests": {
+      "description": "Performance and load testing scenarios",
+      "scenarios": [
+        {
+          "name": "large_dataset_pagination",
+          "endpoint": "GET /api/gastos-unicos?limit=100&offset=0",
+          "description": "Test performance with large page size",
+          "expected": {
+            "status": 200,
+            "performance": {
+              "max_response_time": 2000
+            },
+            "assertions": [
+              "response.success == true",
+              "response.data.size() <= 100"
+            ]
+          }
+        },
+        {
+          "name": "concurrent_creation_test",
+          "endpoint": "POST /api/gastos-unicos",
+          "description": "Test concurrent creation of gastos únicos",
+          "concurrent_requests": 5,
+          "payload_template": {
+            "descripcion": "Concurrent test ${index}",
+            "monto": 1000,
+            "fecha": "2025-01-25",
+            "categoria_gasto_id": 1,
+            "importancia_gasto_id": 1,
+            "tipo_pago_id": 1
+          },
+          "expected": {
+            "status": 201,
+            "assertions": [
+              "response.success == true"
+            ]
+          }
+        }
+      ]
+    },
+    "integration_with_mcp": {
+      "description": "Test MCP server integration",
+      "scenarios": [
+        {
+          "name": "mcp_health_check",
+          "endpoint": "GET /mcp/health",
+          "base_url": "http://localhost:3031",
+          "description": "Verify MCP server is running",
+          "expected": {
+            "status": 200,
+            "assertions": [
+              "response.status == 'ok'",
+              "response.server == 'finanzas-api-mcp'"
+            ]
+          }
+        },
+        {
+          "name": "mcp_get_api_endpoints",
+          "endpoint": "POST /mcp/tools/get_api_endpoints",
+          "base_url": "http://localhost:3031",
+          "description": "Get API endpoints via MCP",
+          "payload": {},
+          "expected": {
+            "status": 200,
+            "assertions": [
+              "response.content != null",
+              "response.content[0].text.contains('gastos_unicos')"
+            ]
+          }
+        },
+        {
+          "name": "mcp_execute_api_call",
+          "endpoint": "POST /mcp/tools/execute_api_call",
+          "base_url": "http://localhost:3031",
+          "description": "Execute API call through MCP proxy",
+          "payload": {
+            "method": "GET",
+            "endpoint": "/api/gastos-unicos?limit=3"
+          },
+          "expected": {
+            "status": 200,
+            "assertions": [
+              "response.content != null",
+              "JSON.parse(response.content[0].text).status == 200",
+              "JSON.parse(response.content[0].text).data.size() <= 3"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "test_data": {
+    "valid_categoria_ids": [1, 2, 3, 4, 5, 6, 7],
+    "valid_importancia_ids": [1, 2, 3],
+    "valid_tipo_pago_ids": [1, 2, 3, 4],
+    "valid_tarjeta_ids": [1, 2],
+    "sample_descriptions": [
+      "Gasto de prueba RestAssured",
+      "Test expense for API validation",
+      "Prueba de integración automática"
+    ],
+    "date_ranges": {
+      "current_month": {
+        "start": "2025-01-01",
+        "end": "2025-01-31"
+      },
+      "last_month": {
+        "start": "2024-12-01", 
+        "end": "2024-12-31"
+      }
+    }
+  },
+  "environment_setup": {
+    "prerequisites": [
+      "API server running on localhost:3030",
+      "MCP server running on localhost:3031",
+      "Database seeded with test data",
+      "Docker containers running"
+    ],
+    "cleanup_procedures": [
+      "Delete test records created during tests",
+      "Reset auto-increment IDs if needed",
+      "Clear any temporary test data"
+    ]
+  }
+}

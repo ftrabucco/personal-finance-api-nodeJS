@@ -1,55 +1,226 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1>Gastos Recurrentes</h1>
-  <a href="/gastos-recurrentes/nuevo" class="btn btn-primary">Nuevo Gasto Recurrente</a>
+  <div>
+    <h1 class="mb-0"><i class="bi bi-arrow-repeat"></i> Gastos Recurrentes</h1>
+    <p class="text-muted mb-0">Gestiona tus gastos periódicos</p>
+  </div>
+  <div class="btn-group">
+    <a href="/gastos-recurrentes/nuevo" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Nuevo Gasto Recurrente
+    </a>
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+      <i class="bi bi-funnel"></i> Filtros
+    </button>
+    <div class="dropdown-menu">
+      <a class="dropdown-item" href="#" onclick="filtrarPorFrecuencia('mensual')">Mensuales</a>
+      <a class="dropdown-item" href="#" onclick="filtrarPorFrecuencia('anual')">Anuales</a>
+      <div class="dropdown-divider"></div>
+      <a class="dropdown-item" href="#" onclick="limpiarFiltros()">Limpiar filtros</a>
+    </div>
+  </div>
 </div>
 
-<div class="table-responsive">
-  <table class="table table-hover">
-    <thead>
-      <tr>
-        <th>Descripción</th>
-        <th class="text-end">Monto</th>
-        <th class="text-center">Día de Pago</th>
-        <th>Frecuencia</th>
-        <th>Categoría</th>
-        <th>Importancia</th>
-        <th>Tipo de Pago</th>
-        <th>Tarjeta</th>
-        <th class="text-end">Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#each gastos}}
-        <tr>
-          <td>{{this.descripcion}}</td>
-          <td class="text-end">{{formatMoney this.monto}}</td>
-          <td class="text-center">{{formatDayOfMonth this.dia_de_pago}}</td>
-          <td>{{this.frecuencia.nombre_frecuencia}}</td>
-          <td>{{this.categoria.nombre_categoria}}</td>
-          <td>{{this.importancia.nombre_importancia}}</td>
-          <td>{{this.tipoPago.nombre}}</td>
-          <td>{{#if this.tarjeta}}{{this.tarjeta.nombre}}{{else}}-{{/if}}</td>
-          <td class="text-end">
-            <div class="btn-group btn-group-sm">
-              <a href="/gastos-recurrentes/{{this.id}}" class="btn btn-info">
-                <i class="bi bi-eye"></i> Ver
-              </a>
-              <a href="/gastos-recurrentes/editar/{{this.id}}" class="btn btn-warning">
-                <i class="bi bi-pencil"></i> Editar
-              </a>
-              <form action="/gastos-recurrentes/{{this.id}}?_method=DELETE" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de eliminar este gasto recurrente?')">
-                  <i class="bi bi-trash"></i> Eliminar
-                </button>
-              </form>
-            </div>
-          </td>
-        </tr>
-      {{else}}
-        <tr>
-          <td colspan="9" class="text-center">No hay gastos recurrentes registrados</td>
-        </tr>
-      {{/each}}
-    </tbody>
-  </table>
-</div> 
+<!-- Resumen rápido -->
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card bg-primary text-white">
+      <div class="card-body text-center">
+        <h5>Total Mensual</h5>
+        <h3 id="totalMensual">$0</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-success text-white">
+      <div class="card-body text-center">
+        <h5>Activos</h5>
+        <h3 id="gastosActivos">0</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-info text-white">
+      <div class="card-body text-center">
+        <h5>Promedio</h5>
+        <h3 id="promedioGastos">$0</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-warning text-white">
+      <div class="card-body text-center">
+        <h5>Total</h5>
+        <h3 id="totalGastos">0</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lista de gastos mejorada -->
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> Lista de Gastos Recurrentes</h5>
+  </div>
+  <div class="card-body p-0">
+    {{#if gastos.length}}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="tablaGastos">
+          <thead class="table-light">
+            <tr>
+              <th>
+                <i class="bi bi-card-text"></i> Descripción
+              </th>
+              <th class="text-end">
+                <i class="bi bi-currency-dollar"></i> Monto
+              </th>
+              <th class="text-center">
+                <i class="bi bi-calendar-date"></i> Día de Pago
+              </th>
+              <th>
+                <i class="bi bi-arrow-clockwise"></i> Frecuencia
+              </th>
+              <th>
+                <i class="bi bi-tag"></i> Categoría
+              </th>
+              <th class="text-center">
+                <i class="bi bi-exclamation-circle"></i> Importancia
+              </th>
+              <th>
+                <i class="bi bi-credit-card"></i> Pago
+              </th>
+              <th>
+                <i class="bi bi-credit-card-2-front"></i> Tarjeta
+              </th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each gastos}}
+              <tr class="gasto-row" data-frecuencia="{{this.frecuencia.nombre_frecuencia}}" data-monto="{{this.monto}}" data-activo="{{this.activo}}">
+                <td>
+                  <div class="fw-bold">{{this.descripcion}}</div>
+                  {{#if this.activo}}
+                    <small class="badge bg-success">Activo</small>
+                  {{else}}
+                    <small class="badge bg-secondary">Inactivo</small>
+                  {{/if}}
+                </td>
+                <td class="text-end">
+                  <span class="fw-bold text-{{#if (gte this.monto 5000)}}danger{{else if (gte this.monto 2000)}}warning{{else}}success{{/if}}">
+                    {{formatMoney this.monto}}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-light text-dark">{{formatDayOfMonth this.dia_de_pago}}</span>
+                </td>
+                <td>
+                  <span class="badge bg-secondary">{{this.frecuencia.nombre_frecuencia}}</span>
+                </td>
+                <td>
+                  <span class="badge bg-primary">{{this.categoria.nombre_categoria}}</span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-{{#if (eq this.importancia.nombre_importancia 'Esencial')}}danger{{else if (eq this.importancia.nombre_importancia 'Deseable')}}warning{{else}}secondary{{/if}}">
+                    {{this.importancia.nombre_importancia}}
+                  </span>
+                </td>
+                <td>
+                  <i class="bi bi-{{#if (contains this.tipoPago.nombre 'crédito')}}credit-card{{else if (contains this.tipoPago.nombre 'débito')}}credit-card-2-back{{else if (contains this.tipoPago.nombre 'efectivo')}}cash{{else}}bank{{/if}}"></i>
+                  {{this.tipoPago.nombre}}
+                </td>
+                <td>
+                  {{#if this.tarjeta}}
+                    <span class="badge bg-info">{{this.tarjeta.nombre}}</span>
+                  {{else}}
+                    <span class="text-muted">-</span>
+                  {{/if}}
+                </td>
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm">
+                    <a href="/gastos-recurrentes/{{this.id}}" class="btn btn-info btn-sm" title="Ver detalle">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="/gastos-recurrentes/editar/{{this.id}}" class="btn btn-warning btn-sm" title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form action="/gastos-recurrentes/{{this.id}}?_method=DELETE" method="POST" class="d-inline">
+                      <button type="submit" class="btn btn-danger btn-sm" 
+                              onclick="return confirm('¿Estás seguro de eliminar este gasto recurrente?')" 
+                              title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    {{else}}
+      <div class="text-center py-5">
+        <i class="bi bi-arrow-repeat text-muted" style="font-size: 4rem;"></i>
+        <h5 class="mt-3">No hay gastos recurrentes registrados</h5>
+        <p class="text-muted">Comienza agregando tu primer gasto recurrente</p>
+        <a href="/gastos-recurrentes/nuevo" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> Crear primer gasto recurrente
+        </a>
+      </div>
+    {{/if}}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  calcularResumen();
+});
+
+function calcularResumen() {
+  const filas = document.querySelectorAll('.gasto-row');
+  let total = 0;
+  let totalMensual = 0;
+  let activos = 0;
+  
+  filas.forEach(fila => {
+    const monto = parseFloat(fila.dataset.monto) || 0;
+    const activo = fila.dataset.activo === 'true';
+    const frecuencia = fila.dataset.frecuencia.toLowerCase();
+    
+    if (activo) {
+      activos++;
+      total += monto;
+      
+      // Calcular monto mensual equivalente
+      if (frecuencia.includes('mensual')) {
+        totalMensual += monto;
+      } else if (frecuencia.includes('anual')) {
+        totalMensual += monto / 12;
+      }
+    }
+  });
+  
+  const cantidad = filas.length;
+  const promedio = activos > 0 ? total / activos : 0;
+  
+  document.getElementById('totalMensual').textContent = '$' + Math.round(totalMensual).toLocaleString();
+  document.getElementById('gastosActivos').textContent = activos.toString();
+  document.getElementById('promedioGastos').textContent = '$' + Math.round(promedio).toLocaleString();
+  document.getElementById('totalGastos').textContent = cantidad.toString();
+}
+
+function filtrarPorFrecuencia(frecuencia) {
+  const filas = document.querySelectorAll('.gasto-row');
+  
+  filas.forEach(fila => {
+    const frecuenciaGasto = fila.dataset.frecuencia.toLowerCase();
+    const mostrar = frecuenciaGasto.includes(frecuencia);
+    fila.style.display = mostrar ? '' : 'none';
+  });
+}
+
+function limpiarFiltros() {
+  const filas = document.querySelectorAll('.gasto-row');
+  filas.forEach(fila => {
+    fila.style.display = '';
+  });
+}
+</script> 
