@@ -9,6 +9,7 @@ import logger from '../../utils/logger.js';
 export class GastoUnicoController extends BaseController {
   constructor() {
     super(GastoUnico, 'Gasto Único');
+    this.gastoUnicoService = new GastoUnicoService();
   }
 
   getIncludes() {
@@ -49,42 +50,16 @@ export class GastoUnicoController extends BaseController {
       // Normalizar fecha (YYYY-MM-DD)
       const fechaParaBD = new Date(req.body.fecha).toISOString().split('T')[0];
       
-      // 1. Crear gasto único
-      const gastoUnico = await this.model.create({
+      // Crear gasto único y gasto real de forma transaccional usando el servicio
+      const gastoUnico = await this.gastoUnicoService.createWithGastoReal({
         ...req.body,
-        fecha: fechaParaBD,
-        procesado: false
-      }, { 
-        transaction,
-        fields: ['descripcion', 'monto', 'fecha', 'categoria_gasto_id', 'importancia_gasto_id', 'tipo_pago_id', 'tarjeta_id', 'procesado']
-      });
-      
-      // 2. Crear gasto real inmediatamente (business rule: inserción simultánea)
-      const gasto = await Gasto.create({
-        fecha: fechaParaBD,
-        monto_ars: gastoUnico.monto,
-        descripcion: gastoUnico.descripcion,
-        categoria_gasto_id: gastoUnico.categoria_gasto_id,
-        importancia_gasto_id: gastoUnico.importancia_gasto_id,
-        tipo_pago_id: gastoUnico.tipo_pago_id,
-        tarjeta_id: gastoUnico.tarjeta_id,
-        tipo_origen: 'unico',
-        id_origen: gastoUnico.id
-      }, { 
-        transaction,
-        fields: ['fecha', 'monto_ars', 'descripcion', 'categoria_gasto_id', 'importancia_gasto_id', 'tipo_pago_id', 'tarjeta_id', 'tipo_origen', 'id_origen']
-      });
-
-      // 3. Marcar como procesado
-      await gastoUnico.update({ procesado: true }, { transaction });
+        fecha: fechaParaBD
+      }, transaction);
 
       await transaction.commit();
-      logger.info('Gasto único y gasto real creados exitosamente:', { 
-        gastoUnico_id: gastoUnico.id, 
-        gasto_id: gasto.id 
-      });
+      logger.info('Gasto único creado exitosamente:', { gastoUnico_id: gastoUnico.id });
 
-      return sendSuccess(res, { gastoUnico, gasto }, 201);
+      return sendSuccess(res, gastoUnico, 201);
     } catch (error) {
       await transaction.rollback();
       logger.error('Error al crear gasto único:', { error });

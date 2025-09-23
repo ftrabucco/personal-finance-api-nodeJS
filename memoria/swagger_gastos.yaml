@@ -748,6 +748,20 @@ paths:
           schema:
             type: number
           description: Monto máximo en USD
+        - name: tipo_origen
+          in: query
+          schema:
+            type: string
+            enum: [unico, recurrente, debito_automatico, compra]
+          description: Filtrar por tipo de origen del gasto
+          example: "unico"
+        - name: id_origen
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Filtrar por ID del registro origen que generó este gasto
+          example: 123
         - $ref: '#/components/parameters/PaginationLimit'
         - $ref: '#/components/parameters/PaginationOffset'
         - $ref: '#/components/parameters/OrderBy'
@@ -1092,6 +1106,16 @@ paths:
                 monto_max_usd:
                   type: number
                   description: Monto máximo en USD
+                tipo_origen:
+                  type: string
+                  enum: [unico, recurrente, debito_automatico, compra]
+                  description: Filtrar por tipo de origen del gasto
+                  example: "unico"
+                id_origen:
+                  type: integer
+                  minimum: 1
+                  description: Filtrar por ID del registro origen que generó este gasto
+                  example: 123
                 limit:
                   type: integer
                   minimum: 1
@@ -1113,6 +1137,8 @@ paths:
                   default: DESC
             example:
               categoria_gasto_id: 5
+              tipo_origen: "unico"
+              id_origen: 123
               fecha_desde: "2024-01-01"
               fecha_hasta: "2024-12-31"
               monto_min_ars: 100

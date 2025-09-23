@@ -6,7 +6,8 @@ import {
   eliminarGasto,
   obtenerGastosConFiltros,
   obtenerResumenGastos,
-  generarGastosPendientes
+  generarGastosPendientes,
+  buscarGastos
 } from '../../controllers/api/gasto.controller.js';
 
 import {
@@ -66,6 +67,7 @@ const router = Router();
 router.get('/gastos', validateGastoFilters, obtenerGastosConFiltros); // Con filtros opcionales y paginación inteligente
 router.get('/gastos/summary', obtenerResumenGastos);
 router.get('/gastos/generate', generarGastosPendientes);
+router.post('/gastos/search', buscarGastos); // Búsqueda avanzada
 router.get('/gastos/:id', validateIdParam, obtenerGastoPorId);
 router.post('/gastos', validateCreateGasto, crearGasto); // Create new gasto
 router.put('/gastos/:id', [validateIdParam, validateUpdateGasto], actualizarGasto);

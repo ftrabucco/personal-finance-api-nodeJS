@@ -13,7 +13,7 @@ const mockGastoUnicoModel = {
 };
 
 // Mock the models module
-jest.unstable_mockModule('../../../models/index.js', () => ({
+jest.unstable_mockModule('../../../src/models/index.js', () => ({
   Gasto: mockGastoModel,
   GastoUnico: mockGastoUnicoModel,
   CategoriaGasto: {},
@@ -31,13 +31,13 @@ const mockGastoUnicoServiceInstance = {
   delete: jest.fn()
 };
 
-jest.unstable_mockModule('../../../services/gastoUnico.service.js', () => ({
+jest.unstable_mockModule('../../../src/services/gastoUnico.service.js', () => ({
   GastoUnicoService: jest.fn().mockImplementation(() => mockGastoUnicoServiceInstance)
 }));
 
 // Now import the controller and service
-const { GastoUnicoController } = await import('../gastoUnico.controller.js');
-const { GastoUnicoService } = await import('../../../services/gastoUnico.service.js');
+const { GastoUnicoController } = await import('../../../src/controllers/api/gastoUnico.controller.js');
+const { GastoUnicoService } = await import('../../../src/services/gastoUnico.service.js');
 
 describe('GastoUnicoController', () => {
   let controller;

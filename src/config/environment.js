@@ -49,6 +49,12 @@ const environments = {
     logging: {
       level: process.env.LOG_LEVEL || 'debug',
       format: 'dev'
+    },
+    scheduler: {
+      enabled: process.env.SCHEDULER_ENABLED !== 'false', // Por defecto habilitado en desarrollo
+      cronPattern: process.env.SCHEDULER_CRON_PATTERN || '5 0 * * *', // 00:05 AM diario
+      timezone: process.env.SCHEDULER_TIMEZONE || 'America/Argentina/Buenos_Aires',
+      runOnStartup: process.env.SCHEDULER_RUN_ON_STARTUP === 'true' // Por defecto false
     }
   },
   
@@ -90,6 +96,12 @@ const environments = {
     logging: {
       level: 'error',
       format: 'minimal'
+    },
+    scheduler: {
+      enabled: false, // Deshabilitado en tests
+      cronPattern: '5 0 * * *',
+      timezone: 'America/Argentina/Buenos_Aires',
+      runOnStartup: false
     }
   },
   
@@ -151,6 +163,12 @@ const environments = {
     logging: {
       level: process.env.LOG_LEVEL || 'info',
       format: 'combined'
+    },
+    scheduler: {
+      enabled: process.env.SCHEDULER_ENABLED === 'true', // Explícitamente habilitado en producción
+      cronPattern: process.env.SCHEDULER_CRON_PATTERN || '5 0 * * *', // 00:05 AM diario
+      timezone: process.env.SCHEDULER_TIMEZONE || 'America/Argentina/Buenos_Aires',
+      runOnStartup: process.env.SCHEDULER_RUN_ON_STARTUP === 'true'
     }
   }
 };

@@ -14,6 +14,7 @@ import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import config from './src/config/environment.js';
 import security from './src/middlewares/security.middleware.js';
+import ExpenseScheduler from './src/schedulers/expenseScheduler.js';
 
 // Middlewares de seguridad (antes que todo)
 app.use(security.cors);
@@ -77,7 +78,10 @@ async function startServer() {
   try {
     // Conectar a PostgreSQL
     await connectDatabase();
-    
+
+    // Iniciar scheduler de gastos
+    ExpenseScheduler.start();
+
     // Iniciar servidor
     app.listen(config.server.port, config.server.host, () => {
       logger.info(`🚀 Servidor iniciado exitosamente`);
@@ -85,9 +89,17 @@ async function startServer() {
       logger.info(`🌍 Entorno: ${config.app.env}`);
       logger.info(`📚 Documentación API: ${config.app.url}/api-docs`);
       logger.info(`💊 Health Check: ${config.app.url}/health`);
-      
+
       if (config.mcp.enabled) {
         logger.info(`🔗 MCP Server: http://localhost:${config.mcp.port}`);
+      }
+
+      // Log del estado del scheduler
+      const schedulerStatus = ExpenseScheduler.getStatus();
+      if (schedulerStatus.isRunning) {
+        logger.info(`📅 Expense Scheduler: Activo (próxima ejecución: ${schedulerStatus.nextExecution})`);
+      } else {
+        logger.info(`📅 Expense Scheduler: Inactivo`);
       }
     });
   } catch (error) {

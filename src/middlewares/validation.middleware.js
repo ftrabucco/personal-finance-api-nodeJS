@@ -304,6 +304,7 @@ const gastoSchema = Joi.object({
 const gastoFiltersSchema = Joi.object({
   categoria_gasto_id: Joi.number().integer().positive().optional(),
   importancia_gasto_id: Joi.number().integer().positive().optional(),
+  frecuencia_gasto_id: Joi.number().integer().positive().optional(),
   tipo_pago_id: Joi.number().integer().positive().optional(),
   tarjeta_id: Joi.number().integer().positive().optional(),
   fecha_desde: Joi.date().iso().optional(),
@@ -312,6 +313,8 @@ const gastoFiltersSchema = Joi.object({
   monto_max_ars: Joi.number().positive().min(Joi.ref('monto_min_ars')).optional(),
   monto_min_usd: Joi.number().positive().optional(),
   monto_max_usd: Joi.number().positive().min(Joi.ref('monto_min_usd')).optional(),
+  tipo_origen: Joi.string().valid('unico', 'recurrente', 'debito_automatico', 'compra').optional(),
+  id_origen: Joi.number().integer().positive().optional(),
   limit: Joi.number().integer().min(1).max(1000).optional(),
   offset: Joi.number().integer().min(0).optional(),
   orderBy: Joi.string().valid('fecha', 'monto_ars', 'monto_usd', 'descripcion', 'createdAt', 'updatedAt').optional(),

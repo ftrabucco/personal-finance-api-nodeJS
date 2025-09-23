@@ -30,12 +30,13 @@ export class GastoController extends BaseController {
     };
   }
 
-  // Método para generar todos los gastos pendientes
+  // Método para generar todos los gastos pendientes (endpoint manual)
   async generatePendingGastos(req, res) {
     try {
-      logger.info('Iniciando generación automática de gastos pendientes...');
+      logger.info('Iniciando generación manual de gastos pendientes...');
+      // Usar el método completo que incluye gastos únicos para procesamiento manual
       const results = await GastoGeneratorService.generatePendingExpenses();
-      
+
       const summary = {
         total_generated: results.success.length,
         total_errors: results.errors.length,
@@ -44,19 +45,20 @@ export class GastoController extends BaseController {
           debitos: results.success.filter(r => r.type === 'debito').length,
           compras: results.success.filter(r => r.type === 'compra').length,
           unicos: results.success.filter(r => r.type === 'unico').length
-        }
+        },
+        type: 'manual'
       };
 
-      logger.info('Generación de gastos completada exitosamente', { summary });
-      
+      logger.info('Generación manual de gastos completada exitosamente', { summary });
+
       const responseData = {
         summary,
         details: results
       };
 
-      return sendSuccess(res, responseData, 200, 'Generación de gastos completada exitosamente');
+      return sendSuccess(res, responseData, 200, 'Generación manual de gastos completada exitosamente');
     } catch (error) {
-      logger.error('Error en la generación automática de gastos:', { error });
+      logger.error('Error en la generación manual de gastos:', { error });
       return sendError(res, 500, 'Error al generar gastos pendientes', error.message);
     }
   }
@@ -69,12 +71,15 @@ export class GastoController extends BaseController {
         importancia_gasto_id,
         frecuencia_gasto_id,
         tipo_pago_id,
+        tarjeta_id,
         fecha_desde,
         fecha_hasta,
         monto_min_ars,
         monto_max_ars,
         monto_min_usd,
         monto_max_usd,
+        tipo_origen,
+        id_origen,
         limit,
         offset = 0,
         orderBy = 'fecha',
@@ -88,6 +93,11 @@ export class GastoController extends BaseController {
       if (importancia_gasto_id) where.importancia_gasto_id = importancia_gasto_id;
       if (frecuencia_gasto_id) where.frecuencia_gasto_id = frecuencia_gasto_id;
       if (tipo_pago_id) where.tipo_pago_id = tipo_pago_id;
+      if (tarjeta_id) where.tarjeta_id = tarjeta_id;
+
+      // Filtros por origen
+      if (tipo_origen) where.tipo_origen = tipo_origen;
+      if (id_origen) where.id_origen = id_origen;
 
       // Filtro por rango de fechas
       if (fecha_desde || fecha_hasta) {
@@ -155,6 +165,8 @@ export class GastoController extends BaseController {
         monto_min_usd,
         monto_max_usd,
         tarjeta_id,
+        tipo_origen,
+        id_origen,
         limit = 100,
         offset = 0,
         orderBy = 'fecha',
@@ -169,6 +181,10 @@ export class GastoController extends BaseController {
       if (frecuencia_gasto_id) where.frecuencia_gasto_id = frecuencia_gasto_id;
       if (tipo_pago_id) where.tipo_pago_id = tipo_pago_id;
       if (tarjeta_id) where.tarjeta_id = tarjeta_id;
+
+      // Filtros por origen
+      if (tipo_origen) where.tipo_origen = tipo_origen;
+      if (id_origen) where.id_origen = id_origen;
 
       // Filtro por rango de fechas
       if (fecha_desde || fecha_hasta) {

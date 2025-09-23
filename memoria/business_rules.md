@@ -110,11 +110,14 @@ Cada cuota se transforma en un gasto real en la tabla `gastos` según el tipo de
     - Si la compra es antes del día cierre da la tajeta, se paga el dia de vencimiento → vence en el mismo mes
     - Si la compra es después del día de cierre → vence el mes siguiente (dia de vencimiento)
     - **Requisito:** Las tarjetas de crédito deben tener `dia_cierre` y `dia_vencimiento` configurados (1-31)
-- **COMPRAS EN CUOTAS (cantidad_cuotas > 1):**  
+- **COMPRAS EN CUOTAS (cantidad_cuotas > 1):**
   - Se generan `N` gastos en la tabla `gastos` (N = cantidad de cuotas)
   - Cada gasto corresponde a una cuota proporcional (`monto_total / cantidad_cuotas`)
   - **Fechas de generación:**
-    - **Primera cuota:** Similar a compra de 1 cuota según tipo de pago
+    - **Efectivo/Débito/Transferencia:** Cada cuota se genera el mismo día del mes de la compra original
+    - **Tarjeta de Crédito:** Cada cuota se genera en el `dia_vencimiento` de la tarjeta cada mes
+      - Primera cuota: Respeta regla de día de cierre (este mes o siguiente)
+      - Cuotas siguientes: Siempre el `dia_vencimiento` de cada mes
     - **Cuotas siguientes:** Mensualmente en la misma fecha (día del mes)
 - **GENERACIÓN AUTOMÁTICA:**
   - Un job/servicio se ejecuta diariamente para procesar compras con `pendiente_cuotas = true`
