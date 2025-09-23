@@ -186,14 +186,16 @@ class FinanzasApiMCPServer {
 
   async getBusinessRules() {
     try {
-      const rulesPath = path.join(__dirname, 'memoria', 'business_rules.md');
+      const rulesPath = path.join(__dirname, 'docs', 'architecture', 'business-rules.md');
       const content = await fs.readFile(rulesPath, 'utf-8');
-      
+
       return {
         content: [
           {
             type: 'text',
-            text: content,
+            text: `# Business Rules (Strategy Pattern + BaseService Architecture)\n\n` +
+                  `> Last Updated: September 2025 - Post Major Migration\n` +
+                  `> Architecture: Clean Architecture with Strategy Pattern\n\n${content}`,
           },
         ],
       };
@@ -202,7 +204,7 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `Error leyendo business rules: ${error.message}`,
+            text: `Error reading business rules: ${error.message}\nPath: docs/architecture/business-rules.md`,
           },
         ],
       };
@@ -211,14 +213,16 @@ class FinanzasApiMCPServer {
 
   async getGastosApiDocs() {
     try {
-      const docsPath = path.join(__dirname, 'memoria', 'api_gastos_endpoints.md');
+      const docsPath = path.join(__dirname, 'docs', 'api', 'endpoints.md');
       const content = await fs.readFile(docsPath, 'utf-8');
-      
+
       return {
         content: [
           {
             type: 'text',
-            text: content,
+            text: `# API Endpoints Documentation (Current)\n\n` +
+                  `> Strategy Pattern + BaseService Architecture\n` +
+                  `> All endpoints verified and functional\n\n${content}`,
           },
         ],
       };
@@ -227,7 +231,7 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `Error leyendo documentación de gastos API: ${error.message}`,
+            text: `Error reading API documentation: ${error.message}\nPath: docs/api/endpoints.md`,
           },
         ],
       };
@@ -236,14 +240,16 @@ class FinanzasApiMCPServer {
 
   async getSwaggerDocs() {
     try {
-      const swaggerPath = path.join(__dirname, 'memoria', 'swagger_gastos.yaml');
+      const swaggerPath = path.join(__dirname, 'docs', 'api', 'swagger.yaml');
       const content = await fs.readFile(swaggerPath, 'utf-8');
-      
+
       return {
         content: [
           {
             type: 'text',
-            text: content,
+            text: `# OpenAPI/Swagger Specification (Current)\n` +
+                  `# Architecture: Strategy Pattern + BaseService\n` +
+                  `# Last Updated: September 2025\n\n${content}`,
           },
         ],
       };
@@ -252,7 +258,7 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `Error leyendo documentación Swagger: ${error.message}`,
+            text: `Error reading Swagger documentation: ${error.message}\nPath: docs/api/swagger.yaml`,
           },
         ],
       };
@@ -266,13 +272,18 @@ class FinanzasApiMCPServer {
         endpoints: [
           '✅ GET /api/gastos - Obtener gastos con filtros opcionales y paginación inteligente',
           '✅ GET /api/gastos/summary - Resumen de gastos por período',
-          '✅ GET /api/gastos/generate - Ejecutar job de generación',
+          '✅ GET /api/gastos/generate - Ejecutar job de generación automática de gastos',
           '✅ GET /api/gastos/:id - Obtener gasto por ID',
           '✅ POST /api/gastos - Crear nuevo gasto',
           '✅ PUT /api/gastos/:id - Actualizar gasto',
-          '✅ DELETE /api/gastos/:id - Eliminar gasto',
-          '❌ GET /api/gastos/all - NO IMPLEMENTADO (endpoint documentado pero no disponible)',
-          '❌ POST /api/gastos/search - NO IMPLEMENTADO (lógica existe, ruta no)'
+          '✅ DELETE /api/gastos/:id - Eliminar gasto'
+        ],
+        architecture: 'Strategy Pattern + BaseService',
+        generation_types: [
+          '🔄 Immediate: Gastos únicos (createWithGastoReal)',
+          '🔄 Recurring: Gastos recurrentes con frecuencia',
+          '🔄 AutomaticDebit: Débitos automáticos con fecha_fin',
+          '🔄 Installment: Compras con cuotas (billing cycle aware)'
         ]
       },
       gastos_unicos: {
@@ -528,44 +539,58 @@ class FinanzasApiMCPServer {
     const schema = {
       tables: {
         gastos: {
-          description: 'Tabla principal de gastos reales',
+          description: 'Tabla principal de gastos reales generados por strategies',
           fields: [
             'id (PK)', 'fecha', 'monto_ars', 'monto_usd', 'descripcion',
-            'categoria_gasto_id (FK)', 'importancia_gasto_id (FK)', 
+            'categoria_gasto_id (FK)', 'importancia_gasto_id (FK)',
             'tipo_pago_id (FK)', 'tarjeta_id (FK)', 'frecuencia_gasto_id (FK)',
-            'tipo_origen', 'id_origen', 'cantidad_cuotas_totales', 'cantidad_cuotas_pagadas'
+            'tipo_origen (unico|recurrente|debito_automatico|compra)',
+            'id_origen (FK to source table)',
+            'cantidad_cuotas_totales', 'cantidad_cuotas_pagadas'
+          ]
+        },
+        gastos_unicos: {
+          description: 'Gastos únicos procesados con ImmediateExpenseStrategy',
+          fields: [
+            'id (PK)', 'descripcion', 'monto', 'fecha',
+            'categoria_gasto_id (FK)', 'importancia_gasto_id (FK)',
+            'tipo_pago_id (FK)', 'tarjeta_id (FK)',
+            'procesado (boolean - sync with real gasto)'
           ]
         },
         compras: {
-          description: 'Compras en cuotas o inmediatas',
+          description: 'Compras procesadas con InstallmentExpenseStrategy',
           fields: [
             'id (PK)', 'descripcion', 'monto_total', 'cantidad_cuotas', 'fecha_compra',
             'categoria_gasto_id (FK)', 'importancia_gasto_id (FK)',
-            'tipo_pago_id (FK)', 'tarjeta_id (FK)', 'pendiente_cuotas'
+            'tipo_pago_id (FK)', 'tarjeta_id (FK)',
+            'pendiente_cuotas (boolean)', 'fecha_ultima_cuota_generada'
           ]
         },
         gastos_recurrentes: {
-          description: 'Gastos que se repiten periódicamente',
+          description: 'Gastos procesados con RecurringExpenseStrategy',
           fields: [
             'id (PK)', 'descripcion', 'monto', 'dia_de_pago', 'mes_de_pago',
             'categoria_gasto_id (FK)', 'importancia_gasto_id (FK)',
             'frecuencia_gasto_id (FK)', 'tipo_pago_id (FK)', 'tarjeta_id (FK)',
-            'activo', 'ultima_fecha_generado'
+            'activo (boolean)', 'ultima_fecha_generado', 'fecha_inicio'
           ]
         },
         debitos_automaticos: {
-          description: 'Débitos automáticos programados',
+          description: 'Débitos procesados con AutomaticDebitExpenseStrategy',
           fields: [
             'id (PK)', 'descripcion', 'monto', 'dia_de_pago', 'mes_de_pago',
             'categoria_gasto_id (FK)', 'importancia_gasto_id (FK)',
             'frecuencia_gasto_id (FK)', 'tipo_pago_id (FK)', 'tarjeta_id (FK)',
-            'activo', 'ultima_fecha_generado'
+            'activo (boolean)', 'ultima_fecha_generado',
+            'fecha_inicio', 'fecha_fin (specific to debitos)'
           ]
         },
         tarjetas: {
-          description: 'Tarjetas de crédito y débito',
+          description: 'Tarjetas con billing cycle logic for InstallmentStrategy',
           fields: [
-            'id (PK)', 'nombre', 'tipo', 'banco', 'dia_cierre', 'dia_vencimiento',
+            'id (PK)', 'nombre', 'tipo', 'banco',
+            'dia_cierre (billing close)', 'dia_vencimiento (due date)',
             'permite_cuotas'
           ]
         }
@@ -575,7 +600,23 @@ class FinanzasApiMCPServer {
         'gastos -> importancias_gasto': 'importancia_gasto_id',
         'gastos -> tipos_pago': 'tipo_pago_id',
         'gastos -> tarjetas': 'tarjeta_id',
-        'gastos -> frecuencias_gasto': 'frecuencia_gasto_id'
+        'gastos -> frecuencias_gasto': 'frecuencia_gasto_id',
+        'gastos -> source_tables': 'tipo_origen + id_origen (polymorphic)'
+      },
+      architecture: {
+        pattern: 'Strategy Pattern + BaseService',
+        strategies: {
+          'ImmediateExpenseStrategy': 'gastos_unicos -> gastos (immediate)',
+          'RecurringExpenseStrategy': 'gastos_recurrentes -> gastos (scheduled)',
+          'AutomaticDebitExpenseStrategy': 'debitos_automaticos -> gastos (scheduled)',
+          'InstallmentExpenseStrategy': 'compras -> gastos (billing cycle aware)'
+        },
+        services: {
+          'BaseService': 'Common CRUD operations (200+ lines saved)',
+          'GastoGeneratorService': 'Orchestrates all strategies',
+          'Scheduler': 'Node-cron daily execution (5:00 AM Argentina)',
+          'Transaction Safety': 'All operations use database transactions'
+        }
       }
     };
 

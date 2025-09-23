@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // Configuración Swagger
-const swaggerDocument = YAML.load('./memoria/swagger_gastos.yaml');
+const swaggerDocument = YAML.load('./docs/api/swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // API Routes (JSON endpoints)

@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### API Documentation (Swagger/OpenAPI)
 - **URL**: http://localhost:3030/api-docs
-- **File**: `/memoria/swagger_gastos.yaml`
+- **File**: `/docs/api/swagger.yaml`
 - **Setup**: Automatically enabled when running `npm run dev`
 - **Requirements**: Main server must be running on port 3030
 
