@@ -23,12 +23,32 @@
 
       <div class="mb-3">
         <label class="form-label">Frecuencia:</label>
-        <select name="frecuencia_gasto_id" class="form-select" required>
+        <select name="frecuencia_gasto_id" class="form-select" required id="frecuencia_select">
           <option value="">Seleccione una frecuencia</option>
           {{#each frecuencias}}
-            <option value="{{this.id}}" {{selected this.id ../gasto.frecuencia_gasto_id}}>{{this.nombre_frecuencia}}</option>
+            <option value="{{this.id}}" data-frecuencia="{{this.nombre_frecuencia}}" {{selected this.id ../gasto.frecuencia_gasto_id}}>{{this.nombre_frecuencia}}</option>
           {{/each}}
         </select>
+      </div>
+
+      <div class="mb-3" id="mes_pago_container" style="display: none;">
+        <label class="form-label">Mes de pago:</label>
+        <select name="mes_de_pago" class="form-select">
+          <option value="">Seleccione el mes (requerido para gastos anuales)</option>
+          <option value="1" {{selected 1 gasto.mes_de_pago}}>Enero</option>
+          <option value="2" {{selected 2 gasto.mes_de_pago}}>Febrero</option>
+          <option value="3" {{selected 3 gasto.mes_de_pago}}>Marzo</option>
+          <option value="4" {{selected 4 gasto.mes_de_pago}}>Abril</option>
+          <option value="5" {{selected 5 gasto.mes_de_pago}}>Mayo</option>
+          <option value="6" {{selected 6 gasto.mes_de_pago}}>Junio</option>
+          <option value="7" {{selected 7 gasto.mes_de_pago}}>Julio</option>
+          <option value="8" {{selected 8 gasto.mes_de_pago}}>Agosto</option>
+          <option value="9" {{selected 9 gasto.mes_de_pago}}>Septiembre</option>
+          <option value="10" {{selected 10 gasto.mes_de_pago}}>Octubre</option>
+          <option value="11" {{selected 11 gasto.mes_de_pago}}>Noviembre</option>
+          <option value="12" {{selected 12 gasto.mes_de_pago}}>Diciembre</option>
+        </select>
+        <div class="form-text">Solo requerido para gastos con frecuencia anual</div>
       </div>
 
       <div class="mb-3">
@@ -77,4 +97,34 @@
       </div>
     </form>
   </div>
-</div> 
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const frecuenciaSelect = document.getElementById('frecuencia_select');
+  const mesPagoContainer = document.getElementById('mes_pago_container');
+  const mesPagoSelect = mesPagoContainer.querySelector('select[name="mes_de_pago"]');
+  
+  function toggleMesPago() {
+    const selectedOption = frecuenciaSelect.querySelector('option:checked');
+    const frecuenciaNombre = selectedOption ? selectedOption.dataset.frecuencia : '';
+    
+    if (frecuenciaNombre && frecuenciaNombre.toLowerCase() === 'anual') {
+      mesPagoContainer.style.display = 'block';
+      mesPagoSelect.required = true;
+    } else {
+      mesPagoContainer.style.display = 'none';
+      mesPagoSelect.required = false;
+      if (!mesPagoSelect.value) {
+        mesPagoSelect.value = '';
+      }
+    }
+  }
+  
+  // Check initial state
+  toggleMesPago();
+  
+  // Listen for changes
+  frecuenciaSelect.addEventListener('change', toggleMesPago);
+});
+</script> 

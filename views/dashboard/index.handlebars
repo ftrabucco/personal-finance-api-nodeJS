@@ -1,0 +1,477 @@
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center">
+      <h1 class="mb-0">📊 Panel de Control - {{mesActual}}</h1>
+      <div class="btn-group">
+        <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="bi bi-plus-circle"></i> Crear Nuevo
+        </button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="/gastos-unicos/nuevo">
+            <i class="bi bi-receipt text-primary"></i> Gasto Único
+          </a></li>
+          <li><a class="dropdown-item" href="/compras/nueva">
+            <i class="bi bi-cart text-info"></i> Compra en Cuotas
+          </a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="/gastos-recurrentes/nuevo">
+            <i class="bi bi-arrow-repeat text-warning"></i> Gasto Recurrente
+          </a></li>
+          <li><a class="dropdown-item" href="/debitos-automaticos/nuevo">
+            <i class="bi bi-credit-card text-danger"></i> Débito Automático
+          </a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen Financiero Mejorado -->
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card text-white bg-primary mb-3 shadow-sm">
+      <div class="card-body text-center">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <i class="bi bi-cash-stack fs-1 me-2"></i>
+          <div>
+            <h5 class="card-title mb-0">Gastos del Mes</h5>
+            <h2 class="card-text mb-0">${{totalGastos}}</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-warning mb-3 shadow-sm">
+      <div class="card-body text-center">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <i class="bi bi-calendar-check fs-1 me-2"></i>
+          <div>
+            <h5 class="card-title mb-0">Próximos Vencimientos</h5>
+            <h2 class="card-text mb-0">{{proximosVencimientos.length}}</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-info mb-3 shadow-sm">
+      <div class="card-body text-center">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <i class="bi bi-tags fs-1 me-2"></i>
+          <div>
+            <h5 class="card-title mb-0">Categorías Activas</h5>
+            <h2 class="card-text mb-0">{{categoriasConGastos}}</h2>
+            <small>de {{totalCategorias}} totales</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-white bg-success mb-3 shadow-sm">
+      <div class="card-body text-center">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <i class="bi bi-graph-up fs-1 me-2"></i>
+          <div>
+            <h5 class="card-title mb-0">Promedio Diario</h5>
+            <h2 class="card-text mb-0" id="promedioDiario">$0</h2>
+            <small>gastos por día</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gráficos de Análisis -->
+<div class="row mb-4">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Distribución de Gastos por Categoría</h5>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-primary active" onclick="cambiarTipoGrafico('doughnut')">Donut</button>
+          <button type="button" class="btn btn-outline-primary" onclick="cambiarTipoGrafico('bar')">Barras</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <canvas id="gastosChart" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-speedometer2"></i> Resumen Rápido</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <small class="text-muted">Mayor Gasto por Categoría</small>
+          <div class="fw-bold" id="mayorCategoria">-</div>
+        </div>
+        <div class="mb-3">
+          <small class="text-muted">Promedio por Transacción</small>
+          <div class="fw-bold" id="promedioTransaccion">$0</div>
+        </div>
+        <div class="mb-3">
+          <small class="text-muted">Total de Transacciones</small>
+          <div class="fw-bold" id="totalTransacciones">0</div>
+        </div>
+        <div class="progress mb-2">
+          <div class="progress-bar bg-primary" role="progressbar" style="width: 0%" id="progressMes"></div>
+        </div>
+        <small class="text-muted">Progreso del mes (<span id="diaActual"></span>/31)</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Próximos Vencimientos Mejorados -->
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Próximos Vencimientos</h5>
+        <span class="badge bg-primary">{{proximosVencimientos.length}} pendientes</span>
+      </div>
+      <div class="card-body">
+        {{#if proximosVencimientos.length}}
+          <div class="row">
+            {{#each proximosVencimientos}}
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card border-left-{{#if (eq this.tipo 'compra')}}warning{{else if (eq this.tipo 'gasto recurrente')}}primary{{else}}info{{/if}} h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <div class="flex-grow-1">
+                        <h6 class="card-title text-truncate">{{this.descripcion}}</h6>
+                        <p class="card-text">
+                          <span class="badge bg-{{#if (eq this.tipo 'compra')}}warning{{else if (eq this.tipo 'gasto recurrente')}}primary{{else}}info{{/if}} text-dark">
+                            {{this.tipo}}
+                          </span>
+                        </p>
+                      </div>
+                      <div class="text-end">
+                        <div class="fs-5 fw-bold text-{{#if (gte this.monto_ars 1000)}}danger{{else if (gte this.monto_ars 500)}}warning{{else}}success{{/if}}">
+                          ${{this.monto_ars}}
+                        </div>
+                        <small class="text-muted">{{this.fecha_vencimiento}}</small>
+                      </div>
+                    </div>
+                    <div class="progress" style="height: 4px;">
+                      <div class="progress-bar bg-{{#if (eq this.tipo 'compra')}}warning{{else if (eq this.tipo 'gasto recurrente')}}primary{{else}}info{{/if}}" 
+                           role="progressbar" style="width: 100%"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {{/each}}
+          </div>
+          
+          <!-- Resumen de Vencimientos -->
+          <div class="mt-4 pt-3 border-top">
+            <div class="row text-center">
+              <div class="col-md-4">
+                <div class="mb-2">
+                  <i class="bi bi-cash-stack text-success fs-4"></i>
+                  <div class="fw-bold">$<span id="totalVencimientos">0</span></div>
+                  <small class="text-muted">Total a Pagar</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="mb-2">
+                  <i class="bi bi-calendar-week text-info fs-4"></i>
+                  <div class="fw-bold"><span id="vencimientosSemana">0</span></div>
+                  <small class="text-muted">Esta Semana</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="mb-2">
+                  <i class="bi bi-exclamation-triangle text-warning fs-4"></i>
+                  <div class="fw-bold"><span id="vencimientosUrgentes">0</span></div>
+                  <small class="text-muted">Urgentes (3 días)</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        {{else}}
+          <div class="text-center py-5">
+            <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+            <h5 class="mt-3">¡Todo al día!</h5>
+            <p class="text-muted">No hay vencimientos próximos en los próximos 30 días.</p>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Script mejorado para el dashboard -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    
+    const ctx = document.getElementById('gastosChart').getContext('2d');
+    let datosGrafico;
+    let chartInstance;
+    let currentChartType = 'doughnut';
+    
+    // Variables globales para los datos
+    const proximosVencimientos = {{{JSON proximosVencimientos}}};
+    const totalGastos = parseFloat({{totalGastos}}) || 0;
+    const totalTransacciones = {{totalTransacciones}} || 0;
+    
+    
+    try {
+      // Los datos del gráfico ya vienen como array desde el servidor
+      datosGrafico = {{{datosGrafico}}};
+      
+      // Asegurarse de que datosGrafico sea un array válido
+      if (!Array.isArray(datosGrafico)) {
+        datosGrafico = [];
+      }
+    } catch (error) {
+      datosGrafico = [];
+    }
+    
+    // Inicializar métricas del dashboard
+    inicializarMetricas();
+    
+    let chartData = [];
+    
+    if (datosGrafico && datosGrafico.length > 0) {
+      // Asegurarse de que los montos sean números
+      chartData = datosGrafico.map(item => ({
+        categoria: item.categoria || 'Sin categoría',
+        monto: parseFloat(item.monto) || 0
+      })).filter(item => item.monto > 0);
+      
+      if (chartData.length === 0) {
+        document.getElementById('gastosChart').parentNode.innerHTML = 
+          '<div class="alert alert-info">No hay datos de gastos para mostrar.</div>';
+      } else {
+        crearGrafico(chartData, currentChartType);
+      }
+    } else {
+      document.getElementById('gastosChart').parentNode.innerHTML = 
+        '<div class="alert alert-info text-center"><i class="bi bi-info-circle fs-4"></i><br>No hay datos de gastos para mostrar este mes.</div>';
+    }
+    
+    // Siempre actualizar el resumen rápido, incluso si no hay datos del gráfico
+    actualizarResumenRapido(chartData);
+    
+    // Calcular estadísticas de vencimientos
+    calcularEstadisticasVencimientos();
+  });
+  
+  function crearGrafico(chartData, tipo) {
+    // Buscar instancia existente del gráfico y destruirla
+    if (window.chartInstance) {
+      window.chartInstance.destroy();
+    }
+    
+    const colores = [
+      '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+      '#5a5c69', '#858796', '#fd7e14', '#20c997', '#6f42c1'
+    ];
+    
+    const config = {
+      type: tipo,
+      data: {
+        labels: chartData.map(item => item.categoria),
+        datasets: [{
+          data: chartData.map(item => item.monto),
+          backgroundColor: colores,
+          hoverBackgroundColor: colores.map(color => color + 'CC'),
+          hoverBorderColor: 'rgba(234, 236, 244, 1)',
+          borderWidth: tipo === 'bar' ? 0 : 2,
+          borderColor: '#fff'
+        }],
+      },
+      options: {
+        maintainAspectRatio: false,
+        responsive: true,
+        plugins: {
+          legend: {
+            position: tipo === 'doughnut' ? 'right' : 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 15
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const value = context.raw || 0;
+                const total = context.dataset.data.reduce((a, b) => a + parseFloat(b), 0);
+                const percentage = Math.round((value / total) * 100);
+                return `${label}: $${value.toLocaleString()} (${percentage}%)`;
+              }
+            }
+          }
+        },
+        scales: tipo === 'bar' ? {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        } : {}
+      },
+    };
+    
+    const ctx = document.getElementById('gastosChart').getContext('2d');
+    window.chartInstance = new Chart(ctx, config);
+  }
+  
+  function cambiarTipoGrafico(tipo) {
+    // Actualizar botones activos
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Usar datos del servidor directamente
+    try {
+      const datosGrafico = {{{datosGrafico}}};
+      if (Array.isArray(datosGrafico) && datosGrafico.length > 0) {
+        const chartData = datosGrafico.map(item => ({
+          categoria: item.categoria || 'Sin categoría',
+          monto: parseFloat(item.monto) || 0
+        })).filter(item => item.monto > 0);
+        
+        crearGrafico(chartData, tipo);
+      }
+    } catch (error) {
+      console.error('Error al cambiar tipo de gráfico:', error);
+    }
+  }
+  
+  function inicializarMetricas() {
+    const hoy = new Date();
+    const diaActual = hoy.getDate();
+    const diasDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    
+    // Calcular promedio diario usando los datos del servidor directamente
+    const gastos = parseFloat({{totalGastos}}) || 0;
+    const promedioDiario = gastos / diaActual;
+    document.getElementById('promedioDiario').textContent = '$' + promedioDiario.toFixed(0);
+    
+    // Actualizar progreso del mes
+    const progressPorcentaje = (diaActual / diasDelMes) * 100;
+    document.getElementById('progressMes').style.width = progressPorcentaje + '%';
+    document.getElementById('diaActual').textContent = diaActual;
+  }
+  
+  function actualizarResumenRapido(chartData) {
+    // Usar datos directamente del servidor para evitar problemas de scope
+    const gastos = parseFloat({{totalGastos}}) || 0;
+    const transacciones = {{totalTransacciones}} || 0;
+    
+    
+    const mayorCategoriaEl = document.getElementById('mayorCategoria');
+    const promedioTransaccionEl = document.getElementById('promedioTransaccion');
+    const totalTransaccionesEl = document.getElementById('totalTransacciones');
+    
+    
+    if (chartData.length === 0) {
+      if (mayorCategoriaEl) mayorCategoriaEl.textContent = '-';
+      if (promedioTransaccionEl) promedioTransaccionEl.textContent = '$0';
+      if (totalTransaccionesEl) totalTransaccionesEl.textContent = '0';
+      return;
+    }
+    
+    // Encontrar la categoría con mayor gasto
+    const mayorCategoria = chartData.reduce((max, item) => 
+      item.monto > max.monto ? item : max
+    );
+    
+    
+    if (mayorCategoriaEl) {
+      mayorCategoriaEl.innerHTML = 
+        `<span class="text-primary">${mayorCategoria.categoria}</span><br>$${mayorCategoria.monto.toLocaleString()}`;
+    }
+    
+    // Usar el total de transacciones del servidor
+    const promedioTransaccion = transacciones > 0 ? gastos / transacciones : 0;
+    
+    
+    if (promedioTransaccionEl) {
+      promedioTransaccionEl.textContent = '$' + promedioTransaccion.toFixed(0);
+    }
+    if (totalTransaccionesEl) {
+      totalTransaccionesEl.textContent = transacciones;
+    }
+    
+  }
+  
+  function calcularEstadisticasVencimientos() {
+    // Usar datos directamente del servidor para evitar problemas de scope
+    const vencimientos = {{{JSON proximosVencimientos}}};
+    if (!vencimientos || vencimientos.length === 0) return;
+    
+    const hoy = new Date();
+    const enUnaSemana = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const enTresDias = new Date(hoy.getTime() + 3 * 24 * 60 * 60 * 1000);
+    
+    let totalVencimientos = 0;
+    let vencimientosSemana = 0;
+    let vencimientosUrgentes = 0;
+    
+    vencimientos.forEach(vencimiento => {
+      const monto = parseFloat(vencimiento.monto_ars) || 0;
+      totalVencimientos += monto;
+      
+      // Parsear fecha (formato dd/MM/yyyy)
+      const fechaParts = vencimiento.fecha_vencimiento.split('/');
+      const fechaVencimiento = new Date(fechaParts[2], fechaParts[1] - 1, fechaParts[0]);
+      
+      if (fechaVencimiento <= enUnaSemana) {
+        vencimientosSemana++;
+      }
+      
+      if (fechaVencimiento <= enTresDias) {
+        vencimientosUrgentes++;
+      }
+    });
+    
+    document.getElementById('totalVencimientos').textContent = totalVencimientos.toLocaleString();
+    document.getElementById('vencimientosSemana').textContent = vencimientosSemana;
+    document.getElementById('vencimientosUrgentes').textContent = vencimientosUrgentes;
+    
+    // Añadir animaciones a las métricas
+    animarContador('totalVencimientos', totalVencimientos);
+    animarContador('vencimientosSemana', vencimientosSemana);
+    animarContador('vencimientosUrgentes', vencimientosUrgentes);
+  }
+  
+  function animarContador(elementId, valorFinal) {
+    const elemento = document.getElementById(elementId);
+    if (!elemento) return;
+    
+    const valorInicial = 0;
+    const duracion = 1000; // 1 segundo
+    const incremento = valorFinal / (duracion / 16); // 60 FPS
+    let valorActual = valorInicial;
+    
+    const animacion = setInterval(() => {
+      valorActual += incremento;
+      if (valorActual >= valorFinal) {
+        valorActual = valorFinal;
+        clearInterval(animacion);
+      }
+      
+      if (elementId === 'totalVencimientos') {
+        elemento.textContent = Math.floor(valorActual).toLocaleString();
+      } else {
+        elemento.textContent = Math.floor(valorActual);
+      }
+    }, 16);
+  }
+  
+  // Hacer la función global para los botones
+  window.cambiarTipoGrafico = cambiarTipoGrafico;
+</script>

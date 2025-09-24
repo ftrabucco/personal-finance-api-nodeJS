@@ -31,10 +31,45 @@ describe('GastoGeneratorService', () => {
       expect(() => {
         const mockGastoRecurrente = {
           id: 1,
-          dia_de_pago: 15
+          dia_de_pago: 15,
+          mes_de_pago: null // For monthly/weekly frequency
         };
         GastoGeneratorService.generateFromGastoRecurrente(mockGastoRecurrente).catch(() => {});
       }).not.toThrow();
+    });
+
+    test('generateFromGastoRecurrente should handle annual frequency with mes_de_pago', () => {
+      expect(() => {
+        const mockGastoRecurrenteAnual = {
+          id: 1,
+          dia_de_pago: 15,
+          mes_de_pago: 6, // June
+          frecuencia: {
+            nombre_frecuencia: 'anual'
+          }
+        };
+        GastoGeneratorService.generateFromGastoRecurrente(mockGastoRecurrenteAnual).catch(() => {});
+      }).not.toThrow();
+    });
+
+    test('generateFromGastoRecurrente should handle different frequency types', () => {
+      const frequencies = [
+        { nombre_frecuencia: 'semanal', mes_de_pago: null },
+        { nombre_frecuencia: 'mensual', mes_de_pago: null },
+        { nombre_frecuencia: 'anual', mes_de_pago: 12 }
+      ];
+
+      frequencies.forEach(freq => {
+        expect(() => {
+          const mockGastoRecurrente = {
+            id: 1,
+            dia_de_pago: 15,
+            mes_de_pago: freq.mes_de_pago,
+            frecuencia: freq
+          };
+          GastoGeneratorService.generateFromGastoRecurrente(mockGastoRecurrente).catch(() => {});
+        }).not.toThrow();
+      });
     });
 
     test('generateFromDebitoAutomatico should handle monthly tracking', () => {
@@ -54,7 +89,7 @@ describe('GastoGeneratorService', () => {
           id: 1,
           fecha: '2024-01-15',
           monto: 100,
-          update: jest.fn()
+          update: () => Promise.resolve()
         };
         GastoGeneratorService.generateFromGastoUnico(mockGastoUnico).catch(() => {});
       }).not.toThrow();

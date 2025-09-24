@@ -60,6 +60,12 @@
         </select>
       </div>
 
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="procesado" name="procesado" {{#if gasto.procesado}}checked{{/if}}>
+        <label class="form-check-label" for="procesado">Marcar como procesado</label>
+        <small class="form-text text-muted d-block">Si está marcado, se creará o actualizará automáticamente el gasto correspondiente.</small>
+      </div>
+
       <div class="mb-3">
         <button type="submit" class="btn btn-primary">Guardar cambios</button>
         <a href="/gastos-unicos" class="btn btn-secondary">Cancelar</a>

@@ -10,6 +10,18 @@ import exphbs from 'express-handlebars';
 import path from 'path';
 import { helpers } from './src/utils/handlebars.helpers.js';
 import methodOverride from 'method-override';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+import config from './src/config/environment.js';
+import security from './src/middlewares/security.middleware.js';
+import ExpenseScheduler from './src/schedulers/expenseScheduler.js';
+
+// Middlewares de seguridad (antes que todo)
+app.use(security.cors);
+app.use(security.helmet);
+app.use(security.rateLimit);
+app.use(security.sanitize);
+app.use(security.securityLogger);
 
 // Configuración para Handlebars
 const hbs = exphbs.create({
@@ -22,15 +34,36 @@ app.engine('handlebars', hbs.engine);
 app.set('view engine', 'handlebars');
 app.set('views', path.join(process.cwd(), 'views'));
 
+// Configuración del proxy (para obtener IP real detrás de proxy)
+app.set('trust proxy', 1);
+
 // Para leer datos de formularios
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Validación de Content-Type
+app.use(security.validateContentType);
+
 // Configuración de method-override para PUT y DELETE de las vistas
 app.use(methodOverride('_method'));
 
-app.use(json());
 app.use(requestLogger);
+
+// Health check endpoint (antes de otros middlewares)
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: config.app.env,
+    version: config.app.version,
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
+  });
+});
+
+// Configuración Swagger
+const swaggerDocument = YAML.load('./docs/api/swagger.yaml');
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // API Routes (JSON endpoints)
 app.use('/api', apiRouter);
@@ -41,19 +74,36 @@ app.use('/', viewRouter);
 app.use(errorMiddleware);
 
 // Iniciar servidor y conectar a PostgreSQL
-const PORT = process.env.PORT || 3030;
-
 async function startServer() {
   try {
     // Conectar a PostgreSQL
     await connectDatabase();
-    
+
+    // Iniciar scheduler de gastos
+    ExpenseScheduler.start();
+
     // Iniciar servidor
-    app.listen(PORT, () => {
-      logger.info(`Servidor corriendo en http://localhost:${PORT}`);
+    app.listen(config.server.port, config.server.host, () => {
+      logger.info(`🚀 Servidor iniciado exitosamente`);
+      logger.info(`📍 URL: ${config.app.url}`);
+      logger.info(`🌍 Entorno: ${config.app.env}`);
+      logger.info(`📚 Documentación API: ${config.app.url}/api-docs`);
+      logger.info(`💊 Health Check: ${config.app.url}/health`);
+
+      if (config.mcp.enabled) {
+        logger.info(`🔗 MCP Server: http://localhost:${config.mcp.port}`);
+      }
+
+      // Log del estado del scheduler
+      const schedulerStatus = ExpenseScheduler.getStatus();
+      if (schedulerStatus.isRunning) {
+        logger.info(`📅 Expense Scheduler: Activo (próxima ejecución: ${schedulerStatus.nextExecution})`);
+      } else {
+        logger.info(`📅 Expense Scheduler: Inactivo`);
+      }
     });
   } catch (error) {
-    logger.error('Error al iniciar el servidor:', error);
+    logger.error('❌ Error al iniciar el servidor:', error);
     process.exit(1);
   }
 }

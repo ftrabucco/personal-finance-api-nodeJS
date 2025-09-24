@@ -1,0 +1,22 @@
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+          <h4 class="mb-0">Error</h4>
+        </div>
+        <div class="card-body">
+          <h5 class="card-title">{{mensaje}}</h5>
+          {{#if error}}
+            <div class="alert alert-danger mt-3">
+              <pre class="mb-0">{{error}}</pre>
+            </div>
+          {{/if}}
+          <div class="mt-4">
+            <a href="/" class="btn btn-primary">Volver al Inicio</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

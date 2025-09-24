@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import logger from '../utils/logger.js';
+import { sendValidationError } from '../utils/responseHelper.js';
 
 // Esquemas base reutilizables
 const baseGastoSchema = {
@@ -85,13 +86,20 @@ const gastoRecurrenteSchema = Joi.object({
   importancia_gasto_id: baseGastoSchema.importancia_gasto_id,
   tipo_pago_id: baseGastoSchema.tipo_pago_id,
   tarjeta_id: baseGastoSchema.tarjeta_id,
-  dia_de_pago: Joi.number().integer().min(1).max(28).required()
+  dia_de_pago: Joi.number().integer().min(1).max(31).required()
     .messages({
       'number.base': 'El día de pago debe ser un número',
       'number.integer': 'El día de pago debe ser un número entero',
       'number.min': 'El día de pago debe ser al menos 1',
-      'number.max': 'El día de pago no puede exceder 28 (para evitar problemas con febrero)',
+      'number.max': 'El día de pago no puede exceder 31',
       'any.required': 'El día de pago es requerido'
+    }),
+  mes_de_pago: Joi.number().integer().min(1).max(12).optional().allow(null)
+    .messages({
+      'number.base': 'El mes de pago debe ser un número',
+      'number.integer': 'El mes de pago debe ser un número entero',
+      'number.min': 'El mes de pago debe ser al menos 1',
+      'number.max': 'El mes de pago no puede exceder 12'
     }),
   frecuencia_gasto_id: Joi.number().integer().positive().required()
     .messages({
@@ -115,12 +123,12 @@ const debitoAutomaticoSchema = Joi.object({
   importancia_gasto_id: baseGastoSchema.importancia_gasto_id,
   tipo_pago_id: baseGastoSchema.tipo_pago_id,
   tarjeta_id: baseGastoSchema.tarjeta_id,
-  dia_de_pago: Joi.number().integer().min(1).max(28).required()
+  dia_de_pago: Joi.number().integer().min(1).max(31).required()
     .messages({
       'number.base': 'El día de pago debe ser un número',
       'number.integer': 'El día de pago debe ser un número entero',
       'number.min': 'El día de pago debe ser al menos 1',
-      'number.max': 'El día de pago no puede exceder 28 (para evitar problemas con febrero)',
+      'number.max': 'El día de pago no puede exceder 31',
       'any.required': 'El día de pago es requerido'
     }),
   frecuencia_gasto_id: Joi.number().integer().positive().required()
@@ -149,10 +157,154 @@ const gastoUnicoSchema = Joi.object({
     })
 }).unknown(false);
 
+const gastoUnicoFiltersSchema = Joi.object({
+  categoria_gasto_id: Joi.number().integer().positive().optional(),
+  importancia_gasto_id: Joi.number().integer().positive().optional(),
+  tipo_pago_id: Joi.number().integer().positive().optional(),
+  tarjeta_id: Joi.number().integer().positive().optional(),
+  fecha_desde: Joi.date().iso().optional(),
+  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  monto_min: Joi.number().positive().optional(),
+  monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
+  procesado: Joi.boolean().optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('fecha', 'monto', 'descripcion', 'createdAt', 'updatedAt').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
+}).unknown(false);
+
+const compraFiltersSchema = Joi.object({
+  categoria_gasto_id: Joi.number().integer().positive().optional(),
+  importancia_gasto_id: Joi.number().integer().positive().optional(),
+  tipo_pago_id: Joi.number().integer().positive().optional(),
+  tarjeta_id: Joi.number().integer().positive().optional(),
+  fecha_desde: Joi.date().iso().optional(),
+  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  monto_min: Joi.number().positive().optional(),
+  monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
+  pendiente_cuotas: Joi.boolean().optional(),
+  cuotas_min: Joi.number().integer().min(1).optional(),
+  cuotas_max: Joi.number().integer().min(Joi.ref('cuotas_min')).optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('fecha_compra', 'monto_total', 'descripcion', 'cantidad_cuotas', 'createdAt', 'updatedAt').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
+}).unknown(false);
+
+const gastoRecurrenteFiltersSchema = Joi.object({
+  categoria_gasto_id: Joi.number().integer().positive().optional(),
+  importancia_gasto_id: Joi.number().integer().positive().optional(),
+  tipo_pago_id: Joi.number().integer().positive().optional(),
+  tarjeta_id: Joi.number().integer().positive().optional(),
+  frecuencia_gasto_id: Joi.number().integer().positive().optional(),
+  monto_min: Joi.number().positive().optional(),
+  monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
+  activo: Joi.boolean().optional(),
+  dia_de_pago: Joi.number().integer().min(1).max(31).optional(),
+  mes_de_pago: Joi.number().integer().min(1).max(12).optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('monto', 'descripcion', 'dia_de_pago', 'mes_de_pago', 'activo', 'createdAt', 'updatedAt').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
+}).unknown(false);
+
+const debitoAutomaticoFiltersSchema = Joi.object({
+  categoria_gasto_id: Joi.number().integer().positive().optional(),
+  importancia_gasto_id: Joi.number().integer().positive().optional(),
+  tipo_pago_id: Joi.number().integer().positive().optional(),
+  tarjeta_id: Joi.number().integer().positive().optional(),
+  frecuencia_gasto_id: Joi.number().integer().positive().optional(),
+  monto_min: Joi.number().positive().optional(),
+  monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
+  activo: Joi.boolean().optional(),
+  dia_de_pago: Joi.number().integer().min(1).max(31).optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('monto', 'descripcion', 'dia_de_pago', 'activo', 'createdAt', 'updatedAt').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
+}).unknown(false);
+
+const gastoSchema = Joi.object({
+  fecha: Joi.date().iso().max('now').required()
+    .messages({
+      'date.base': 'La fecha debe ser una fecha válida',
+      'date.format': 'La fecha debe estar en formato ISO',
+      'date.max': 'La fecha no puede ser futura',
+      'any.required': 'La fecha es requerida'
+    }),
+  monto_ars: Joi.number().positive().optional()
+    .messages({
+      'number.base': 'El monto ARS debe ser un número',
+      'number.positive': 'El monto ARS debe ser positivo'
+    }),
+  monto_usd: Joi.number().positive().optional()
+    .messages({
+      'number.base': 'El monto USD debe ser un número',
+      'number.positive': 'El monto USD debe ser positivo'
+    }),
+  descripcion: baseGastoSchema.descripcion,
+  categoria_gasto_id: baseGastoSchema.categoria_gasto_id,
+  importancia_gasto_id: baseGastoSchema.importancia_gasto_id,
+  frecuencia_gasto_id: Joi.number().integer().positive().optional()
+    .messages({
+      'number.base': 'La frecuencia debe ser un número',
+      'number.integer': 'La frecuencia debe ser un número entero',
+      'number.positive': 'La frecuencia debe ser un ID válido'
+    }),
+  cantidad_cuotas_totales: Joi.number().integer().min(1).max(60).optional()
+    .messages({
+      'number.base': 'Las cuotas totales deben ser un número',
+      'number.integer': 'Las cuotas totales deben ser un número entero',
+      'number.min': 'Las cuotas totales deben ser al menos 1',
+      'number.max': 'Las cuotas totales no pueden exceder 60'
+    }),
+  cantidad_cuotas_pagadas: Joi.number().integer().min(0).optional()
+    .when('cantidad_cuotas_totales', {
+      is: Joi.exist(),
+      then: Joi.number().max(Joi.ref('cantidad_cuotas_totales'))
+    })
+    .messages({
+      'number.base': 'Las cuotas pagadas deben ser un número',
+      'number.integer': 'Las cuotas pagadas deben ser un número entero',
+      'number.min': 'Las cuotas pagadas no pueden ser negativas',
+      'number.max': 'Las cuotas pagadas no pueden exceder las cuotas totales'
+    }),
+  tipo_pago_id: Joi.number().integer().positive().optional()
+    .messages({
+      'number.base': 'El tipo de pago debe ser un número',
+      'number.integer': 'El tipo de pago debe ser un número entero',
+      'number.positive': 'El tipo de pago debe ser un ID válido'
+    }),
+  tarjeta_id: baseGastoSchema.tarjeta_id,
+  usuario_id: Joi.number().integer().positive().optional()
+    .messages({
+      'number.base': 'El usuario debe ser un número',
+      'number.integer': 'El usuario debe ser un número entero',
+      'number.positive': 'El usuario debe ser un ID válido'
+    }),
+  tipo_origen: Joi.string().valid('recurrente', 'debito_automatico', 'compra', 'unico').required()
+    .messages({
+      'string.base': 'El tipo de origen debe ser un texto',
+      'any.only': 'El tipo de origen debe ser uno de: recurrente, debito_automatico, compra, unico',
+      'any.required': 'El tipo de origen es requerido'
+    }),
+  id_origen: Joi.number().integer().positive().required()
+    .messages({
+      'number.base': 'El ID de origen debe ser un número',
+      'number.integer': 'El ID de origen debe ser un número entero',
+      'number.positive': 'El ID de origen debe ser un ID válido',
+      'any.required': 'El ID de origen es requerido'
+    })
+}).or('monto_ars', 'monto_usd')
+  .messages({
+    'object.missing': 'Debe proporcionar al menos monto_ars o monto_usd'
+  }).unknown(false);
+
 // Esquemas para filtros y parámetros
 const gastoFiltersSchema = Joi.object({
   categoria_gasto_id: Joi.number().integer().positive().optional(),
   importancia_gasto_id: Joi.number().integer().positive().optional(),
+  frecuencia_gasto_id: Joi.number().integer().positive().optional(),
   tipo_pago_id: Joi.number().integer().positive().optional(),
   tarjeta_id: Joi.number().integer().positive().optional(),
   fecha_desde: Joi.date().iso().optional(),
@@ -160,7 +312,13 @@ const gastoFiltersSchema = Joi.object({
   monto_min_ars: Joi.number().positive().optional(),
   monto_max_ars: Joi.number().positive().min(Joi.ref('monto_min_ars')).optional(),
   monto_min_usd: Joi.number().positive().optional(),
-  monto_max_usd: Joi.number().positive().min(Joi.ref('monto_min_usd')).optional()
+  monto_max_usd: Joi.number().positive().min(Joi.ref('monto_min_usd')).optional(),
+  tipo_origen: Joi.string().valid('unico', 'recurrente', 'debito_automatico', 'compra').optional(),
+  id_origen: Joi.number().integer().positive().optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('fecha', 'monto_ars', 'monto_usd', 'descripcion', 'createdAt', 'updatedAt').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
 }).unknown(false);
 
 const idParamSchema = Joi.object({
@@ -199,22 +357,26 @@ const createValidationMiddleware = (schema, location = 'body') => {
         errors: validationErrors 
       });
 
-      return res.status(400).json({
-        error: 'Error de validación',
-        details: validationErrors
-      });
+      return sendValidationError(res, validationErrors);
     }
 
     // Reemplazar los datos con los validados
-    if (location === 'body') req.body = value;
-    else if (location === 'query') req.query = value;
-    else if (location === 'params') req.params = value;
+    if (location === 'body') {
+      req.body = value;
+    } else if (location === 'query') {
+      // No reemplazar req.query directamente, solo agregar propiedades validadas
+      Object.assign(req.query, value);
+    } else if (location === 'params') {
+      req.params = value;
+    }
 
     next();
   };
 };
 
 // Exportar middlewares de validación unificados
+export const validateCreateGasto = createValidationMiddleware(gastoSchema, 'body');
+export const validateUpdateGasto = createValidationMiddleware(gastoSchema, 'body');
 export const validateCreateCompra = createValidationMiddleware(compraSchema, 'body');
 export const validateUpdateCompra = createValidationMiddleware(compraSchema, 'body');
 export const validateCreateGastoRecurrente = createValidationMiddleware(gastoRecurrenteSchema, 'body');
@@ -224,4 +386,8 @@ export const validateUpdateDebitoAutomatico = createValidationMiddleware(debitoA
 export const validateCreateGastoUnico = createValidationMiddleware(gastoUnicoSchema, 'body');
 export const validateUpdateGastoUnico = createValidationMiddleware(gastoUnicoSchema, 'body');
 export const validateGastoFilters = createValidationMiddleware(gastoFiltersSchema, 'query');
+export const validateGastoUnicoFilters = createValidationMiddleware(gastoUnicoFiltersSchema, 'query');
+export const validateCompraFilters = createValidationMiddleware(compraFiltersSchema, 'query');
+export const validateGastoRecurrenteFilters = createValidationMiddleware(gastoRecurrenteFiltersSchema, 'query');
+export const validateDebitoAutomaticoFilters = createValidationMiddleware(debitoAutomaticoFiltersSchema, 'query');
 export const validateIdParam = createValidationMiddleware(idParamSchema, 'params');

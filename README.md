@@ -21,11 +21,25 @@ A complete REST API for personal finance management, built with Node.js, Express
 - **Validation**: Joi for data schemas
 - **Logging**: Winston for structured logs
 - **Frontend**: Handlebars for HTML views
-- **Pattern**: MVC with reusable base controllers
+- **Architecture**: Strategy Pattern + BaseService + Clean Architecture
+- **Testing**: Jest with centralized test structure
+- **MCP Integration**: Model Context Protocol for external access
+
+## 📚 Documentation
+
+For complete documentation, architecture details, API reference, and testing guides:
+
+👉 **[Complete Documentation](./docs/README.md)**
+
+Quick links:
+- 🏗️ **[Architecture Overview](./docs/architecture/README.md)** - Strategy Pattern, services, database design
+- 🔌 **[API Reference](./docs/api/)** - Endpoints, schemas, and examples
+- 🧪 **[Testing Guide](./docs/testing/)** - Test structure and MCP integration
+- 🤖 **[MCP Server](./docs/testing/mcp-integration.md)** - Model Context Protocol setup
 
 ## 📋 Prerequisites
 
-- **Node.js** 18+ 
+- **Node.js** 18+
 - **Docker Desktop** for macOS/Windows
 - **npm** or **yarn**
 

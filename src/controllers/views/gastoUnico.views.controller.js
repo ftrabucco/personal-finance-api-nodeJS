@@ -1,6 +1,40 @@
 import { GastoUnico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../../models/index.js';
-import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
+import { GastoUnicoController } from '../api/gastoUnico.controller.js';
 import logger from '../../utils/logger.js';
+
+// Instancia del API controller para reutilizar lógica de business rules
+const apiController = new GastoUnicoController();
+
+// Helper para capturar respuestas del API controller
+function createMockResponse() {
+  let result = {};
+  return {
+    status: (code) => ({
+      json: (data) => { result = { status: code, data }; return result; }
+    }),
+    json: (data) => { result = { status: 200, data }; return result; },
+    getResult: () => result
+  };
+}
+
+// Helper para limpiar datos del formulario antes de enviar al API
+function cleanFormData(body) {
+  const cleaned = { ...body };
+  
+  // Convertir strings vacíos a null para campos opcionales
+  if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
+    cleaned.tarjeta_id = null;
+  }
+  
+  // Asegurar tipos numéricos correctos
+  if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
+  if (cleaned.categoria_gasto_id) cleaned.categoria_gasto_id = parseInt(cleaned.categoria_gasto_id);
+  if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
+  if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
+  if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
+  
+  return cleaned;
+}
 
 // Helper function to get reference data for forms
 async function getReferenceData() {
@@ -101,157 +135,107 @@ export const renderFormEditarGastoUnico = async (req, res) => {
 
 export const handleFormNuevoGastoUnico = async (req, res) => {
   try {
-    const {
-      descripcion,
-      monto,
-      fecha,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    } = req.body;
+    logger.debug('Datos recibidos en formulario:', req.body);
 
-    logger.debug('Datos recibidos:', {
-      descripcion,
-      monto,
-      fecha,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    });
+    // Limpiar datos del formulario antes de enviar al API
+    req.body = cleanFormData(req.body);
+    logger.debug('Datos limpiados:', req.body);
 
-    // Validar que los IDs existan antes de crear
-    const [categoria, importancia, tipoPago, tarjeta] = await Promise.all([
-      CategoriaGasto.findByPk(categoria_gasto_id),
-      ImportanciaGasto.findByPk(importancia_gasto_id),
-      TipoPago.findByPk(tipo_pago_id),
-      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
-    ]);
+    // Usar el API controller para mantener business rules consistentes
+    const mockRes = createMockResponse();
+    await apiController.create(req, mockRes);
+    const result = mockRes.getResult();
 
-    logger.debug('Datos encontrados:', {
-      categoria: categoria?.get(),
-      importancia: importancia?.get(),
-      tipoPago: tipoPago?.get(),
-      tarjeta: tarjeta?.get()
-    });
-
-    if (!categoria) {
-      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
+    if (result.status === 201) {
+      logger.info('Gasto único creado exitosamente desde vista:', { 
+        gastoUnico_id: result.data.gastoUnico?.id,
+        gasto_id: result.data.gasto?.id
+      });
+      return res.redirect('/gastos-unicos');
+    } else {
+      // Manejar errores del API
+      const refData = await getReferenceData();
+      return res.render('gastosUnicos/nuevo', {
+        ...refData,
+        error: result.data.error || 'Error al crear el gasto único',
+        details: result.data.details,
+        formData: req.body
+      });
     }
-    if (!importancia) {
-      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
-    }
-    if (!tipoPago) {
-      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
-    }
-    if (tarjeta_id && !tarjeta) {
-      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
-    }
-
-    const nuevoGasto = await GastoUnico.create({
-      descripcion,
-      monto: parseFloat(monto),
-      fecha,
-      categoria_gasto_id: parseInt(categoria_gasto_id),
-      importancia_gasto_id: parseInt(importancia_gasto_id),
-      tipo_pago_id: parseInt(tipo_pago_id),
-      tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
-    });
-
-    // Generar el gasto real inmediatamente
-    await GastoGeneratorService.generateFromGastoUnico(nuevoGasto);
-
-    logger.info('Gasto único creado y gasto real generado:', { id: nuevoGasto.id });
-    res.redirect('/gastos-unicos');
   } catch (error) {
-    logger.error('Error al crear gasto único:', { error });
+    logger.error('Error en handleFormNuevoGastoUnico:', { error });
     const refData = await getReferenceData();
-    res.render('gastosUnicos/nuevo', { 
-      ...refData, 
-      error: error.message,
-      formData: req.body // Mantener los datos del formulario
+    res.render('gastosUnicos/nuevo', {
+      ...refData,
+      error: 'Error interno del servidor',
+      details: error.message,
+      formData: req.body
     });
   }
 };
 
 export const handleFormEditarGastoUnico = async (req, res) => {
   try {
-    const gasto = await GastoUnico.findByPk(req.params.id);
-    if (!gasto) {
-      return res.status(404).send('Gasto único no encontrado');
-    }
+    logger.debug('Datos recibidos para edición:', { body: req.body, params: req.params });
 
-    const {
-      descripcion,
-      monto,
-      fecha,
-      categoria_gasto_id,
-      importancia_gasto_id,
-      tipo_pago_id,
-      tarjeta_id
-    } = req.body;
+    // Limpiar datos del formulario antes de enviar al API
+    req.body = cleanFormData(req.body);
+    logger.debug('Datos limpiados:', req.body);
 
-    // Validar campos requeridos
-    if (!descripcion || !monto || !fecha || !categoria_gasto_id || !importancia_gasto_id || !tipo_pago_id) {
-      throw new Error('Todos los campos son requeridos excepto tarjeta');
-    }
+    // Usar el API controller para mantener business rules consistentes
+    const mockRes = createMockResponse();
+    await apiController.update(req, mockRes);
+    const result = mockRes.getResult();
 
-    // Validar que los IDs existan antes de actualizar
-    const [categoria, importancia, tipoPago, tarjeta] = await Promise.all([
-      CategoriaGasto.findByPk(categoria_gasto_id),
-      ImportanciaGasto.findByPk(importancia_gasto_id),
-      TipoPago.findByPk(tipo_pago_id),
-      tarjeta_id ? Tarjeta.findByPk(tarjeta_id) : Promise.resolve(null)
-    ]);
-
-    if (!categoria) {
-      throw new Error(`La categoría con ID ${categoria_gasto_id} no existe`);
+    if (result.status === 200) {
+      logger.info('Gasto único actualizado exitosamente desde vista:', { 
+        gastoUnico_id: req.params.id
+      });
+      return res.redirect('/gastos-unicos');
+    } else {
+      // Manejar errores del API
+      const refData = await getReferenceData();
+      return res.render('gastosUnicos/editar', {
+        ...refData,
+        error: result.data.error || 'Error al actualizar el gasto único',
+        details: result.data.details,
+        gasto: { ...req.body, id: req.params.id }
+      });
     }
-    if (!importancia) {
-      throw new Error(`La importancia con ID ${importancia_gasto_id} no existe`);
-    }
-    if (!tipoPago) {
-      throw new Error(`El tipo de pago con ID ${tipo_pago_id} no existe`);
-    }
-    if (tarjeta_id && !tarjeta) {
-      throw new Error(`La tarjeta con ID ${tarjeta_id} no existe`);
-    }
-
-    await gasto.update({
-      descripcion,
-      monto: parseFloat(monto),
-      fecha,
-      categoria_gasto_id: parseInt(categoria_gasto_id),
-      importancia_gasto_id: parseInt(importancia_gasto_id),
-      tipo_pago_id: parseInt(tipo_pago_id),
-      tarjeta_id: tarjeta_id ? parseInt(tarjeta_id) : null
-    });
-
-    logger.info('Gasto único actualizado:', { id: gasto.id });
-    res.redirect('/gastos-unicos');
   } catch (error) {
-    logger.error('Error al actualizar gasto único:', { error });
+    logger.error('Error en handleFormEditarGastoUnico:', { error });
     const refData = await getReferenceData();
     res.render('gastosUnicos/editar', {
-      error: error.message,
-      gasto: { ...req.body, id: req.params.id },
-      ...refData
+      ...refData,
+      error: 'Error interno del servidor',
+      details: error.message,
+      gasto: { ...req.body, id: req.params.id }
     });
   }
 };
 
 export const handleDeleteGastoUnico = async (req, res) => {
   try {
-    const gasto = await GastoUnico.findByPk(req.params.id);
-    if (!gasto) {
+    logger.debug('Eliminando gasto único:', { id: req.params.id });
+
+    // Usar el API controller para mantener business rules consistentes
+    const mockRes = createMockResponse();
+    await apiController.delete(req, mockRes);
+    const result = mockRes.getResult();
+
+    if (result.status === 200) {
+      logger.info('Gasto único eliminado exitosamente desde vista:', { 
+        gastoUnico_id: req.params.id,
+        gastos_eliminados: result.data.gastos_eliminados
+      });
+      return res.redirect('/gastos-unicos');
+    } else if (result.status === 404) {
       return res.status(404).send('Gasto único no encontrado');
+    } else {
+      return res.status(500).send(result.data.error || 'Error al eliminar el gasto único');
     }
-    await gasto.destroy();
-    logger.info('Gasto único eliminado:', { id: req.params.id });
-    res.redirect('/gastos-unicos');
   } catch (error) {
-    logger.error('Error al eliminar gasto único:', { error });
-    res.status(500).send('Error al eliminar el gasto único');
+    logger.error('Error en handleDeleteGastoUnico:', { error });
+    res.status(500).send('Error interno del servidor');
   }
 }; 

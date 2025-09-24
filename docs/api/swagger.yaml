@@ -1,0 +1,2277 @@
+openapi: 3.0.3
+info:
+  title: Personal Finance API - Gastos
+  description: API para gestión de gastos en aplicación de finanzas personales
+  version: 1.0.0
+  contact:
+    name: Personal Finance API
+    url: http://localhost:3030
+
+servers:
+  - url: http://localhost:3030/api
+    description: Development server
+
+tags:
+  - name: gastos
+    description: Operaciones con gastos reales generados
+  - name: gastos-unicos
+    description: Operaciones con gastos únicos (no recurrentes)
+  - name: compras
+    description: Operaciones con compras en cuotas
+  - name: gastos-recurrentes
+    description: Operaciones con gastos recurrentes (mensuales, anuales, etc.)
+  - name: debitos-automaticos
+    description: Operaciones con débitos automáticos (suscripciones, servicios)
+
+components:
+  schemas:
+    StandardResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indica si la operación fue exitosa
+        data:
+          description: Datos de la respuesta
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total de elementos
+            type:
+              type: string
+              description: Tipo de respuesta
+              enum: [collection, single]
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+    
+    StandardError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Mensaje de error
+        details:
+          description: Detalles adicionales del error
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp del error
+
+    ValidationError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Error de validación"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Campo que falló la validación
+              message:
+                type: string
+                description: Mensaje de error específico
+              value:
+                description: Valor que causó el error
+        timestamp:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+          description: Número de elementos por página
+        offset:
+          type: integer  
+          description: Número de elementos saltados
+        hasNext:
+          type: boolean
+          description: Indica si hay página siguiente
+        hasPrev:
+          type: boolean
+          description: Indica si hay página anterior
+
+    Gasto:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del gasto
+          example: 123
+        fecha:
+          type: string
+          format: date
+          description: Fecha del gasto
+          example: "2024-01-15"
+        monto_ars:
+          type: string
+          pattern: '^[0-9]+\.[0-9]{2}$'
+          description: Monto en pesos argentinos
+          example: "1500.50"
+        monto_usd:
+          type: string
+          pattern: '^[0-9]+\.[0-9]{2}$'
+          nullable: true
+          description: Monto en dólares estadounidenses
+          example: "25.30"
+        descripcion:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Descripción del gasto
+          example: "Almuerzo en restaurante"
+        categoria_gasto_id:
+          type: integer
+          description: ID de la categoría del gasto
+          example: 5
+        importancia_gasto_id:
+          type: integer
+          description: ID de la importancia del gasto
+          example: 2
+        frecuencia_gasto_id:
+          type: integer
+          nullable: true
+          description: ID de la frecuencia (si aplica)
+          example: null
+        cantidad_cuotas_totales:
+          type: integer
+          minimum: 1
+          maximum: 60
+          nullable: true
+          description: Cantidad total de cuotas
+          example: 6
+        cantidad_cuotas_pagadas:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Cantidad de cuotas pagadas
+          example: 2
+        tipo_pago_id:
+          type: integer
+          nullable: true
+          description: ID del tipo de pago
+          example: 3
+        tarjeta_id:
+          type: integer
+          nullable: true
+          description: ID de la tarjeta utilizada
+          example: 2
+        usuario_id:
+          type: integer
+          nullable: true
+          description: ID del usuario
+          example: 1
+        tipo_origen:
+          type: string
+          enum: [unico, recurrente, debito_automatico, compra]
+          description: Tipo de origen del gasto
+          example: "unico"
+        id_origen:
+          type: integer
+          description: ID en la tabla de origen
+          example: 456
+        createdAt:
+          type: string
+          format: date-time
+          description: Fecha de creación
+        updatedAt:
+          type: string
+          format: date-time
+          description: Fecha de última actualización
+        categoria:
+          $ref: '#/components/schemas/Categoria'
+        importancia:
+          $ref: '#/components/schemas/Importancia'
+        tipoPago:
+          $ref: '#/components/schemas/TipoPago'
+        tarjeta:
+          $ref: '#/components/schemas/Tarjeta'
+        frecuencia:
+          $ref: '#/components/schemas/Frecuencia'
+
+    GastoUnico:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del gasto único
+          example: 789
+        descripcion:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Descripción del gasto
+          example: "Compra única de equipo"
+        monto:
+          type: number
+          minimum: 0.01
+          description: Monto del gasto
+          example: 2500.75
+        fecha:
+          type: string
+          format: date
+          description: Fecha del gasto (no puede ser futura)
+          example: "2024-01-15"
+        categoria_gasto_id:
+          type: integer
+          description: ID de la categoría del gasto
+          example: 8
+        importancia_gasto_id:
+          type: integer
+          description: ID de la importancia del gasto
+          example: 1
+        tipo_pago_id:
+          type: integer
+          description: ID del tipo de pago
+          example: 3
+        tarjeta_id:
+          type: integer
+          nullable: true
+          description: ID de la tarjeta (opcional)
+          example: 1
+        procesado:
+          type: boolean
+          description: Indica si ya fue procesado para generar gasto real
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        categoria:
+          $ref: '#/components/schemas/Categoria'
+        importancia:
+          $ref: '#/components/schemas/Importancia'
+        tipoPago:
+          $ref: '#/components/schemas/TipoPago'
+        tarjeta:
+          $ref: '#/components/schemas/Tarjeta'
+
+    Compra:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único de la compra
+          example: 456
+        descripcion:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Descripción de la compra
+          example: "Notebook nueva en 12 cuotas"
+        monto_total:
+          type: number
+          minimum: 0.01
+          description: Monto total de la compra
+          example: 120000.00
+        fecha_compra:
+          type: string
+          format: date
+          description: Fecha de la compra
+          example: "2024-01-15"
+        cantidad_cuotas:
+          type: integer
+          minimum: 1
+          maximum: 60
+          default: 1
+          description: Cantidad de cuotas
+          example: 12
+        pendiente_cuotas:
+          type: boolean
+          description: Si hay cuotas pendientes de procesar
+          example: true
+        categoria_gasto_id:
+          type: integer
+          description: ID de la categoría
+        importancia_gasto_id:
+          type: integer
+          description: ID de la importancia
+        tipo_pago_id:
+          type: integer
+          description: ID del tipo de pago
+        tarjeta_id:
+          type: integer
+          nullable: true
+          description: ID de la tarjeta (opcional)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        categoria:
+          $ref: '#/components/schemas/Categoria'
+        importancia:
+          $ref: '#/components/schemas/Importancia'
+        tipoPago:
+          $ref: '#/components/schemas/TipoPago'
+        tarjeta:
+          $ref: '#/components/schemas/Tarjeta'
+
+    GastoRecurrente:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del gasto recurrente
+          example: 321
+        descripcion:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Descripción del gasto
+          example: "Alquiler mensual"
+        monto:
+          type: number
+          minimum: 0.01
+          description: Monto del gasto
+          example: 50000.00
+        dia_de_pago:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Día del mes para el pago
+          example: 15
+        mes_de_pago:
+          type: integer
+          minimum: 1
+          maximum: 12
+          nullable: true
+          description: Mes específico para gastos anuales
+          example: null
+        activo:
+          type: boolean
+          description: Si el gasto está activo
+          example: true
+        ultima_fecha_generado:
+          type: string
+          format: date
+          nullable: true
+          description: Última fecha que se generó un gasto
+        fecha_inicio:
+          type: string
+          format: date
+          nullable: true
+          description: Fecha de inicio opcional
+        categoria_gasto_id:
+          type: integer
+        importancia_gasto_id:
+          type: integer
+        tipo_pago_id:
+          type: integer
+        tarjeta_id:
+          type: integer
+          nullable: true
+        frecuencia_gasto_id:
+          type: integer
+          description: ID de la frecuencia (mensual, anual, etc.)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        categoria:
+          $ref: '#/components/schemas/Categoria'
+        importancia:
+          $ref: '#/components/schemas/Importancia'
+        tipoPago:
+          $ref: '#/components/schemas/TipoPago'
+        tarjeta:
+          $ref: '#/components/schemas/Tarjeta'
+        frecuencia:
+          $ref: '#/components/schemas/Frecuencia'
+
+    DebitoAutomatico:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del débito automático
+          example: 654
+        descripcion:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Descripción del débito
+          example: "Suscripción Netflix"
+        monto:
+          type: number
+          minimum: 0.01
+          description: Monto del débito
+          example: 1200.00
+        dia_de_pago:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Día del mes para el débito
+          example: 5
+        activo:
+          type: boolean
+          description: Si el débito está activo
+          example: true
+        ultima_fecha_generado:
+          type: string
+          format: date
+          nullable: true
+          description: Última fecha que se generó un gasto
+        categoria_gasto_id:
+          type: integer
+        importancia_gasto_id:
+          type: integer
+        tipo_pago_id:
+          type: integer
+        tarjeta_id:
+          type: integer
+          nullable: true
+        frecuencia_gasto_id:
+          type: integer
+          description: ID de la frecuencia
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        categoria:
+          $ref: '#/components/schemas/Categoria'
+        importancia:
+          $ref: '#/components/schemas/Importancia'
+        tipoPago:
+          $ref: '#/components/schemas/TipoPago'
+        tarjeta:
+          $ref: '#/components/schemas/Tarjeta'
+        frecuencia:
+          $ref: '#/components/schemas/Frecuencia'
+
+    Categoria:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre_categoria:
+          type: string
+
+    Importancia:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre_importancia:
+          type: string
+
+    TipoPago:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        permite_cuotas:
+          type: boolean
+
+    Tarjeta:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        tipo:
+          type: string
+        banco:
+          type: string
+        dia_cierre:
+          type: integer
+        dia_vencimiento:
+          type: integer
+        permite_cuotas:
+          type: boolean
+
+    Frecuencia:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+
+    GastosSummary:
+      type: object
+      properties:
+        periodo:
+          type: object
+          properties:
+            desde:
+              type: string
+              format: date
+            hasta:
+              type: string
+              format: date
+        total_ars:
+          type: number
+          description: Total en pesos argentinos
+        total_usd:
+          type: number
+          description: Total en dólares estadounidenses
+        cantidad_gastos:
+          type: integer
+          description: Cantidad total de gastos
+        por_categoria:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              total_ars:
+                type: number
+              total_usd:
+                type: number
+              cantidad:
+                type: integer
+        por_importancia:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              total_ars:
+                type: number
+              total_usd:
+                type: number
+              cantidad:
+                type: integer
+        por_tipo_pago:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              total_ars:
+                type: number
+              total_usd:
+                type: number
+              cantidad:
+                type: integer
+
+    GenerateResult:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            total_generated:
+              type: integer
+            total_errors:
+              type: integer
+            breakdown:
+              type: object
+              properties:
+                recurrentes:
+                  type: integer
+                debitos:
+                  type: integer
+                compras:
+                  type: integer
+                unicos:
+                  type: integer
+        details:
+          type: object
+          properties:
+            success:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  id:
+                    type: integer
+            errors:
+              type: array
+              items:
+                type: object
+
+  parameters:
+    GastoIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: ID del gasto
+      example: 123
+
+    PaginationLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+      description: Número máximo de resultados a devolver
+      example: 20
+
+    PaginationOffset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+      description: Número de resultados a omitir
+      example: 40
+
+    OrderBy:
+      name: orderBy
+      in: query
+      schema:
+        type: string
+        enum: [fecha, monto_ars, monto_usd, descripcion, createdAt, updatedAt]
+        default: fecha
+      description: Campo por el cual ordenar
+      example: fecha
+
+    OrderDirection:
+      name: orderDirection
+      in: query
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: DESC
+      description: Dirección del ordenamiento
+      example: DESC
+
+paths:
+  /gastos/all:
+    get:
+      tags:
+        - gastos
+      summary: Obtener todos los gastos
+      description: Retorna todos los gastos sin filtros ni paginación
+      responses:
+        '200':
+          description: Lista completa de gastos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Gasto'
+              example:
+                success: true
+                data: []
+                meta:
+                  total: 150
+                  type: "collection"
+
+  /gastos:
+    get:
+      tags:
+        - gastos
+      summary: Obtener gastos con filtros
+      description: |
+        Obtiene gastos aplicando filtros opcionales. 
+        
+        **Comportamiento de paginación:**
+        - Sin `limit`: Devuelve todos los resultados filtrados
+        - Con `limit`: Devuelve respuesta paginada con metadata de navegación
+      parameters:
+        - name: categoria_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por categoría de gasto
+        - name: importancia_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por importancia
+        - name: tipo_pago_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tipo de pago
+        - name: tarjeta_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tarjeta
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de inicio del rango
+          example: "2024-01-01"
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de fin del rango
+          example: "2024-12-31"
+        - name: monto_min_ars
+          in: query
+          schema:
+            type: number
+          description: Monto mínimo en ARS
+        - name: monto_max_ars
+          in: query
+          schema:
+            type: number
+          description: Monto máximo en ARS
+        - name: monto_min_usd
+          in: query
+          schema:
+            type: number
+          description: Monto mínimo en USD
+        - name: monto_max_usd
+          in: query
+          schema:
+            type: number
+          description: Monto máximo en USD
+        - name: tipo_origen
+          in: query
+          schema:
+            type: string
+            enum: [unico, recurrente, debito_automatico, compra]
+          description: Filtrar por tipo de origen del gasto
+          example: "unico"
+        - name: id_origen
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Filtrar por ID del registro origen que generó este gasto
+          example: 123
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/OrderDirection'
+      responses:
+        '200':
+          description: Lista de gastos filtrados
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - allOf:
+                      - $ref: '#/components/schemas/StandardResponse'
+                      - type: object
+                        properties:
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Gasto'
+                        description: Respuesta sin paginación
+                  - allOf:
+                      - $ref: '#/components/schemas/StandardResponse'
+                      - type: object
+                        properties:
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Gasto'
+                          meta:
+                            type: object
+                            properties:
+                              total:
+                                type: integer
+                              type:
+                                type: string
+                                example: "collection"
+                              pagination:
+                                $ref: '#/components/schemas/Pagination'
+                        description: Respuesta con paginación
+        '400':
+          description: Error de validación en parámetros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+    post:
+      tags:
+        - gastos
+      summary: Crear nuevo gasto
+      description: Crea un nuevo gasto en la tabla principal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fecha
+                - descripcion
+                - categoria_gasto_id
+                - importancia_gasto_id
+                - tipo_origen
+                - id_origen
+              properties:
+                fecha:
+                  type: string
+                  format: date
+                  description: Fecha del gasto (no puede ser futura)
+                monto_ars:
+                  type: number
+                  minimum: 0.01
+                  description: Monto en pesos argentinos
+                monto_usd:
+                  type: number
+                  minimum: 0.01
+                  description: Monto en dólares estadounidenses
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                frecuencia_gasto_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                cantidad_cuotas_totales:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+                cantidad_cuotas_pagadas:
+                  type: integer
+                  minimum: 0
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                usuario_id:
+                  type: integer
+                  minimum: 1
+                tipo_origen:
+                  type: string
+                  enum: [unico, recurrente, debito_automatico, compra]
+                id_origen:
+                  type: integer
+                  minimum: 1
+              description: |
+                **Validaciones:**
+                - Al menos `monto_ars` o `monto_usd` debe proporcionarse
+                - Todos los IDs de referencia deben existir
+                - `cantidad_cuotas_pagadas` ≤ `cantidad_cuotas_totales`
+            example:
+              fecha: "2024-01-15"
+              monto_ars: 1500.50
+              descripcion: "Almuerzo en restaurante"
+              categoria_gasto_id: 5
+              importancia_gasto_id: 2
+              tipo_pago_id: 3
+              tarjeta_id: 2
+              tipo_origen: "unico"
+              id_origen: 123
+      responses:
+        '201':
+          description: Gasto creado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Gasto'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /gastos/{id}:
+    get:
+      tags:
+        - gastos
+      summary: Obtener gasto por ID
+      description: Obtiene un gasto específico con todas sus relaciones
+      parameters:
+        - $ref: '#/components/parameters/GastoIdParam'
+      responses:
+        '200':
+          description: Gasto encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Gasto'
+        '404':
+          description: Gasto no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Gasto no encontrado"
+                timestamp: "2025-09-10T00:35:00.434Z"
+
+    put:
+      tags:
+        - gastos
+      summary: Actualizar gasto
+      description: Actualiza un gasto existente
+      parameters:
+        - $ref: '#/components/parameters/GastoIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fecha:
+                  type: string
+                  format: date
+                monto_ars:
+                  type: number
+                  minimum: 0.01
+                monto_usd:
+                  type: number
+                  minimum: 0.01
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                frecuencia_gasto_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                cantidad_cuotas_totales:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+                cantidad_cuotas_pagadas:
+                  type: integer
+                  minimum: 0
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                usuario_id:
+                  type: integer
+                  minimum: 1
+                tipo_origen:
+                  type: string
+                  enum: [unico, recurrente, debito_automatico, compra]
+                id_origen:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Gasto actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Gasto'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Gasto no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+    delete:
+      tags:
+        - gastos
+      summary: Eliminar gasto
+      description: Elimina un gasto existente
+      parameters:
+        - $ref: '#/components/parameters/GastoIdParam'
+      responses:
+        '200':
+          description: Gasto eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Gasto eliminado correctamente"
+        '404':
+          description: Gasto no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /gastos/search:
+    post:
+      tags:
+        - gastos
+      summary: Búsqueda avanzada de gastos
+      description: |
+        Realiza búsquedas complejas con filtros avanzados y paginación.
+        Ideal para formularios de búsqueda con múltiples criterios.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                categoria_gasto_id:
+                  type: integer
+                  description: Filtrar por categoría
+                importancia_gasto_id:
+                  type: integer
+                  description: Filtrar por importancia
+                frecuencia_gasto_id:
+                  type: integer
+                  description: Filtrar por frecuencia
+                tipo_pago_id:
+                  type: integer
+                  description: Filtrar por tipo de pago
+                tarjeta_id:
+                  type: integer
+                  description: Filtrar por tarjeta
+                fecha_desde:
+                  type: string
+                  format: date
+                  description: Fecha de inicio
+                fecha_hasta:
+                  type: string
+                  format: date
+                  description: Fecha de fin
+                monto_min_ars:
+                  type: number
+                  description: Monto mínimo en ARS
+                monto_max_ars:
+                  type: number
+                  description: Monto máximo en ARS
+                monto_min_usd:
+                  type: number
+                  description: Monto mínimo en USD
+                monto_max_usd:
+                  type: number
+                  description: Monto máximo en USD
+                tipo_origen:
+                  type: string
+                  enum: [unico, recurrente, debito_automatico, compra]
+                  description: Filtrar por tipo de origen del gasto
+                  example: "unico"
+                id_origen:
+                  type: integer
+                  minimum: 1
+                  description: Filtrar por ID del registro origen que generó este gasto
+                  example: 123
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000
+                  default: 100
+                  description: Elementos por página
+                offset:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                  description: Elementos a saltar
+                orderBy:
+                  type: string
+                  enum: [fecha, monto_ars, monto_usd, descripcion, createdAt, updatedAt]
+                  default: fecha
+                orderDirection:
+                  type: string
+                  enum: [ASC, DESC]
+                  default: DESC
+            example:
+              categoria_gasto_id: 5
+              tipo_origen: "unico"
+              id_origen: 123
+              fecha_desde: "2024-01-01"
+              fecha_hasta: "2024-12-31"
+              monto_min_ars: 100
+              limit: 20
+              offset: 0
+              orderBy: "fecha"
+              orderDirection: "DESC"
+      responses:
+        '200':
+          description: Resultados de búsqueda
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Gasto'
+                      meta:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          type:
+                            type: string
+                            example: "collection"
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /gastos/summary:
+    get:
+      tags:
+        - gastos
+      summary: Obtener resumen de gastos
+      description: |
+        Obtiene estadísticas agregadas de gastos por período.
+        Si no se especifican fechas, usa el mes actual por defecto.
+      parameters:
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de inicio del período
+          example: "2024-01-01"
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de fin del período
+          example: "2024-12-31"
+      responses:
+        '200':
+          description: Resumen estadístico de gastos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GastosSummary'
+              example:
+                success: true
+                data:
+                  periodo:
+                    desde: "2025-09-01"
+                    hasta: "2025-09-30"
+                  total_ars: 3317375.34
+                  total_usd: 0
+                  cantidad_gastos: 20
+                  por_categoria:
+                    "Entretenimiento":
+                      total_ars: 1302398.16
+                      total_usd: 0
+                      cantidad: 7
+                  por_importancia:
+                    "Esencial":
+                      total_ars: 101700
+                      total_usd: 0
+                      cantidad: 6
+                  por_tipo_pago:
+                    "Efectivo":
+                      total_ars: 287764.08
+                      total_usd: 0
+                      cantidad: 10
+
+  /gastos/generate:
+    get:
+      tags:
+        - gastos
+      summary: Generar gastos pendientes
+      description: |
+        Ejecuta el proceso de generación automática de gastos pendientes.
+        Procesa gastos recurrentes, débitos automáticos, compras y gastos únicos.
+      responses:
+        '200':
+          description: Proceso de generación completado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GenerateResult'
+                      message:
+                        type: string
+                        example: "Generación de gastos completada exitosamente"
+        '500':
+          description: Error en el proceso de generación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  # GASTOS ÚNICOS
+  /gastos-unicos:
+    get:
+      tags:
+        - gastos-unicos
+      summary: Obtener gastos únicos con filtros
+      description: |
+        Obtiene gastos únicos aplicando filtros opcionales con paginación inteligente.
+        
+        **Comportamiento de paginación:**
+        - Sin `limit`: Devuelve todos los resultados filtrados
+        - Con `limit`: Devuelve respuesta paginada con metadata de navegación
+      parameters:
+        - name: categoria_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por categoría de gasto
+        - name: importancia_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por importancia
+        - name: tipo_pago_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tipo de pago
+        - name: tarjeta_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tarjeta
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de inicio del rango
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de fin del rango
+        - name: monto_min
+          in: query
+          schema:
+            type: number
+          description: Monto mínimo
+        - name: monto_max
+          in: query
+          schema:
+            type: number
+          description: Monto máximo
+        - name: procesado
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado procesado
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: Número máximo de resultados (activa paginación)
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Número de resultados a omitir
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [fecha, monto, descripcion, createdAt, updatedAt]
+            default: fecha
+          description: Campo por el cual ordenar
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          description: Dirección del ordenamiento
+      responses:
+        '200':
+          description: Lista de gastos únicos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GastoUnico'
+
+    post:
+      tags:
+        - gastos-unicos
+      summary: Crear gasto único
+      description: |
+        Crea un nuevo gasto único. Al crearse, se programa automáticamente
+        para generar un gasto real en la tabla principal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - descripcion
+                - monto
+                - fecha
+                - categoria_gasto_id
+                - importancia_gasto_id
+                - tipo_pago_id
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                  example: "Compra de equipamiento"
+                monto:
+                  type: number
+                  minimum: 0.01
+                  example: 2500.50
+                fecha:
+                  type: string
+                  format: date
+                  description: Fecha del gasto (no puede ser futura)
+                  example: "2024-01-15"
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                  example: 8
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                  example: 3
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  description: Requerido para pagos con tarjeta
+                  example: 2
+            example:
+              descripcion: "Compra de equipamiento"
+              monto: 2500.50
+              fecha: "2024-01-15"
+              categoria_gasto_id: 8
+              importancia_gasto_id: 2
+              tipo_pago_id: 3
+              tarjeta_id: 2
+      responses:
+        '201':
+          description: Gasto único creado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GastoUnico'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /gastos-unicos/{id}:
+    get:
+      tags:
+        - gastos-unicos
+      summary: Obtener gasto único por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del gasto único
+      responses:
+        '200':
+          description: Gasto único encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GastoUnico'
+        '404':
+          description: Gasto único no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+    put:
+      tags:
+        - gastos-unicos
+      summary: Actualizar gasto único
+      description: |
+        Actualiza un gasto único existente. Los cambios se reflejan
+        también en el gasto real asociado si ya fue generado.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del gasto único
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                monto:
+                  type: number
+                  minimum: 0.01
+                fecha:
+                  type: string
+                  format: date
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+      responses:
+        '200':
+          description: Gasto único actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GastoUnico'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Gasto único no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+    delete:
+      tags:
+        - gastos-unicos
+      summary: Eliminar gasto único
+      description: |
+        Elimina un gasto único. También elimina el gasto real asociado
+        si ya fue generado, manteniendo la consistencia de datos.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del gasto único
+      responses:
+        '200':
+          description: Gasto único eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Gasto único eliminado correctamente"
+        '404':
+          description: Gasto único no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  # COMPRAS
+  /compras:
+    get:
+      tags:
+        - compras
+      summary: Obtener compras con filtros
+      description: |
+        Obtiene compras aplicando filtros opcionales con paginación inteligente.
+        Incluye filtros específicos para compras en cuotas.
+      parameters:
+        - name: categoria_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por categoría de gasto
+        - name: importancia_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por importancia
+        - name: tipo_pago_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tipo de pago
+        - name: tarjeta_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por tarjeta
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de inicio del rango de compras
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de fin del rango de compras
+        - name: monto_min
+          in: query
+          schema:
+            type: number
+          description: Monto total mínimo
+        - name: monto_max
+          in: query
+          schema:
+            type: number
+          description: Monto total máximo
+        - name: pendiente_cuotas
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado de cuotas pendientes
+        - name: cuotas_min
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Cantidad mínima de cuotas
+        - name: cuotas_max
+          in: query
+          schema:
+            type: integer
+          description: Cantidad máxima de cuotas
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [fecha_compra, monto_total, descripcion, cantidad_cuotas, createdAt, updatedAt]
+            default: fecha_compra
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        '200':
+          description: Lista de compras
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Compra'
+
+    post:
+      tags:
+        - compras
+      summary: Crear compra
+      description: |
+        Crea una nueva compra en cuotas. Se genera automáticamente el primer gasto
+        para compras de una sola cuota.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - descripcion
+                - monto_total
+                - fecha_compra
+                - categoria_gasto_id
+                - importancia_gasto_id
+                - tipo_pago_id
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                monto_total:
+                  type: number
+                  minimum: 0.01
+                fecha_compra:
+                  type: string
+                  format: date
+                  description: No puede ser futura
+                cantidad_cuotas:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+                  default: 1
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+      responses:
+        '201':
+          description: Compra creada exitosamente
+
+  /compras/{id}:
+    get:
+      tags:
+        - compras
+      summary: Obtener compra por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Compra encontrada
+
+    put:
+      tags:
+        - compras
+      summary: Actualizar compra
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                monto_total:
+                  type: number
+                  minimum: 0.01
+                fecha_compra:
+                  type: string
+                  format: date
+                cantidad_cuotas:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+      responses:
+        '200':
+          description: Compra actualizada exitosamente
+
+    delete:
+      tags:
+        - compras
+      summary: Eliminar compra
+      description: |
+        Elimina una compra. Los gastos ya generados se mantienen como histórico.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Compra eliminada exitosamente
+
+  # GASTOS RECURRENTES
+  /gastos-recurrentes:
+    get:
+      tags:
+        - gastos-recurrentes
+      summary: Obtener gastos recurrentes con filtros
+      description: |
+        Obtiene gastos recurrentes con filtros específicos para frecuencia y estado.
+      parameters:
+        - name: categoria_gasto_id
+          in: query
+          schema:
+            type: integer
+        - name: importancia_gasto_id
+          in: query
+          schema:
+            type: integer
+        - name: tipo_pago_id
+          in: query
+          schema:
+            type: integer
+        - name: tarjeta_id
+          in: query
+          schema:
+            type: integer
+        - name: frecuencia_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por frecuencia (mensual, anual, etc.)
+        - name: monto_min
+          in: query
+          schema:
+            type: number
+        - name: monto_max
+          in: query
+          schema:
+            type: number
+        - name: activo
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado activo/inactivo
+        - name: dia_de_pago
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 31
+          description: Día específico del mes
+        - name: mes_de_pago
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Mes específico (para gastos anuales)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [monto, descripcion, dia_de_pago, mes_de_pago, activo, createdAt, updatedAt]
+            default: createdAt
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        '200':
+          description: Lista de gastos recurrentes
+
+    post:
+      tags:
+        - gastos-recurrentes
+      summary: Crear gasto recurrente
+      description: |
+        Crea un nuevo gasto recurrente. Se procesará automáticamente según su frecuencia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - descripcion
+                - monto
+                - dia_de_pago
+                - categoria_gasto_id
+                - importancia_gasto_id
+                - tipo_pago_id
+                - frecuencia_gasto_id
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                monto:
+                  type: number
+                  minimum: 0.01
+                dia_de_pago:
+                  type: integer
+                  minimum: 1
+                  maximum: 31
+                mes_de_pago:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  nullable: true
+                  description: Requerido para frecuencias anuales
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                frecuencia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                fecha_inicio:
+                  type: string
+                  format: date
+                  nullable: true
+      responses:
+        '201':
+          description: Gasto recurrente creado exitosamente
+
+  /gastos-recurrentes/{id}:
+    get:
+      tags:
+        - gastos-recurrentes
+      summary: Obtener gasto recurrente por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Gasto recurrente encontrado
+
+    put:
+      tags:
+        - gastos-recurrentes
+      summary: Actualizar gasto recurrente
+      description: |
+        Actualiza un gasto recurrente. Los cambios no afectan gastos ya generados.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                monto:
+                  type: number
+                  minimum: 0.01
+                dia_de_pago:
+                  type: integer
+                  minimum: 1
+                  maximum: 31
+                mes_de_pago:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  nullable: true
+                activo:
+                  type: boolean
+                  description: Activar/desactivar el gasto recurrente
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                frecuencia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+      responses:
+        '200':
+          description: Gasto recurrente actualizado exitosamente
+
+    delete:
+      tags:
+        - gastos-recurrentes
+      summary: Eliminar gasto recurrente
+      description: |
+        Elimina un gasto recurrente. Los gastos ya generados se mantienen como histórico.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Gasto recurrente eliminado exitosamente
+
+  # DÉBITOS AUTOMÁTICOS
+  /debitos-automaticos:
+    get:
+      tags:
+        - debitos-automaticos
+      summary: Obtener débitos automáticos con filtros
+      description: |
+        Obtiene débitos automáticos (suscripciones, servicios) con filtros específicos.
+      parameters:
+        - name: categoria_gasto_id
+          in: query
+          schema:
+            type: integer
+        - name: importancia_gasto_id
+          in: query
+          schema:
+            type: integer
+        - name: tipo_pago_id
+          in: query
+          schema:
+            type: integer
+        - name: tarjeta_id
+          in: query
+          schema:
+            type: integer
+        - name: frecuencia_gasto_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrar por frecuencia del débito
+        - name: monto_min
+          in: query
+          schema:
+            type: number
+        - name: monto_max
+          in: query
+          schema:
+            type: number
+        - name: activo
+          in: query
+          schema:
+            type: boolean
+          description: Filtrar por estado activo/inactivo
+        - name: dia_de_pago
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 31
+          description: Día específico del mes para el débito
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [monto, descripcion, dia_de_pago, activo, createdAt, updatedAt]
+            default: createdAt
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        '200':
+          description: Lista de débitos automáticos
+
+    post:
+      tags:
+        - debitos-automaticos
+      summary: Crear débito automático
+      description: |
+        Crea un nuevo débito automático (suscripción, servicio, etc.).
+        Se procesará automáticamente según su frecuencia configurada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - descripcion
+                - monto
+                - dia_de_pago
+                - categoria_gasto_id
+                - importancia_gasto_id
+                - tipo_pago_id
+                - frecuencia_gasto_id
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                  example: "Suscripción Netflix"
+                monto:
+                  type: number
+                  minimum: 0.01
+                  example: 1200.00
+                dia_de_pago:
+                  type: integer
+                  minimum: 1
+                  maximum: 31
+                  example: 5
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                frecuencia_gasto_id:
+                  type: integer
+                  minimum: 1
+                  description: Frecuencia del débito (mensual, anual, etc.)
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+      responses:
+        '201':
+          description: Débito automático creado exitosamente
+
+  /debitos-automaticos/{id}:
+    get:
+      tags:
+        - debitos-automaticos
+      summary: Obtener débito automático por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Débito automático encontrado
+
+    put:
+      tags:
+        - debitos-automaticos
+      summary: Actualizar débito automático
+      description: |
+        Actualiza un débito automático. Los cambios no afectan gastos ya generados.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descripcion:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                monto:
+                  type: number
+                  minimum: 0.01
+                dia_de_pago:
+                  type: integer
+                  minimum: 1
+                  maximum: 31
+                activo:
+                  type: boolean
+                  description: Activar/desactivar el débito automático
+                categoria_gasto_id:
+                  type: integer
+                  minimum: 1
+                importancia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tipo_pago_id:
+                  type: integer
+                  minimum: 1
+                frecuencia_gasto_id:
+                  type: integer
+                  minimum: 1
+                tarjeta_id:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+      responses:
+        '200':
+          description: Débito automático actualizado exitosamente
+
+    delete:
+      tags:
+        - debitos-automaticos
+      summary: Eliminar débito automático
+      description: |
+        Elimina un débito automático. Los gastos ya generados se mantienen como histórico.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Débito automático eliminado exitosamente

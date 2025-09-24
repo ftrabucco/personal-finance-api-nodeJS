@@ -8,8 +8,14 @@ export function defineGastoRecurrente(sequelize) {
       autoIncrement: true,
     },
     descripcion: { type: DataTypes.STRING, allowNull: false },
-    monto: { type: DataTypes.FLOAT, allowNull: false },
-    dia_de_pago: { type: DataTypes.INTEGER, allowNull: false }, // Día del mes
+    monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    dia_de_pago: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1, max: 31 } }, // Día del mes
+    mes_de_pago: { 
+      type: DataTypes.INTEGER, 
+      allowNull: true,
+      validate: { min: 1, max: 12 },
+      comment: 'Mes de pago para gastos anuales (1-12). Null para otras frecuencias'
+    },
     frecuencia_gasto_id: { 
       type: DataTypes.INTEGER, 
       allowNull: false,

@@ -1,55 +1,253 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1>Lista de Compras</h1>
-  <a href="/compras/nueva" class="btn btn-primary">Nueva Compra</a>
+  <div>
+    <h1 class="mb-0"><i class="bi bi-cart"></i> Compras en Cuotas</h1>
+    <p class="text-muted mb-0">Gestiona tus compras financiadas</p>
+  </div>
+  <div class="btn-group">
+    <a href="/compras/nueva" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Nueva Compra
+    </a>
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+      <i class="bi bi-funnel"></i> Filtros
+    </button>
+    <div class="dropdown-menu">
+      <a class="dropdown-item" href="#" onclick="filtrarPorEstado('pendientes')">Con cuotas pendientes</a>
+      <a class="dropdown-item" href="#" onclick="filtrarPorEstado('finalizadas')">Finalizadas</a>
+      <a class="dropdown-item" href="#" onclick="filtrarPorPeriodo('mes')">Este mes</a>
+      <div class="dropdown-divider"></div>
+      <a class="dropdown-item" href="#" onclick="limpiarFiltros()">Limpiar filtros</a>
+    </div>
+  </div>
 </div>
 
-<div class="table-responsive">
-  <table class="table table-hover">
-    <thead>
-      <tr>
-        <th>Descripción</th>
-        <th class="text-end">Monto</th>
-        <th class="text-center">Cuotas</th>
-        <th>Fecha</th>
-        <th>Categoría</th>
-        <th>Importancia</th>
-        <th>Tipo de Pago</th>
-        <th>Tarjeta</th>
-        <th class="text-end">Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#each compras}}
-        <tr>
-          <td>{{this.descripcion}}</td>
-          <td class="text-end">${{this.monto_total}}</td>
-          <td class="text-center">{{this.cantidad_cuotas}}</td>
-          <td>{{formatDate this.fecha_compra}}</td>
-          <td>{{this.categoria.nombre_categoria}}</td>
-          <td>{{this.importancia.nombre_importancia}}</td>
-          <td>{{this.tipoPago.nombre}}</td>
-          <td>{{#if this.tarjeta}}{{this.tarjeta.nombre}}{{else}}-{{/if}}</td>
-          <td class="text-end">
-            <div class="btn-group btn-group-sm">
-              <a href="/compras/{{this.id}}" class="btn btn-info">
-                <i class="bi bi-eye"></i> Ver
-              </a>
-              <a href="/compras/editar/{{this.id}}" class="btn btn-warning">
-                <i class="bi bi-pencil"></i> Editar
-              </a>
-              <form action="/compras/{{this.id}}?_method=DELETE" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Estás seguro de eliminar esta compra?')">
-                  <i class="bi bi-trash"></i> Eliminar
-                </button>
-              </form>
-            </div>
-          </td>
-        </tr>
-      {{else}}
-        <tr>
-          <td colspan="9" class="text-center">No hay compras registradas</td>
-        </tr>
-      {{/each}}
-    </tbody>
-  </table>
+<!-- Resumen rápido de compras -->
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card bg-primary text-white">
+      <div class="card-body text-center">
+        <h5>Total Compras</h5>
+        <h3 id="totalCompras">$0</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-warning text-white">
+      <div class="card-body text-center">
+        <h5>Pendientes</h5>
+        <h3 id="comprasPendientes">0</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-success text-white">
+      <div class="card-body text-center">
+        <h5>Promedio Cuotas</h5>
+        <h3 id="promedioCuotas">0</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-info text-white">
+      <div class="card-body text-center">
+        <h5>Total Items</h5>
+        <h3 id="totalItems">0</h3>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- Lista de compras mejorada -->
+<div class="card shadow-sm">
+  <div class="card-header">
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> Lista de Compras (Más recientes primero)</h5>
+  </div>
+  <div class="card-body p-0">
+    {{#if compras.length}}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="tablaCompras">
+          <thead class="table-light">
+            <tr>
+              <th><i class="bi bi-card-text"></i> Descripción</th>
+              <th class="text-end"><i class="bi bi-currency-dollar"></i> Monto Total</th>
+              <th class="text-center"><i class="bi bi-credit-card"></i> Cuotas</th>
+              <th class="text-center"><i class="bi bi-calendar"></i> Fecha</th>
+              <th><i class="bi bi-tag"></i> Categoría</th>
+              <th class="text-center"><i class="bi bi-exclamation-circle"></i> Importancia</th>
+              <th><i class="bi bi-credit-card"></i> Pago</th>
+              <th><i class="bi bi-credit-card-2-front"></i> Tarjeta</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each compras}}
+              <tr class="compra-row" data-fecha="{{this.fecha_compra}}" data-monto="{{this.monto_total}}" data-cuotas="{{this.cantidad_cuotas}}" data-pendiente="{{this.pendiente_cuotas}}">
+                <td>
+                  <div class="fw-bold">{{this.descripcion}}</div>
+                  {{#if this.pendiente_cuotas}}
+                    <small class="badge bg-warning">Cuotas Pendientes</small>
+                  {{else}}
+                    <small class="badge bg-success">Finalizada</small>
+                  {{/if}}
+                </td>
+                <td class="text-end">
+                  <div class="fw-bold text-{{#if (gte this.monto_total 5000)}}danger{{else if (gte this.monto_total 2000)}}warning{{else}}success{{/if}}">
+                    {{formatMoney this.monto_total}}
+                  </div>
+                  <small class="text-muted">
+                    {{formatMoney (div this.monto_total this.cantidad_cuotas)}} por cuota
+                  </small>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-{{#if (eq this.cantidad_cuotas 1)}}secondary{{else if (gte this.cantidad_cuotas 12)}}danger{{else if (gte this.cantidad_cuotas 6)}}warning{{else}}primary{{/if}} fs-6">
+                    {{this.cantidad_cuotas}}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-light text-dark">{{formatDate this.fecha_compra}}</span>
+                </td>
+                <td>
+                  <span class="badge bg-primary">{{this.categoria.nombre_categoria}}</span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-{{#if (eq this.importancia.nombre_importancia 'Esencial')}}danger{{else if (eq this.importancia.nombre_importancia 'Deseable')}}warning{{else}}secondary{{/if}}">
+                    {{this.importancia.nombre_importancia}}
+                  </span>
+                </td>
+                <td>
+                  <i class="bi bi-{{#if (contains this.tipoPago.nombre 'crédito')}}credit-card{{else if (contains this.tipoPago.nombre 'débito')}}credit-card-2-back{{else if (contains this.tipoPago.nombre 'efectivo')}}cash{{else}}bank{{/if}}"></i>
+                  {{this.tipoPago.nombre}}
+                </td>
+                <td>
+                  {{#if this.tarjeta}}
+                    <span class="badge bg-info">{{this.tarjeta.nombre}}</span>
+                  {{else}}
+                    <span class="text-muted">-</span>
+                  {{/if}}
+                </td>
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm">
+                    <a href="/compras/{{this.id}}" class="btn btn-info" title="Ver detalle">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="/compras/editar/{{this.id}}" class="btn btn-warning" title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form action="/compras/{{this.id}}?_method=DELETE" method="POST" class="d-inline">
+                      <button type="submit" class="btn btn-danger btn-sm" 
+                              onclick="return confirm('¿Estás seguro de eliminar esta compra?')" 
+                              title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    {{else}}
+      <div class="text-center py-5">
+        <i class="bi bi-cart text-muted" style="font-size: 4rem;"></i>
+        <h5 class="mt-3">No hay compras registradas</h5>
+        <p class="text-muted">Comienza agregando tu primera compra en cuotas</p>
+        <a href="/compras/nueva" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> Crear primera compra
+        </a>
+      </div>
+    {{/if}}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  calcularResumenCompras();
+});
+
+function calcularResumenCompras() {
+  const filas = document.querySelectorAll('.compra-row');
+  let total = 0;
+  let pendientes = 0;
+  let totalCuotas = 0;
+  
+  filas.forEach(fila => {
+    const monto = parseFloat(fila.dataset.monto) || 0;
+    const cuotas = parseInt(fila.dataset.cuotas) || 0;
+    const esPendiente = fila.dataset.pendiente === 'true';
+    
+    total += monto;
+    totalCuotas += cuotas;
+    
+    if (esPendiente) {
+      pendientes++;
+    }
+  });
+  
+  const cantidad = filas.length;
+  const promedioCuotas = cantidad > 0 ? Math.round(totalCuotas / cantidad) : 0;
+  
+  document.getElementById('totalCompras').textContent = '$' + total.toLocaleString();
+  document.getElementById('comprasPendientes').textContent = pendientes.toString();
+  document.getElementById('promedioCuotas').textContent = promedioCuotas.toString();
+  document.getElementById('totalItems').textContent = cantidad.toString();
+}
+
+function filtrarPorEstado(estado) {
+  const filas = document.querySelectorAll('.compra-row');
+  
+  filas.forEach(fila => {
+    const esPendiente = fila.dataset.pendiente === 'true';
+    let mostrar = true;
+    
+    switch(estado) {
+      case 'pendientes':
+        mostrar = esPendiente;
+        break;
+      case 'finalizadas':
+        mostrar = !esPendiente;
+        break;
+    }
+    
+    fila.style.display = mostrar ? '' : 'none';
+  });
+}
+
+function filtrarPorPeriodo(periodo) {
+  const filas = document.querySelectorAll('.compra-row');
+  const hoy = new Date();
+  
+  filas.forEach(fila => {
+    const fechaCompra = new Date(fila.dataset.fecha);
+    let mostrar = true;
+    
+    switch(periodo) {
+      case 'mes':
+        mostrar = fechaCompra.getMonth() === hoy.getMonth() && 
+                 fechaCompra.getFullYear() === hoy.getFullYear();
+        break;
+    }
+    
+    fila.style.display = mostrar ? '' : 'none';
+  });
+}
+
+function limpiarFiltros() {
+  const filas = document.querySelectorAll('.compra-row');
+  filas.forEach(fila => {
+    fila.style.display = '';
+  });
+}
+
+// Helper function for handlebars
+function formatMoney(amount) {
+  return parseFloat(amount).toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+// Helper function for division in handlebars
+function div(a, b) {
+  return a / b;
+}
+</script>
