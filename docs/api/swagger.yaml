@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Personal Finance API - Gastos
-  description: API para gestión de gastos en aplicación de finanzas personales
-  version: 1.0.0
+  title: Personal Finance API
+  description: API completa para gestión de finanzas personales con autenticación JWT
+  version: 2.0.0
   contact:
     name: Personal Finance API
     url: http://localhost:3030
@@ -12,6 +12,8 @@ servers:
     description: Development server
 
 tags:
+  - name: auth
+    description: Autenticación y gestión de usuarios
   - name: gastos
     description: Operaciones con gastos reales generados
   - name: gastos-unicos
@@ -24,6 +26,13 @@ tags:
     description: Operaciones con débitos automáticos (suscripciones, servicios)
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtenido del endpoint de login
+
   schemas:
     StandardResponse:
       type: object
@@ -604,6 +613,155 @@ components:
               items:
                 type: object
 
+    # Authentication Schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del usuario
+          example: 1
+        nombre:
+          type: string
+          description: Nombre completo del usuario
+          example: "Juan Pérez"
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+          example: "juan@example.com"
+      required:
+        - id
+        - nombre
+        - email
+
+    RegisterRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre completo del usuario
+          example: "Juan Pérez"
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+          example: "juan@example.com"
+        password:
+          type: string
+          minLength: 6
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+          description: "Contraseña (mín 6 chars, 1 mayúscula, 1 minúscula, 1 número)"
+          example: "Password123"
+      required:
+        - nombre
+        - email
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+          example: "juan@example.com"
+        password:
+          type: string
+          description: Contraseña del usuario
+          example: "Password123"
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Login exitoso"
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: JWT token para autenticación
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            user:
+              $ref: '#/components/schemas/User'
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nuevo nombre del usuario
+          example: "Juan Carlos Pérez"
+        email:
+          type: string
+          format: email
+          description: Nuevo email del usuario
+          example: "juan.carlos@example.com"
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          description: Contraseña actual
+          example: "OldPassword123"
+        newPassword:
+          type: string
+          minLength: 6
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+          description: "Nueva contraseña (mín 6 chars, 1 mayúscula, 1 minúscula, 1 número)"
+          example: "NewPassword123"
+      required:
+        - currentPassword
+        - newPassword
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operación exitosa"
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+
+    AuthErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Error de autenticación"
+        error:
+          type: string
+          enum:
+            - MISSING_TOKEN
+            - INVALID_TOKEN
+            - INVALID_CREDENTIALS
+            - EMAIL_ALREADY_EXISTS
+            - INVALID_CURRENT_PASSWORD
+            - INSUFFICIENT_PERMISSIONS
+          example: "INVALID_CREDENTIALS"
+
   parameters:
     GastoIdParam:
       name: id
@@ -655,6 +813,326 @@ components:
       example: DESC
 
 paths:
+  # AUTHENTICATION ENDPOINTS
+  /auth/register:
+    post:
+      tags:
+        - auth
+      summary: Registrar nuevo usuario
+      description: |
+        Registra un nuevo usuario en el sistema.
+
+        **Validaciones:**
+        - Email único en el sistema
+        - Contraseña debe cumplir con política de seguridad
+        - Nombre debe tener al menos 2 caracteres
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario registrado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Usuario registrado exitosamente"
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/AuthErrorResponse'
+              examples:
+                validation_error:
+                  summary: Error de validación de datos
+                  value:
+                    success: false
+                    message: "Datos de registro inválidos"
+                    errors: ["La contraseña debe tener al menos 6 caracteres"]
+                email_exists:
+                  summary: Email ya registrado
+                  value:
+                    success: false
+                    message: "Email ya está registrado"
+                    error: "EMAIL_ALREADY_EXISTS"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Iniciar sesión
+      description: |
+        Autentica un usuario y devuelve un JWT token para acceso a endpoints protegidos.
+
+        **Uso del token:**
+        - Incluir en header `Authorization: Bearer <token>`
+        - Token válido por 7 días (configurable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Error de validación en datos de entrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                success: false
+                message: "Datos de login inválidos"
+                errors: ["Debe ser un email válido"]
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+              example:
+                success: false
+                message: "Email o contraseña incorrectos"
+                error: "INVALID_CREDENTIALS"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/profile:
+    get:
+      tags:
+        - auth
+      summary: Obtener perfil del usuario
+      description: Obtiene la información del perfil del usuario autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+              example:
+                success: true
+                message: "Perfil obtenido exitosamente"
+                data:
+                  user:
+                    id: 1
+                    nombre: "Juan Pérez"
+                    email: "juan@example.com"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+              example:
+                success: false
+                message: "Token de acceso requerido"
+                error: "MISSING_TOKEN"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+    put:
+      tags:
+        - auth
+      summary: Actualizar perfil del usuario
+      description: |
+        Actualiza la información del perfil del usuario autenticado.
+        Solo se actualizan los campos proporcionados.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Perfil actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+              example:
+                success: true
+                message: "Perfil actualizado exitosamente"
+                data:
+                  user:
+                    id: 1
+                    nombre: "Juan Carlos Pérez"
+                    email: "juan.carlos@example.com"
+        '400':
+          description: Error de validación o email ya en uso
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/AuthErrorResponse'
+              examples:
+                validation_error:
+                  summary: Error de validación
+                  value:
+                    success: false
+                    message: "Datos inválidos"
+                    errors: ["El nombre debe tener al menos 2 caracteres"]
+                email_exists:
+                  summary: Email ya en uso
+                  value:
+                    success: false
+                    message: "Email ya está en uso"
+                    error: "EMAIL_ALREADY_EXISTS"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/change-password:
+    post:
+      tags:
+        - auth
+      summary: Cambiar contraseña
+      description: |
+        Cambia la contraseña del usuario autenticado.
+        Requiere proporcionar la contraseña actual para validación.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Contraseña actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Contraseña actualizada exitosamente"
+        '400':
+          description: Error de validación o contraseña actual incorrecta
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/AuthErrorResponse'
+              examples:
+                validation_error:
+                  summary: Nueva contraseña inválida
+                  value:
+                    success: false
+                    message: "Datos inválidos"
+                    errors: ["La contraseña debe tener al menos 6 caracteres"]
+                invalid_current:
+                  summary: Contraseña actual incorrecta
+                  value:
+                    success: false
+                    message: "Password actual incorrecto"
+                    error: "INVALID_CURRENT_PASSWORD"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Cerrar sesión
+      description: |
+        Cierra la sesión del usuario autenticado.
+
+        **Nota:** En JWT stateless, el logout es principalmente informativo.
+        El token seguirá siendo válido hasta su expiración.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Sesión cerrada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Sesión cerrada exitosamente"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
   /gastos/all:
     get:
       tags:

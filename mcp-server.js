@@ -83,8 +83,8 @@ class FinanzasApiMCPServer {
               properties: {
                 category: {
                   type: 'string',
-                  description: 'Categoría de tests: gastos_unicos, compras, recurrentes, tarjetas, job',
-                  enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'all']
+                  description: 'Categoría de tests: gastos_unicos, compras, recurrentes, tarjetas, job, auth',
+                  enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'auth', 'all']
                 }
               },
             },
@@ -466,6 +466,133 @@ class FinanzasApiMCPServer {
             error_contains: 'fechas'
           }
         }
+      ],
+      auth: [
+        {
+          name: 'Registro Usuario Válido',
+          description: 'Registrar usuario con datos válidos',
+          endpoint: 'POST /api/auth/register',
+          payload: {
+            nombre: 'Test User',
+            email: 'test@example.com',
+            password: 'Password123'
+          },
+          expected: {
+            status: 201,
+            response_structure: {
+              success: true,
+              message: 'Usuario registrado exitosamente',
+              data: { user: { id: 'number', nombre: 'string', email: 'string' } }
+            },
+            excludes: ['password']
+          }
+        },
+        {
+          name: 'Login Usuario Válido',
+          description: 'Login con credenciales correctas devuelve token JWT',
+          endpoint: 'POST /api/auth/login',
+          payload: {
+            email: 'test@example.com',
+            password: 'Password123'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              message: 'Login exitoso',
+              data: {
+                token: 'string (JWT format)',
+                user: { id: 'number', nombre: 'string', email: 'string' }
+              }
+            },
+            token_validation: 'JWT should be valid and decodable'
+          }
+        },
+        {
+          name: 'Registro Password Débil',
+          description: 'Password que no cumple política de seguridad debe fallar',
+          endpoint: 'POST /api/auth/register',
+          payload: {
+            nombre: 'Test User',
+            email: 'weak@example.com',
+            password: 'weak'
+          },
+          expected: {
+            status: 400,
+            response_structure: {
+              success: false,
+              message: 'Datos de registro inválidos',
+              errors: 'array containing password requirements'
+            }
+          }
+        },
+        {
+          name: 'Login Credenciales Incorrectas',
+          description: 'Login con password incorrecto debe fallar',
+          endpoint: 'POST /api/auth/login',
+          payload: {
+            email: 'test@example.com',
+            password: 'wrongpassword'
+          },
+          expected: {
+            status: 401,
+            response_structure: {
+              success: false,
+              message: 'Email o contraseña incorrectos',
+              error: 'INVALID_CREDENTIALS'
+            }
+          }
+        },
+        {
+          name: 'Perfil Sin Token',
+          description: 'Acceso a perfil sin token debe fallar',
+          endpoint: 'GET /api/auth/profile',
+          headers: {},
+          expected: {
+            status: 401,
+            response_structure: {
+              success: false,
+              message: 'Token de acceso requerido',
+              error: 'MISSING_TOKEN'
+            }
+          }
+        },
+        {
+          name: 'Perfil Con Token Válido',
+          description: 'Acceso a perfil con token válido debe retornar user data',
+          endpoint: 'GET /api/auth/profile',
+          headers: {
+            'Authorization': 'Bearer <JWT_TOKEN_FROM_LOGIN>'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              message: 'Perfil obtenido exitosamente',
+              data: { user: { id: 'number', nombre: 'string', email: 'string' } }
+            }
+          },
+          note: 'Token debe obtenerse desde login exitoso previo'
+        },
+        {
+          name: 'Cambio Password Válido',
+          description: 'Cambio de contraseña con datos válidos',
+          endpoint: 'POST /api/auth/change-password',
+          headers: {
+            'Authorization': 'Bearer <JWT_TOKEN_FROM_LOGIN>'
+          },
+          payload: {
+            currentPassword: 'Password123',
+            newPassword: 'NewPassword456'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              message: 'Contraseña actualizada exitosamente'
+            }
+          }
+        }
       ]
     };
 
@@ -616,6 +743,12 @@ class FinanzasApiMCPServer {
           'GastoGeneratorService': 'Orchestrates all strategies',
           'Scheduler': 'Node-cron daily execution (5:00 AM Argentina)',
           'Transaction Safety': 'All operations use database transactions'
+        },
+        authentication: {
+          'AuthService': 'JWT-based authentication extending BaseService',
+          'AuthMiddleware': 'Token validation and user extraction',
+          'PasswordHashing': 'bcrypt with 10 salt rounds',
+          'UserModel': 'Usuario table with unique email constraint'
         }
       }
     };
@@ -716,7 +849,7 @@ class FinanzasApiMCPServer {
                 properties: {
                   category: {
                     type: 'string',
-                    enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'all']
+                    enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'auth', 'all']
                   }
                 }
               }

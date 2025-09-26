@@ -1,0 +1,158 @@
+# Authentication Schemas for Swagger
+# Add these to the main swagger.yaml file under components/schemas
+
+# JWT Security Scheme (add under components/securitySchemes)
+BearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: JWT token obtenido del endpoint de login
+
+# Schemas (add under components/schemas)
+User:
+  type: object
+  properties:
+    id:
+      type: integer
+      description: ID único del usuario
+      example: 1
+    nombre:
+      type: string
+      description: Nombre completo del usuario
+      example: "Juan Pérez"
+    email:
+      type: string
+      format: email
+      description: Email del usuario
+      example: "juan@example.com"
+  required:
+    - id
+    - nombre
+    - email
+
+RegisterRequest:
+  type: object
+  properties:
+    nombre:
+      type: string
+      minLength: 2
+      maxLength: 100
+      description: Nombre completo del usuario
+      example: "Juan Pérez"
+    email:
+      type: string
+      format: email
+      description: Email del usuario
+      example: "juan@example.com"
+    password:
+      type: string
+      minLength: 6
+      pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+      description: "Contraseña (mín 6 chars, 1 mayúscula, 1 minúscula, 1 número)"
+      example: "Password123"
+  required:
+    - nombre
+    - email
+    - password
+
+LoginRequest:
+  type: object
+  properties:
+    email:
+      type: string
+      format: email
+      description: Email del usuario
+      example: "juan@example.com"
+    password:
+      type: string
+      description: Contraseña del usuario
+      example: "Password123"
+  required:
+    - email
+    - password
+
+LoginResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+    message:
+      type: string
+      example: "Login exitoso"
+    data:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token para autenticación
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/User'
+
+UpdateProfileRequest:
+  type: object
+  properties:
+    nombre:
+      type: string
+      minLength: 2
+      maxLength: 100
+      description: Nuevo nombre del usuario
+      example: "Juan Carlos Pérez"
+    email:
+      type: string
+      format: email
+      description: Nuevo email del usuario
+      example: "juan.carlos@example.com"
+
+ChangePasswordRequest:
+  type: object
+  properties:
+    currentPassword:
+      type: string
+      description: Contraseña actual
+      example: "OldPassword123"
+    newPassword:
+      type: string
+      minLength: 6
+      pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+      description: "Nueva contraseña (mín 6 chars, 1 mayúscula, 1 minúscula, 1 número)"
+      example: "NewPassword123"
+  required:
+    - currentPassword
+    - newPassword
+
+AuthSuccessResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+    message:
+      type: string
+      example: "Operación exitosa"
+    data:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+
+AuthErrorResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    message:
+      type: string
+      example: "Error de autenticación"
+    error:
+      type: string
+      enum:
+        - MISSING_TOKEN
+        - INVALID_TOKEN
+        - INVALID_CREDENTIALS
+        - EMAIL_ALREADY_EXISTS
+        - INVALID_CURRENT_PASSWORD
+        - INSUFFICIENT_PERMISSIONS
+      example: "INVALID_CREDENTIALS"

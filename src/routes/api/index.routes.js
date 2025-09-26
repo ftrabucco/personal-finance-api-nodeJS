@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import authRoutes from './auth.routes.js';
 import {
   obtenerGastoPorId,
   crearGasto,
@@ -62,6 +63,9 @@ import {
 } from '../../middlewares/validation.middleware.js';
 
 const router = Router();
+
+// 🔐 Rutas de Autenticación
+router.use('/auth', authRoutes);
 
 // Rutas para Gastos (reales)
 router.get('/gastos', validateGastoFilters, obtenerGastosConFiltros); // Con filtros opcionales y paginación inteligente
