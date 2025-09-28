@@ -187,7 +187,123 @@ El job revisa las siguientes entidades en orden y genera gastos según correspon
 
 ---
 
-## 3. Consideraciones Generales
+## 3. Sistema de Autenticación
+
+### 3.1 Registro de Usuarios
+**Descripción:**
+Sistema de registro para nuevos usuarios con validación de datos y prevención de duplicados.
+
+**Endpoint:** `POST /api/auth/register`
+
+**Reglas de negocio:**
+- **Validación de datos:**
+  - `nombre`: Obligatorio, 2-100 caracteres
+  - `email`: Obligatorio, formato email válido, único en el sistema
+  - `password`: Obligatorio, mínimo 6 caracteres, debe contener al menos 1 mayúscula, 1 minúscula y 1 número
+- **Seguridad:**
+  - Password se hashea con bcrypt usando 10 salt rounds antes de almacenar
+  - Email se convierte a lowercase para evitar duplicados por caso
+- **Respuesta exitosa (201):**
+  - Usuario creado sin devolver password
+  - Token JWT generado con expiración de 7 días
+- **Errores comunes:**
+  - 400: Email ya existe en el sistema
+  - 400: Datos inválidos (validación Joi)
+
+### 3.2 Autenticación de Usuarios
+**Descripción:**
+Sistema de login con generación de tokens JWT para sesiones.
+
+**Endpoint:** `POST /api/auth/login`
+
+**Reglas de negocio:**
+- **Validación:**
+  - `email`: Obligatorio, formato email
+  - `password`: Obligatorio
+- **Proceso de autenticación:**
+  - Email se busca en formato lowercase
+  - Password se compara con bcrypt contra el hash almacenado
+  - Se genera JWT token con información del usuario (id, email, nombre)
+- **Respuesta exitosa (200):**
+  - Token JWT con expiración de 7 días
+  - Datos del usuario (sin password)
+- **Errores comunes:**
+  - 401: Credenciales inválidas
+  - 400: Datos faltantes o inválidos
+
+### 3.3 Gestión de Perfil
+**Descripción:**
+Operaciones para consultar y actualizar el perfil del usuario autenticado.
+
+**Endpoints:**
+- `GET /api/auth/profile` - Obtener perfil
+- `PUT /api/auth/profile` - Actualizar perfil
+
+**Reglas de negocio:**
+- **Autenticación requerida:** Todos los endpoints requieren token JWT válido
+- **Actualización de perfil:**
+  - `nombre`: Opcional, 2-100 caracteres si se proporciona
+  - `email`: Opcional, formato email válido, único en el sistema
+  - El usuario se identifica por el token JWT (no por parámetro)
+- **Validaciones:**
+  - Email debe ser único (excepto para el mismo usuario)
+  - Datos opcionales pero con validación si se proporcionan
+
+### 3.4 Cambio de Contraseña
+**Descripción:**
+Cambio seguro de contraseña con validación de contraseña actual.
+
+**Endpoint:** `POST /api/auth/change-password`
+
+**Reglas de negocio:**
+- **Autenticación requerida:** Token JWT válido
+- **Validaciones:**
+  - `currentPassword`: Obligatorio, debe coincidir con password actual
+  - `newPassword`: Obligatorio, mismas reglas que en registro
+- **Proceso de cambio:**
+  - Se verifica la contraseña actual con bcrypt
+  - Se hashea la nueva contraseña con bcrypt (10 rounds)
+  - Se actualiza en base de datos
+- **Respuesta exitosa (200):** Confirmación de cambio exitoso
+- **Errores comunes:**
+  - 400: Contraseña actual incorrecta
+  - 400: Nueva contraseña no cumple requisitos
+
+### 3.5 Middleware de Autenticación
+**Descripción:**
+Sistema de middleware para proteger rutas y extraer información del usuario.
+
+**Middlewares disponibles:**
+- **`authenticateToken`**: Autenticación obligatoria
+  - Extrae y valida token JWT del header Authorization
+  - Agrega `req.user` con datos del usuario
+  - Responde 401 si token inválido o faltante
+- **`optionalAuth`**: Autenticación opcional
+  - Similar a authenticateToken pero permite continuar sin token
+  - `req.user` puede ser null
+- **`requireRole`**: Control de roles (extensible)
+  - Para futuras implementaciones de roles/permisos
+- **`logAuthenticatedRequest`**: Auditoría
+  - Registra requests autenticados para seguimiento
+
+### 3.6 Configuración JWT
+**Configuración del sistema de tokens:**
+- **Algoritmo:** HS256
+- **Expiración:** 7 días (configurable via JWT_EXPIRES_IN)
+- **Secret:** Variable de entorno JWT_SECRET (fallback a default en desarrollo)
+- **Payload incluye:** id, email, nombre del usuario
+- **Validación:** Verificación de firma y expiración en cada request
+
+### 3.7 Integración con Gastos
+**Impacto en el sistema de gastos:**
+- **Futura implementación:** Filtrado de gastos por usuario
+- **Preparación:** Tabla `gastos` tiene estructura para agregar `usuario_id`
+- **Rutas protegidas:** Endpoints de gastos requerirán autenticación
+- **Aislamiento de datos:** Cada usuario verá solo sus propios gastos
+
+---
+
+## 4. Consideraciones Generales
 
 - **Origen de los gastos:**  
   Cada gasto real en `gastos` debe tener:  

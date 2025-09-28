@@ -112,6 +112,22 @@ class FinanzasApiMCPServer {
             },
           },
           {
+            name: 'get_auth_endpoints',
+            description: 'Retorna documentación de endpoints de autenticación JWT',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'get_auth_schemas',
+            description: 'Retorna esquemas Swagger para autenticación y JWT',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
             name: 'execute_api_call',
             description: 'Ejecuta llamada a la API para testing',
             inputSchema: {
@@ -164,7 +180,13 @@ class FinanzasApiMCPServer {
           
           case 'get_database_schema':
             return await this.getDatabaseSchema();
-          
+
+          case 'get_auth_endpoints':
+            return await this.getAuthEndpoints();
+
+          case 'get_auth_schemas':
+            return await this.getAuthSchemas();
+
           case 'execute_api_call':
             return await this.executeApiCall(args);
           
@@ -763,6 +785,157 @@ class FinanzasApiMCPServer {
     };
   }
 
+  async getAuthEndpoints() {
+    const endpoints = {
+      authentication: {
+        base_url: process.env.API_BASE_URL || 'http://localhost:3030',
+        endpoints: {
+          'POST /api/auth/register': {
+            description: 'Registro de nuevo usuario con validación JWT',
+            request_body: {
+              nombre: 'string (2-100 chars)',
+              email: 'string (email format)',
+              password: 'string (min 6 chars, 1 uppercase, 1 lowercase, 1 digit)'
+            },
+            responses: {
+              201: 'Usuario creado exitosamente',
+              400: 'Datos inválidos o email ya existe',
+              500: 'Error interno del servidor'
+            },
+            test_scenarios: {
+              valid_user: {
+                nombre: 'Test User',
+                email: 'test@example.com',
+                password: 'Password123'
+              },
+              duplicate_email: 'Should return 400',
+              invalid_password: 'Should return 400'
+            }
+          },
+          'POST /api/auth/login': {
+            description: 'Autenticación de usuario con JWT',
+            request_body: {
+              email: 'string (email format)',
+              password: 'string'
+            },
+            responses: {
+              200: 'Login exitoso con JWT token',
+              401: 'Credenciales inválidas',
+              400: 'Datos faltantes o inválidos'
+            },
+            test_scenarios: {
+              valid_credentials: {
+                email: 'test@example.com',
+                password: 'Password123'
+              },
+              invalid_credentials: 'Should return 401',
+              missing_fields: 'Should return 400'
+            }
+          },
+          'GET /api/auth/profile': {
+            description: 'Obtener perfil del usuario autenticado',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            responses: {
+              200: 'Perfil de usuario',
+              401: 'Token inválido o faltante',
+              404: 'Usuario no encontrado'
+            }
+          },
+          'PUT /api/auth/profile': {
+            description: 'Actualizar perfil del usuario autenticado',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            request_body: {
+              nombre: 'string (optional)',
+              email: 'string (optional, email format)'
+            },
+            responses: {
+              200: 'Perfil actualizado',
+              400: 'Datos inválidos',
+              401: 'Token inválido'
+            }
+          },
+          'POST /api/auth/change-password': {
+            description: 'Cambiar contraseña del usuario autenticado',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            request_body: {
+              currentPassword: 'string',
+              newPassword: 'string (min 6 chars, 1 uppercase, 1 lowercase, 1 digit)'
+            },
+            responses: {
+              200: 'Contraseña cambiada exitosamente',
+              400: 'Datos inválidos o contraseña actual incorrecta',
+              401: 'Token inválido'
+            }
+          },
+          'POST /api/auth/logout': {
+            description: 'Cerrar sesión (invalidar token)',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            responses: {
+              200: 'Logout exitoso',
+              401: 'Token inválido'
+            }
+          }
+        },
+        middleware: {
+          authenticateToken: 'Middleware requerido para rutas protegidas',
+          optionalAuth: 'Middleware opcional para autenticación',
+          requireRole: 'Middleware para control de roles (extensible)',
+          logAuthenticatedRequest: 'Middleware de auditoría'
+        },
+        jwt_configuration: {
+          algorithm: 'HS256',
+          default_expiry: '7d',
+          secret: 'process.env.JWT_SECRET || default',
+          bcrypt_rounds: 10
+        }
+      }
+    };
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(endpoints, null, 2),
+        },
+      ],
+    };
+  }
+
+  async getAuthSchemas() {
+    try {
+      const authSchemasPath = path.join(__dirname, 'docs', 'api', 'auth-schemas.yaml');
+      const content = await fs.readFile(authSchemasPath, 'utf-8');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `# Authentication Schemas (Swagger/OpenAPI)\n` +
+                  `# JWT-based authentication system with bcrypt password hashing\n` +
+                  `# Extends BaseService pattern for consistent CRUD operations\n\n` +
+                  content,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error cargando esquemas de autenticación: ${error.message}`,
+          },
+        ],
+      };
+    }
+  }
+
   async executeApiCall({ method, endpoint, body }) {
     try {
       const baseUrl = process.env.API_BASE_URL || 'http://localhost:3030';
@@ -855,6 +1028,16 @@ class FinanzasApiMCPServer {
               }
             },
             {
+              name: 'get_auth_endpoints',
+              description: 'Retorna documentación de endpoints de autenticación JWT',
+              inputSchema: { type: 'object', properties: {} }
+            },
+            {
+              name: 'get_auth_schemas',
+              description: 'Retorna esquemas Swagger para autenticación y JWT',
+              inputSchema: { type: 'object', properties: {} }
+            },
+            {
               name: 'execute_api_call',
               description: 'Ejecuta llamada a la API para testing',
               inputSchema: {
@@ -896,6 +1079,12 @@ class FinanzasApiMCPServer {
               break;
             case 'get_test_scenarios':
               result = await this.getTestScenarios(args.category || 'all');
+              break;
+            case 'get_auth_endpoints':
+              result = await this.getAuthEndpoints();
+              break;
+            case 'get_auth_schemas':
+              result = await this.getAuthSchemas();
               break;
             case 'execute_api_call':
               result = await this.executeApiCall(args);
