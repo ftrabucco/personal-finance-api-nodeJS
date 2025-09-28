@@ -14,6 +14,15 @@ export function defineGastoUnico(sequelize) {
         importancia_gasto_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'importancias_gasto', key: 'id' } },
         tipo_pago_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'tipos_pago', key: 'id' } },
         tarjeta_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'tarjetas', key: 'id' } },
+        usuario_id: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'usuarios',
+                key: 'id'
+            },
+            comment: 'Usuario propietario del gasto único'
+        },
         procesado: {
             type: DataTypes.BOOLEAN,
             allowNull: false,

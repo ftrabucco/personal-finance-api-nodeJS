@@ -29,10 +29,19 @@ export function defineTarjeta(sequelize) {
             validate: { min: 1, max: 31 },
             comment: 'Día del mes de vencimiento para tarjetas de crédito (1-31)'
         },
-        permite_cuotas: { 
-            type: DataTypes.BOOLEAN, 
+        permite_cuotas: {
+            type: DataTypes.BOOLEAN,
             allowNull: false,
-            defaultValue: false 
+            defaultValue: false
+        },
+        usuario_id: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'usuarios',
+                key: 'id'
+            },
+            comment: 'Usuario propietario de la tarjeta'
         },
     }, {
         tableName: 'tarjetas',

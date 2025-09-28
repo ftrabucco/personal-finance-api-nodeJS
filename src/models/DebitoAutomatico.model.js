@@ -48,18 +48,27 @@ export function defineDebitoAutomatico(sequelize) {
         key: 'id'
       }
     },
-    tarjeta_id: { 
-      type: DataTypes.INTEGER, 
+    tarjeta_id: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: 'tarjetas',
         key: 'id'
       }
     },
-    activo: { 
-      type: DataTypes.BOOLEAN, 
-      allowNull: false, 
-      defaultValue: true 
+    usuario_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'usuarios',
+        key: 'id'
+      },
+      comment: 'Usuario propietario del débito automático'
+    },
+    activo: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
     },
     ultima_fecha_generado: { 
       type: DataTypes.DATEONLY, 

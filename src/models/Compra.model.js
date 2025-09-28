@@ -69,12 +69,21 @@ export function defineCompra(sequelize) {
       }
     },
     tarjeta_id: {
-      type: DataTypes.INTEGER, 
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: 'tarjetas',
         key: 'id'
       }
+    },
+    usuario_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'usuarios',
+        key: 'id'
+      },
+      comment: 'Usuario propietario de la compra'
     },
     pendiente_cuotas: {
       type: DataTypes.BOOLEAN,

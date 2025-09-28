@@ -35,6 +35,23 @@ export class GastoUnicoService extends BaseService {
   }
 
   /**
+   * Find all one-time expenses for a specific user
+   * @param {number} userId - ID of the user
+   * @param {Object} options - Additional query options
+   */
+  async findAllByUser(userId, options = {}) {
+    const userFilterOptions = {
+      where: {
+        usuario_id: userId,
+        ...(options.where || {})
+      },
+      ...options
+    };
+
+    return this.findAll(userFilterOptions);
+  }
+
+  /**
    * Find one-time expense by ID with related data
    * Overrides base method to include specific associations
    */
@@ -50,6 +67,37 @@ export class GastoUnicoService extends BaseService {
     };
 
     return super.findById(id, defaultOptions);
+  }
+
+  /**
+   * Find one-time expense by ID for a specific user
+   * @param {number} id - ID of the expense
+   * @param {number} userId - ID of the user
+   * @param {Object} options - Additional query options
+   */
+  async findByIdAndUser(id, userId, options = {}) {
+    const userFilterOptions = {
+      where: {
+        usuario_id: userId,
+        ...(options.where || {})
+      },
+      ...options
+    };
+
+    return this.findById(id, userFilterOptions);
+  }
+
+  /**
+   * Create one-time expense with automatic real expense generation for a specific user
+   * @param {Object} data - One-time expense data
+   * @param {number} userId - ID of the user
+   * @param {Object} externalTransaction - Optional external transaction
+   */
+  async createForUser(data, userId, externalTransaction = null) {
+    return this.createWithGastoReal({
+      ...data,
+      usuario_id: userId
+    }, externalTransaction);
   }
 
   /**
@@ -219,10 +267,28 @@ export class GastoUnicoService extends BaseService {
   }
 
   /**
+   * Find unprocessed one-time expenses for a specific user
+   */
+  async findUnprocessedByUser(userId) {
+    return this.findAllByUser(userId, {
+      where: { procesado: false }
+    });
+  }
+
+  /**
    * Find processed one-time expenses
    */
   async findProcessed() {
     return this.findAll({
+      where: { procesado: true }
+    });
+  }
+
+  /**
+   * Find processed one-time expenses for a specific user
+   */
+  async findProcessedByUser(userId) {
+    return this.findAllByUser(userId, {
       where: { procesado: true }
     });
   }
