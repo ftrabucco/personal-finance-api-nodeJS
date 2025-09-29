@@ -52,9 +52,10 @@ export class GastoRecurrenteController extends BaseController {
       // 1. Crear el gasto recurrente
       const gastoRecurrente = await this.model.create({
         ...req.body,
+        usuario_id: req.user.id,
         activo: true, // Por defecto activo
         ultima_fecha_generado: null // Inicialmente no se ha generado ningún gasto
-      }, { 
+      }, {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });
@@ -87,7 +88,12 @@ export class GastoRecurrenteController extends BaseController {
   async update(req, res) {
     const transaction = await sequelize.transaction();
     try {
-      const gastoRecurrente = await this.model.findByPk(req.params.id);
+      const gastoRecurrente = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!gastoRecurrente) {
         await transaction.rollback();
         return sendError(res, 404, 'Gasto recurrente no encontrado');
@@ -143,7 +149,12 @@ export class GastoRecurrenteController extends BaseController {
   // Método delete mejorado: preserva gastos ya generados (business rule)
   async delete(req, res) {
     try {
-      const gastoRecurrente = await this.model.findByPk(req.params.id);
+      const gastoRecurrente = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!gastoRecurrente) {
         return sendError(res, 404, 'Gasto recurrente no encontrado');
       }
@@ -245,7 +256,10 @@ export class GastoRecurrenteController extends BaseController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;

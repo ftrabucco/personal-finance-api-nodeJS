@@ -47,9 +47,10 @@ export class CompraController extends BaseController {
         return sendError(res, 400, 'Campos inválidos', validationResult.message);
       }
 
-      // 1. Crear la compra - siempre marcar como pendiente inicialmente  
+      // 1. Crear la compra - siempre marcar como pendiente inicialmente
       const compra = await this.model.create({
         ...req.body,
+        usuario_id: req.user.id,
         pendiente_cuotas: true
       }, { transaction });
       
@@ -92,7 +93,12 @@ export class CompraController extends BaseController {
   async update(req, res) {
     const transaction = await sequelize.transaction();
     try {
-      const compra = await this.model.findByPk(req.params.id);
+      const compra = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!compra) {
         await transaction.rollback();
         return sendError(res, 404, 'Compra no encontrada');
@@ -140,7 +146,12 @@ export class CompraController extends BaseController {
   // Método delete mejorado: preserva gastos ya generados (business rule)
   async delete(req, res) {
     try {
-      const compra = await this.model.findByPk(req.params.id);
+      const compra = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!compra) {
         return sendError(res, 404, 'Compra no encontrada');
       }
@@ -258,7 +269,10 @@ export class CompraController extends BaseController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
