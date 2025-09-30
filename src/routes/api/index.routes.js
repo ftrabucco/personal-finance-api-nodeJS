@@ -44,6 +44,16 @@ import {
 } from '../../controllers/api/gastoUnico.controller.js';
 
 import {
+  obtenerTarjetas,
+  obtenerTarjetaPorId,
+  crearTarjeta,
+  actualizarTarjeta,
+  eliminarTarjeta,
+  obtenerEstadisticasTarjetas,
+  validarUsoTarjeta
+} from '../../controllers/api/tarjeta.controller.js';
+
+import {
   validateGastoFilters,
   validateIdParam,
   validateCreateGasto,
@@ -59,7 +69,10 @@ import {
   validateGastoUnicoFilters,
   validateCompraFilters,
   validateGastoRecurrenteFilters,
-  validateDebitoAutomaticoFilters
+  validateDebitoAutomaticoFilters,
+  validateCreateTarjeta,
+  validateUpdateTarjeta,
+  validateTarjetaFilters
 } from '../../middlewares/validation.middleware.js';
 
 import { authenticateToken } from '../../middlewares/auth.middleware.js';
@@ -106,5 +119,14 @@ router.get('/gastos-unicos/:id', authenticateToken, validateIdParam, obtenerGast
 router.post('/gastos-unicos', authenticateToken, validateCreateGastoUnico, crearGastoUnico);
 router.put('/gastos-unicos/:id', authenticateToken, validateIdParam, validateUpdateGastoUnico, actualizarGastoUnico);
 router.delete('/gastos-unicos/:id', authenticateToken, validateIdParam, eliminarGastoUnico);
+
+// 🔐 Rutas para Tarjetas - Requieren autenticación
+router.get('/tarjetas', authenticateToken, validateTarjetaFilters, obtenerTarjetas); // Con filtros opcionales y paginación
+router.get('/tarjetas/stats', authenticateToken, obtenerEstadisticasTarjetas); // Estadísticas del usuario
+router.get('/tarjetas/:id', authenticateToken, validateIdParam, obtenerTarjetaPorId);
+router.get('/tarjetas/:id/usage', authenticateToken, validateIdParam, validarUsoTarjeta); // Validar uso en gastos/compras
+router.post('/tarjetas', authenticateToken, validateCreateTarjeta, crearTarjeta);
+router.put('/tarjetas/:id', authenticateToken, validateIdParam, validateUpdateTarjeta, actualizarTarjeta);
+router.delete('/tarjetas/:id', authenticateToken, validateIdParam, eliminarTarjeta);
 
 export default router; 

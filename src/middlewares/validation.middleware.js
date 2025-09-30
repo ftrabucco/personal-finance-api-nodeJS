@@ -391,3 +391,114 @@ export const validateCompraFilters = createValidationMiddleware(compraFiltersSch
 export const validateGastoRecurrenteFilters = createValidationMiddleware(gastoRecurrenteFiltersSchema, 'query');
 export const validateDebitoAutomaticoFilters = createValidationMiddleware(debitoAutomaticoFiltersSchema, 'query');
 export const validateIdParam = createValidationMiddleware(idParamSchema, 'params');
+
+// =============================================================================
+// TARJETAS VALIDATIONS
+// =============================================================================
+
+const tarjetaSchema = Joi.object({
+  nombre: Joi.string().trim().min(2).max(100).required()
+    .messages({
+      'string.min': 'El nombre debe tener al menos 2 caracteres',
+      'string.max': 'El nombre no puede exceder 100 caracteres',
+      'any.required': 'El nombre de la tarjeta es requerido'
+    }),
+
+  tipo: Joi.string().valid('debito', 'credito', 'virtual').required()
+    .messages({
+      'any.only': 'El tipo debe ser: debito, credito o virtual',
+      'any.required': 'El tipo de tarjeta es requerido'
+    }),
+
+  banco: Joi.string().trim().min(2).max(100).required()
+    .messages({
+      'string.min': 'El banco debe tener al menos 2 caracteres',
+      'string.max': 'El banco no puede exceder 100 caracteres',
+      'any.required': 'El banco es requerido'
+    }),
+
+  dia_mes_cierre: Joi.when('tipo', {
+    is: 'credito',
+    then: Joi.number().integer().min(1).max(31).required()
+      .messages({
+        'number.base': 'El día de cierre debe ser un número',
+        'number.integer': 'El día de cierre debe ser un número entero',
+        'number.min': 'El día de cierre debe ser entre 1 y 31',
+        'number.max': 'El día de cierre debe ser entre 1 y 31',
+        'any.required': 'Las tarjetas de crédito requieren día de cierre'
+      }),
+    otherwise: Joi.forbidden()
+      .messages({
+        'any.unknown': 'Las tarjetas de débito no deben tener día de cierre'
+      })
+  }),
+
+  dia_mes_vencimiento: Joi.when('tipo', {
+    is: 'credito',
+    then: Joi.number().integer().min(1).max(31).required()
+      .messages({
+        'number.base': 'El día de vencimiento debe ser un número',
+        'number.integer': 'El día de vencimiento debe ser un número entero',
+        'number.min': 'El día de vencimiento debe ser entre 1 y 31',
+        'number.max': 'El día de vencimiento debe ser entre 1 y 31',
+        'any.required': 'Las tarjetas de crédito requieren día de vencimiento'
+      }),
+    otherwise: Joi.forbidden()
+      .messages({
+        'any.unknown': 'Las tarjetas de débito no deben tener día de vencimiento'
+      })
+  }),
+
+  permite_cuotas: Joi.boolean().optional()
+    .messages({
+      'boolean.base': 'El campo permite_cuotas debe ser verdadero o falso'
+    })
+});
+
+const tarjetaFiltersSchema = Joi.object({
+  tipo: Joi.string().valid('debito', 'credito', 'virtual').optional()
+    .messages({
+      'any.only': 'El tipo debe ser: debito, credito o virtual'
+    }),
+
+  banco: Joi.string().trim().min(1).max(100).optional()
+    .messages({
+      'string.min': 'El banco debe tener al menos 1 caracter para la búsqueda',
+      'string.max': 'El banco no puede exceder 100 caracteres'
+    }),
+
+  permite_cuotas: Joi.string().valid('true', 'false').optional()
+    .messages({
+      'any.only': 'El campo permite_cuotas debe ser "true" o "false"'
+    }),
+
+  limit: Joi.number().integer().min(1).max(100).optional()
+    .messages({
+      'number.base': 'El límite debe ser un número',
+      'number.integer': 'El límite debe ser un número entero',
+      'number.min': 'El límite debe ser al menos 1',
+      'number.max': 'El límite no puede ser mayor a 100'
+    }),
+
+  offset: Joi.number().integer().min(0).optional()
+    .messages({
+      'number.base': 'El offset debe ser un número',
+      'number.integer': 'El offset debe ser un número entero',
+      'number.min': 'El offset debe ser 0 o mayor'
+    }),
+
+  orderBy: Joi.string().valid('nombre', 'tipo', 'banco', 'id').optional()
+    .messages({
+      'any.only': 'El ordenamiento debe ser por: nombre, tipo, banco o id'
+    }),
+
+  orderDirection: Joi.string().valid('ASC', 'DESC').optional()
+    .messages({
+      'any.only': 'La dirección debe ser ASC o DESC'
+    })
+});
+
+// Exportar validaciones de tarjeta
+export const validateCreateTarjeta = createValidationMiddleware(tarjetaSchema, 'body');
+export const validateUpdateTarjeta = createValidationMiddleware(tarjetaSchema, 'body');
+export const validateTarjetaFilters = createValidationMiddleware(tarjetaFiltersSchema, 'query');

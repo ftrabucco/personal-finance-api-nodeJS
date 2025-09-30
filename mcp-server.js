@@ -97,8 +97,8 @@ class FinanzasApiMCPServer {
               properties: {
                 entity: {
                   type: 'string',
-                  description: 'Entidad específica: gasto_unico, compra, gasto_recurrente, debito_automatico',
-                  enum: ['gasto_unico', 'compra', 'gasto_recurrente', 'debito_automatico']
+                  description: 'Entidad específica: gasto_unico, compra, gasto_recurrente, debito_automatico, tarjeta',
+                  enum: ['gasto_unico', 'compra', 'gasto_recurrente', 'debito_automatico', 'tarjeta']
                 }
               },
             },
@@ -347,6 +347,25 @@ class FinanzasApiMCPServer {
           '✅ PUT /api/debitos-automaticos/:id - Actualizar',
           '✅ DELETE /api/debitos-automaticos/:id - Eliminar'
         ]
+      },
+      tarjetas: {
+        base: '/api/tarjetas',
+        endpoints: [
+          '✅ GET /api/tarjetas - Obtener tarjetas con filtros opcionales y paginación inteligente',
+          '✅ GET /api/tarjetas/stats - Obtener estadísticas de tarjetas del usuario',
+          '✅ GET /api/tarjetas/:id - Obtener tarjeta por ID',
+          '✅ GET /api/tarjetas/:id/usage - Validar uso de tarjeta en gastos/compras',
+          '✅ POST /api/tarjetas - Crear nueva tarjeta',
+          '✅ PUT /api/tarjetas/:id - Actualizar tarjeta',
+          '✅ DELETE /api/tarjetas/:id - Eliminar tarjeta (solo si no está en uso)'
+        ],
+        business_logic: [
+          '🔧 Validación automática por tipo: crédito requiere fechas, débito no',
+          '🔧 Normalización automática de datos según tipo de tarjeta',
+          '🔧 Validación de uso antes de eliminar (gastos/compras asociados)',
+          '🔧 Estadísticas por usuario: total, crédito, débito, virtual',
+          '🔧 Filtros: tipo, banco, permite_cuotas con paginación inteligente'
+        ]
       }
     };
 
@@ -472,20 +491,191 @@ class FinanzasApiMCPServer {
       ],
       tarjetas: [
         {
-          name: 'Tarjeta Crédito Requiere Fechas',
+          name: 'Tarjeta Crédito Válida',
+          description: 'Crear tarjeta de crédito con todas las validaciones',
+          endpoint: 'POST /api/tarjetas',
+          payload: {
+            nombre: 'Visa Crédito Test',
+            tipo: 'credito',
+            banco: 'Banco Nación',
+            dia_mes_cierre: 15,
+            dia_mes_vencimiento: 10
+          },
+          expected: {
+            status: 201,
+            response_structure: {
+              success: true,
+              data: {
+                id: 'number',
+                nombre: 'Visa Crédito Test',
+                tipo: 'credito',
+                banco: 'Banco Nación',
+                dia_mes_cierre: 15,
+                dia_mes_vencimiento: 10,
+                permite_cuotas: true
+              }
+            }
+          }
+        },
+        {
+          name: 'Tarjeta Débito Válida',
+          description: 'Crear tarjeta de débito sin fechas',
+          endpoint: 'POST /api/tarjetas',
+          payload: {
+            nombre: 'Mastercard Débito Test',
+            tipo: 'debito',
+            banco: 'Banco Santander'
+          },
+          expected: {
+            status: 201,
+            response_structure: {
+              success: true,
+              data: {
+                id: 'number',
+                nombre: 'Mastercard Débito Test',
+                tipo: 'debito',
+                banco: 'Banco Santander',
+                dia_mes_cierre: null,
+                dia_mes_vencimiento: null,
+                permite_cuotas: false
+              }
+            }
+          }
+        },
+        {
+          name: 'Tarjeta Crédito Sin Fechas - Error',
           description: 'Tarjeta de crédito debe tener dias de cierre y vencimiento',
           endpoint: 'POST /api/tarjetas',
           payload: {
-            nombre: 'Test Crédito',
+            nombre: 'Test Crédito Inválido',
             tipo: 'credito',
-            banco: 'Test Bank',
-            dia_cierre: null,
-            dia_vencimiento: null,
-            permite_cuotas: true
+            banco: 'Test Bank'
           },
           expected: {
             status: 400,
-            error_contains: 'fechas'
+            response_structure: {
+              success: false,
+              message: 'Datos de tarjeta inválidos',
+              errors: [
+                'Las tarjetas de crédito requieren día de cierre',
+                'Las tarjetas de crédito requieren día de vencimiento'
+              ]
+            }
+          }
+        },
+        {
+          name: 'Tarjeta Débito Con Fechas - Error',
+          description: 'Tarjeta de débito no debe tener fechas de cierre/vencimiento',
+          endpoint: 'POST /api/tarjetas',
+          payload: {
+            nombre: 'Test Débito Inválido',
+            tipo: 'debito',
+            banco: 'Test Bank',
+            dia_mes_cierre: 15,
+            dia_mes_vencimiento: 10
+          },
+          expected: {
+            status: 400,
+            response_structure: {
+              success: false,
+              message: 'Datos de tarjeta inválidos',
+              errors: [
+                'Las tarjetas de débito no deben tener días de cierre o vencimiento'
+              ]
+            }
+          }
+        },
+        {
+          name: 'Filtros Tarjetas por Tipo',
+          description: 'Filtrar tarjetas por tipo con paginación inteligente',
+          endpoint: 'GET /api/tarjetas?tipo=credito',
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: 'array',
+              meta: {
+                total: 'number',
+                type: 'collection'
+              }
+            }
+          }
+        },
+        {
+          name: 'Estadísticas de Tarjetas',
+          description: 'Obtener estadísticas de tarjetas del usuario autenticado',
+          endpoint: 'GET /api/tarjetas/stats',
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: {
+                estadisticas: {
+                  total: 'number',
+                  credito: 'number',
+                  debito: 'number',
+                  virtual: 'number'
+                },
+                usuario_id: 'number'
+              }
+            }
+          }
+        },
+        {
+          name: 'Validar Uso de Tarjeta',
+          description: 'Verificar si tarjeta está en uso antes de eliminar',
+          endpoint: 'GET /api/tarjetas/:id/usage',
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: {
+                tarjeta: {
+                  id: 'number',
+                  nombre: 'string',
+                  tipo: 'string'
+                },
+                inUse: 'boolean',
+                usage: {
+                  gastos: 'number',
+                  compras: 'number',
+                  total: 'number'
+                }
+              }
+            }
+          }
+        },
+        {
+          name: 'Eliminar Tarjeta en Uso - Error',
+          description: 'No se debe poder eliminar tarjeta que está siendo utilizada',
+          endpoint: 'DELETE /api/tarjetas/:id',
+          expected: {
+            status: 400,
+            response_structure: {
+              success: false,
+              message: 'No se puede eliminar la tarjeta',
+              error: 'La tarjeta está siendo utilizada en X registro(s)'
+            }
+          }
+        },
+        {
+          name: 'Actualizar Tarjeta Válida',
+          description: 'Actualizar datos de tarjeta manteniendo validaciones',
+          endpoint: 'PUT /api/tarjetas/:id',
+          payload: {
+            nombre: 'Visa Actualizada',
+            banco: 'Banco Actualizado'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: {
+                id: 'number',
+                nombre: 'Visa Actualizada',
+                banco: 'Banco Actualizado'
+              }
+            }
           }
         }
       ],
@@ -644,6 +834,21 @@ class FinanzasApiMCPServer {
         case 'debito_automatico':
           schemaPath = 'src/validations/debitoAutomatico.validation.js';
           break;
+        case 'tarjeta':
+          // Tarjetas usan validation.middleware.js que contiene todos los esquemas de validación
+          const validationPath = path.join(__dirname, 'src/middlewares/validation.middleware.js');
+          const validationContent = await fs.readFile(validationPath, 'utf-8');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `# Esquemas de Validación de Tarjetas (Joi)\n` +
+                      `# Validación condicional por tipo: crédito requiere fechas, débito no\n` +
+                      `# Normalización automática de datos según tipo\n\n` +
+                      validationContent.split('// Tarjeta validation')[1]?.split('// Export')[0] || 'Esquemas de tarjeta no encontrados',
+              },
+            ],
+          };
         default:
           // Retornar todos los esquemas
           const allSchemas = await Promise.all([
@@ -736,11 +941,20 @@ class FinanzasApiMCPServer {
           ]
         },
         tarjetas: {
-          description: 'Tarjetas con billing cycle logic for InstallmentStrategy',
+          description: 'Tarjetas con billing cycle logic for InstallmentStrategy + User isolation',
           fields: [
-            'id (PK)', 'nombre', 'tipo', 'banco',
-            'dia_cierre (billing close)', 'dia_vencimiento (due date)',
-            'permite_cuotas'
+            'id (PK)', 'nombre', 'tipo (debito|credito|virtual)', 'banco',
+            'dia_mes_cierre (billing close - required for credito)',
+            'dia_mes_vencimiento (due date - required for credito)',
+            'permite_cuotas (auto-normalized by tipo)',
+            'usuario_id (FK - user isolation)'
+          ],
+          business_rules: [
+            'CREDITO: requiere dia_mes_cierre + dia_mes_vencimiento, permite_cuotas=true',
+            'DEBITO: no debe tener fechas, permite_cuotas=false',
+            'VIRTUAL: permite_cuotas configurable, fechas opcionales',
+            'User isolation: usuarios solo ven/modifican sus propias tarjetas',
+            'Usage validation: no se puede eliminar si está en uso en gastos/compras'
           ]
         }
       },
@@ -1022,7 +1236,7 @@ class FinanzasApiMCPServer {
                 properties: {
                   category: {
                     type: 'string',
-                    enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'auth', 'all']
+                    enum: ['gastos_unicos', 'compras', 'recurrentes', 'debitos_automaticos', 'tarjetas', 'job', 'auth', 'all']
                   }
                 }
               }

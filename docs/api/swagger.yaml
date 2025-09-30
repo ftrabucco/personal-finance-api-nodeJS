@@ -24,6 +24,8 @@ tags:
     description: Operaciones con gastos recurrentes (mensuales, anuales, etc.)
   - name: debitos-automaticos
     description: Operaciones con débitos automáticos (suscripciones, servicios)
+  - name: tarjetas
+    description: Gestión de tarjetas de débito y crédito del usuario
 
 components:
   securitySchemes:
@@ -499,18 +501,147 @@ components:
       properties:
         id:
           type: integer
+          description: ID único de la tarjeta
+          example: 1
         nombre:
           type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre descriptivo de la tarjeta
+          example: "Visa Platinum ICBC"
         tipo:
           type: string
+          enum: [debito, credito, virtual]
+          description: Tipo de tarjeta
+          example: "credito"
         banco:
           type: string
-        dia_cierre:
+          minLength: 2
+          maxLength: 100
+          description: Nombre del banco emisor
+          example: "ICBC"
+        dia_mes_cierre:
           type: integer
-        dia_vencimiento:
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: Día del mes de cierre (solo tarjetas de crédito)
+          example: 20
+        dia_mes_vencimiento:
           type: integer
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: Día del mes de vencimiento (solo tarjetas de crédito)
+          example: 10
         permite_cuotas:
           type: boolean
+          description: Indica si la tarjeta permite compras en cuotas
+          example: true
+        usuario_id:
+          type: integer
+          description: ID del usuario propietario
+          example: 1
+
+    TarjetaInput:
+      type: object
+      required: [nombre, tipo, banco]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre descriptivo de la tarjeta
+          example: "Visa Platinum ICBC"
+        tipo:
+          type: string
+          enum: [debito, credito, virtual]
+          description: Tipo de tarjeta
+          example: "credito"
+        banco:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre del banco emisor
+          example: "ICBC"
+        dia_mes_cierre:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Día del mes de cierre (requerido para tarjetas de crédito)
+          example: 20
+        dia_mes_vencimiento:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Día del mes de vencimiento (requerido para tarjetas de crédito)
+          example: 10
+        permite_cuotas:
+          type: boolean
+          description: Permite compras en cuotas (se auto-configura según tipo)
+          example: true
+
+    TarjetaStats:
+      type: object
+      properties:
+        estadisticas:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total de tarjetas del usuario
+              example: 5
+            credito:
+              type: integer
+              description: Cantidad de tarjetas de crédito
+              example: 3
+            debito:
+              type: integer
+              description: Cantidad de tarjetas de débito
+              example: 2
+            virtual:
+              type: integer
+              description: Cantidad de tarjetas virtuales
+              example: 0
+        usuario_id:
+          type: integer
+          description: ID del usuario
+          example: 1
+
+    TarjetaUsage:
+      type: object
+      properties:
+        tarjeta:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            nombre:
+              type: string
+              example: "Visa Platinum ICBC"
+            tipo:
+              type: string
+              example: "credito"
+        inUse:
+          type: boolean
+          description: Indica si la tarjeta está siendo utilizada
+          example: false
+        usage:
+          type: object
+          properties:
+            gastos:
+              type: integer
+              description: Cantidad de gastos que usan esta tarjeta
+              example: 5
+            compras:
+              type: integer
+              description: Cantidad de compras que usan esta tarjeta
+              example: 2
+            total:
+              type: integer
+              description: Total de registros que usan esta tarjeta
+              example: 7
 
     Frecuencia:
       type: object
@@ -2753,3 +2884,415 @@ paths:
       responses:
         '200':
           description: Débito automático eliminado exitosamente
+
+  # =============================================================================
+  # TARJETAS ENDPOINTS
+  # =============================================================================
+  /tarjetas:
+    get:
+      tags:
+        - tarjetas
+      summary: Listar tarjetas del usuario
+      description: |
+        Obtiene todas las tarjetas del usuario autenticado con filtros opcionales y paginación.
+
+        **Filtros disponibles:**
+        - `tipo`: Filtrar por tipo de tarjeta (debito, credito, virtual)
+        - `banco`: Búsqueda parcial por nombre del banco
+        - `permite_cuotas`: Filtrar por capacidad de cuotas (true/false)
+        - `limit`: Límite de resultados (1-100)
+        - `offset`: Offset para paginación
+        - `orderBy`: Campo de ordenamiento (nombre, tipo, banco, id)
+        - `orderDirection`: Dirección del ordenamiento (ASC, DESC)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+            enum: [debito, credito, virtual]
+          description: Filtrar por tipo de tarjeta
+          example: credito
+        - name: banco
+          in: query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Búsqueda parcial por nombre del banco
+          example: Galicia
+        - name: permite_cuotas
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Filtrar por capacidad de cuotas
+          example: "true"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Límite de resultados
+          example: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Offset para paginación
+          example: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [nombre, tipo, banco, id]
+            default: nombre
+          description: Campo de ordenamiento
+          example: nombre
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+          description: Dirección del ordenamiento
+          example: ASC
+      responses:
+        '200':
+          description: Lista de tarjetas obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Tarjeta'
+              examples:
+                success:
+                  summary: Respuesta exitosa
+                  value:
+                    success: true
+                    data:
+                      - id: 1
+                        nombre: "Visa Platinum ICBC"
+                        tipo: "credito"
+                        banco: "ICBC"
+                        dia_mes_cierre: 20
+                        dia_mes_vencimiento: 10
+                        permite_cuotas: true
+                        usuario_id: 1
+                      - id: 2
+                        nombre: "Débito Santander"
+                        tipo: "debito"
+                        banco: "Banco Santander"
+                        dia_mes_cierre: null
+                        dia_mes_vencimiento: null
+                        permite_cuotas: false
+                        usuario_id: 1
+                    meta:
+                      total: 2
+                      type: collection
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+    post:
+      tags:
+        - tarjetas
+      summary: Crear nueva tarjeta
+      description: |
+        Crea una nueva tarjeta para el usuario autenticado.
+
+        **Reglas de validación:**
+        - Tarjetas de crédito REQUIEREN `dia_mes_cierre` y `dia_mes_vencimiento`
+        - Tarjetas de débito NO deben incluir fechas de cierre/vencimiento
+        - El campo `permite_cuotas` se auto-configura según el tipo
+        - El `usuario_id` se extrae automáticamente del JWT token
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TarjetaInput'
+            examples:
+              credito:
+                summary: Tarjeta de crédito
+                value:
+                  nombre: "Visa Platinum ICBC"
+                  tipo: "credito"
+                  banco: "ICBC"
+                  dia_mes_cierre: 20
+                  dia_mes_vencimiento: 10
+              debito:
+                summary: Tarjeta de débito
+                value:
+                  nombre: "Débito Santander"
+                  tipo: "debito"
+                  banco: "Banco Santander"
+      responses:
+        '201':
+          description: Tarjeta creada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tarjeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tarjetas/stats:
+    get:
+      tags:
+        - tarjetas
+      summary: Obtener estadísticas de tarjetas
+      description: |
+        Obtiene estadísticas resumidas de las tarjetas del usuario autenticado.
+        Incluye totales por tipo (crédito, débito, virtual).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Estadísticas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TarjetaStats'
+              example:
+                success: true
+                data:
+                  estadisticas:
+                    total: 5
+                    credito: 3
+                    debito: 2
+                    virtual: 0
+                  usuario_id: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tarjetas/{id}:
+    get:
+      tags:
+        - tarjetas
+      summary: Obtener tarjeta por ID
+      description: |
+        Obtiene una tarjeta específica por su ID. Solo permite acceso a tarjetas
+        que pertenecen al usuario autenticado.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      responses:
+        '200':
+          description: Tarjeta obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tarjeta'
+        '404':
+          description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Tarjeta no encontrada"
+                timestamp: "2025-01-15T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - tarjetas
+      summary: Actualizar tarjeta
+      description: |
+        Actualiza una tarjeta existente. Solo permite modificar tarjetas
+        que pertenecen al usuario autenticado.
+
+        **Reglas de validación:**
+        - Mismas reglas que la creación (crédito requiere fechas, débito no)
+        - No se puede cambiar el `usuario_id`
+        - Se valida ownership antes de la actualización
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TarjetaInput'
+      responses:
+        '200':
+          description: Tarjeta actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tarjeta'
+        '404':
+          description: Tarjeta no encontrada
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - tarjetas
+      summary: Eliminar tarjeta
+      description: |
+        Elimina una tarjeta del usuario. Antes de eliminar, verifica que la tarjeta
+        no esté siendo utilizada en gastos o compras existentes.
+
+        **Validaciones:**
+        - Solo permite eliminar tarjetas del usuario autenticado
+        - Verifica que no esté en uso por gastos o compras
+        - Si está en uso, devuelve error con detalles de uso
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      responses:
+        '200':
+          description: Tarjeta eliminada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tarjeta eliminada exitosamente"
+                          tarjeta:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                                example: 1
+                              nombre:
+                                type: string
+                                example: "Visa Platinum ICBC"
+                              tipo:
+                                type: string
+                                example: "credito"
+        '400':
+          description: Tarjeta en uso, no se puede eliminar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "No se puede eliminar la tarjeta"
+                details: "La tarjeta está siendo utilizada en 7 registro(s) (5 gastos, 2 compras)"
+                timestamp: "2025-01-15T10:30:00Z"
+        '404':
+          description: Tarjeta no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tarjetas/{id}/usage:
+    get:
+      tags:
+        - tarjetas
+      summary: Validar uso de tarjeta
+      description: |
+        Verifica si una tarjeta está siendo utilizada en gastos o compras.
+        Útil antes de intentar eliminar una tarjeta.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      responses:
+        '200':
+          description: Información de uso obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TarjetaUsage'
+              example:
+                success: true
+                data:
+                  tarjeta:
+                    id: 1
+                    nombre: "Visa Platinum ICBC"
+                    tipo: "credito"
+                  inUse: true
+                  usage:
+                    gastos: 5
+                    compras: 2
+                    total: 7
+        '404':
+          description: Tarjeta no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
