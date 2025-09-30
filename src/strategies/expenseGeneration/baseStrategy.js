@@ -38,7 +38,8 @@ export class BaseExpenseGenerationStrategy {
     return source &&
            source.categoria_gasto_id &&
            source.importancia_gasto_id &&
-           source.tipo_pago_id;
+           source.tipo_pago_id &&
+           source.usuario_id;
   }
 
   /**
@@ -56,6 +57,7 @@ export class BaseExpenseGenerationStrategy {
       descripcion: source.descripcion,
       tipo_origen: this.getType(),
       id_origen: source.id,
+      usuario_id: source.usuario_id,
       ...additionalData
     };
   }

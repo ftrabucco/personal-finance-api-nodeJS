@@ -158,7 +158,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     if (cuotaNumero === 0) {
       const fechaCompra = moment(compra.fecha);
       const diaCompra = fechaCompra.date();
-      const diaCierre = compra.tarjeta.dia_cierre || 28; // Default si no está configurado
+      const diaCierre = compra.tarjeta.dia_mes_cierre || 28; // Default si no está configurado
 
       let mesVencimiento = fechaCompra.month();
       let anioVencimiento = fechaCompra.year();
