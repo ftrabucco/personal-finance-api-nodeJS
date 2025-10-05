@@ -1,6 +1,7 @@
 import { BaseService } from './base.service.js';
-import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../models/index.js';
+import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, Gasto } from '../models/index.js';
 import { InstallmentExpenseStrategy } from '../strategies/expenseGeneration/installmentStrategy.js';
+import { CreditCardDateService } from './creditCardDate.service.js';
 import { Op } from 'sequelize';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
@@ -365,6 +366,126 @@ export class ComprasService extends BaseService {
     if (errors.length > 0) {
       const error = new Error('Validation failed for purchase');
       error.validationErrors = errors;
+      throw error;
+    }
+  }
+
+  /**
+   * Get upcoming payment dates for credit card purchases using smart date logic
+   * @param {number} compraId - Purchase ID
+   * @returns {Object} Payment schedule with smart date calculations
+   */
+  async getSmartPaymentSchedule(compraId) {
+    try {
+      const compra = await this.findById(compraId);
+      if (!compra) {
+        throw new Error('Compra no encontrada');
+      }
+
+      // Get generated installments count
+      const cuotasGeneradas = await Gasto.count({
+        where: {
+          tipo_origen: 'compra',
+          id_origen: compraId
+        }
+      });
+
+      const totalCuotas = compra.cantidad_cuotas || 1;
+      const cuotasPendientes = totalCuotas - cuotasGeneradas;
+
+      // Base payment schedule info
+      const scheduleInfo = {
+        compra_id: compraId,
+        descripcion: compra.descripcion,
+        monto_total: compra.monto_total,
+        monto_cuota: totalCuotas > 1 ? Math.round((compra.monto_total / totalCuotas) * 100) / 100 : compra.monto_total,
+        total_cuotas: totalCuotas,
+        cuotas_generadas: cuotasGeneradas,
+        cuotas_pendientes: cuotasPendientes,
+        pendiente_cuotas: compra.pendiente_cuotas,
+        payment_type: 'regular',
+        upcoming_dates: []
+      };
+
+      // If it's a credit card purchase, use smart date logic
+      if (compra.tarjeta_id && compra.tarjeta?.tipo === 'credito') {
+        try {
+          // Validate credit card configuration
+          const validation = CreditCardDateService.validateCreditCardConfiguration(compra.tarjeta);
+          if (!validation.isValid) {
+            scheduleInfo.payment_type = 'credit_card_invalid';
+            scheduleInfo.validation_errors = validation.errors;
+            scheduleInfo.validation_warnings = validation.warnings;
+            return scheduleInfo;
+          }
+
+          scheduleInfo.payment_type = 'credit_card';
+          scheduleInfo.credit_card_info = {
+            tarjeta_id: compra.tarjeta.id,
+            nombre: compra.tarjeta.nombre,
+            banco: compra.tarjeta.banco,
+            dia_cierre: compra.tarjeta.dia_mes_cierre,
+            dia_vencimiento: compra.tarjeta.dia_mes_vencimiento
+          };
+
+          // Get current cycle info
+          const cycleInfo = CreditCardDateService.getCurrentCycleInfo(compra.tarjeta);
+          scheduleInfo.current_cycle = cycleInfo;
+
+          // Get upcoming payment dates using smart logic
+          const upcomingDates = CreditCardDateService.getUpcomingDueDates(
+            compra,
+            compra.tarjeta,
+            cuotasGeneradas
+          );
+
+          scheduleInfo.upcoming_dates = upcomingDates.map(item => ({
+            cuota: item.cuota,
+            fecha: item.fecha,
+            monto: scheduleInfo.monto_cuota,
+            dias_hasta_vencimiento: item.moment.diff(moment(), 'days')
+          }));
+
+          // Add validation warnings if any
+          if (validation.warnings.length > 0) {
+            scheduleInfo.validation_warnings = validation.warnings;
+          }
+
+        } catch (error) {
+          logger.error('Error calculating smart credit card dates:', {
+            error: error.message,
+            compra_id: compraId,
+            tarjeta_id: compra.tarjeta_id
+          });
+          scheduleInfo.payment_type = 'credit_card_error';
+          scheduleInfo.error = error.message;
+        }
+      } else {
+        // For non-credit card payments, calculate regular schedule
+        const fechaCompra = moment(compra.fecha);
+        for (let i = cuotasGeneradas; i < totalCuotas; i++) {
+          const fechaCuota = moment(fechaCompra).add(i, 'months');
+          scheduleInfo.upcoming_dates.push({
+            cuota: i + 1,
+            fecha: fechaCuota.format('YYYY-MM-DD'),
+            monto: scheduleInfo.monto_cuota,
+            dias_hasta_vencimiento: fechaCuota.diff(moment(), 'days')
+          });
+        }
+      }
+
+      logger.info('Payment schedule calculated:', {
+        compra_id: compraId,
+        payment_type: scheduleInfo.payment_type,
+        upcoming_payments: scheduleInfo.upcoming_dates.length
+      });
+
+      return scheduleInfo;
+    } catch (error) {
+      logger.error('Error getting smart payment schedule:', {
+        error: error.message,
+        compra_id: compraId
+      });
       throw error;
     }
   }

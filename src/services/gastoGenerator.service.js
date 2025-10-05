@@ -184,93 +184,195 @@ export class GastoGeneratorService {
   /**
    * Genera gastos pendientes programados (NO incluye gastos únicos)
    * Los gastos únicos se procesan inmediatamente al crearlos
-   * Usado por el scheduler automático
+   * Usado por el scheduler automático con procesamiento optimizado
    */
   static async generateScheduledExpenses() {
+    const startTime = Date.now();
     const results = {
       success: [],
-      errors: []
+      errors: [],
+      summary: {
+        totalProcessed: 0,
+        processing_time_ms: 0,
+        breakdown: {
+          recurrentes: { processed: 0, generated: 0, skipped: 0, errors: 0 },
+          debitos: { processed: 0, generated: 0, skipped: 0, errors: 0 },
+          compras: { processed: 0, generated: 0, skipped: 0, errors: 0 }
+        }
+      }
     };
 
     try {
-      // Procesar gastos recurrentes activos usando el service migrado
+      logger.info('Starting scheduled expense generation process');
+
+      // Process recurring expenses with improved logging
       const gastosRecurrentes = await this.gastoRecurrenteService.findReadyForGeneration();
+      results.summary.breakdown.recurrentes.processed = gastosRecurrentes.length;
 
-      for (const gastoRecurrente of gastosRecurrentes) {
-        try {
-          const gasto = await this.generateFromGastoRecurrente(gastoRecurrente);
-          if (gasto) {
-            results.success.push({
-              type: 'recurrente',
-              id: gasto.id,
-              source_id: gastoRecurrente.id
-            });
-          }
-        } catch (error) {
-          results.errors.push({
-            type: 'recurrente',
-            id: gastoRecurrente.id,
-            error: error.message
-          });
-        }
-      }
+      logger.debug('Processing recurring expenses', {
+        count: gastosRecurrentes.length,
+        expenses: gastosRecurrentes.map(g => ({
+          id: g.id,
+          descripcion: g.descripcion,
+          reason: g.generationReason,
+          adjustedDate: g.adjustedDate
+        }))
+      });
 
-      // Procesar débitos automáticos activos usando el service migrado
+      await this.processExpensesBatch(
+        gastosRecurrentes,
+        'recurrente',
+        this.generateFromGastoRecurrente,
+        results
+      );
+
+      // Process automatic debits with improved logging
       const debitosAutomaticos = await this.debitoAutomaticoService.findReadyForGeneration();
+      results.summary.breakdown.debitos.processed = debitosAutomaticos.length;
 
-      for (const debitoAutomatico of debitosAutomaticos) {
-        try {
-          const gasto = await this.generateFromDebitoAutomatico(debitoAutomatico);
-          if (gasto) {
-            results.success.push({
-              type: 'debito',
-              id: gasto.id,
-              source_id: debitoAutomatico.id
-            });
-          }
-        } catch (error) {
-          results.errors.push({
-            type: 'debito',
-            id: debitoAutomatico.id,
-            error: error.message
-          });
-        }
-      }
+      logger.debug('Processing automatic debits', {
+        count: debitosAutomaticos.length
+      });
 
-      // Procesar compras con cuotas pendientes usando el service migrado
+      await this.processExpensesBatch(
+        debitosAutomaticos,
+        'debito',
+        this.generateFromDebitoAutomatico,
+        results
+      );
+
+      // Process installment purchases with improved logging
       const compras = await this.comprasService.findReadyForGeneration();
+      results.summary.breakdown.compras.processed = compras.length;
 
-      for (const compra of compras) {
-        try {
-          const gasto = await this.generateFromCompra(compra);
-          if (gasto) {
-            results.success.push({
-              type: 'compra',
-              id: gasto.id,
-              source_id: compra.id
-            });
-          }
-        } catch (error) {
-          results.errors.push({
-            type: 'compra',
-            id: compra.id,
-            error: error.message
-          });
-        }
+      logger.debug('Processing installment purchases', {
+        count: compras.length
+      });
+
+      await this.processExpensesBatch(
+        compras,
+        'compra',
+        this.generateFromCompra,
+        results
+      );
+
+      // Calculate final metrics
+      const endTime = Date.now();
+      results.summary.processing_time_ms = endTime - startTime;
+      results.summary.totalProcessed = results.success.length + results.errors.length;
+
+      // Update breakdown totals
+      for (const type of ['recurrentes', 'debitos', 'compras']) {
+        const breakdown = results.summary.breakdown[type];
+        breakdown.generated = results.success.filter(r => r.type === type.slice(0, -1)).length;
+        breakdown.errors = results.errors.filter(r => r.type === type.slice(0, -1)).length;
+        breakdown.skipped = breakdown.processed - breakdown.generated - breakdown.errors;
       }
 
-      logger.info('Generación automática de gastos programados completada', {
+      logger.info('Scheduled expense generation completed successfully', {
         total_success: results.success.length,
         total_errors: results.errors.length,
-        types_processed: ['recurrente', 'debito', 'compra']
+        processing_time_ms: results.summary.processing_time_ms,
+        breakdown: results.summary.breakdown
       });
+
       return results;
     } catch (error) {
-      logger.error('Error en la generación automática de gastos programados:', {
-        error: error.message
+      const endTime = Date.now();
+      results.summary.processing_time_ms = endTime - startTime;
+
+      logger.error('Fatal error in scheduled expense generation', {
+        error: error.message,
+        stack: error.stack,
+        processing_time_ms: results.summary.processing_time_ms,
+        partial_results: results.summary
       });
       throw error;
     }
+  }
+
+  /**
+   * Process a batch of expenses with parallel processing and detailed error handling
+   */
+  static async processExpensesBatch(expenses, type, generatorFunction, results) {
+    const batchStartTime = Date.now();
+
+    // Process in smaller batches to avoid overwhelming the database
+    const batchSize = 10;
+    const batches = [];
+
+    for (let i = 0; i < expenses.length; i += batchSize) {
+      batches.push(expenses.slice(i, i + batchSize));
+    }
+
+    for (const [batchIndex, batch] of batches.entries()) {
+      logger.debug(`Processing ${type} batch ${batchIndex + 1}/${batches.length}`, {
+        batchSize: batch.length,
+        items: batch.map(item => ({ id: item.id, descripcion: item.descripcion }))
+      });
+
+      // Process batch items in parallel
+      const batchPromises = batch.map(async (expense) => {
+        try {
+          const gasto = await generatorFunction.call(this, expense);
+          if (gasto) {
+            const successItem = {
+              type: type === 'recurrente' ? 'recurrente' : type,
+              id: gasto.id,
+              source_id: expense.id,
+              monto: gasto.monto_ars,
+              descripcion: expense.descripcion,
+              generationReason: expense.generationReason || 'Standard generation',
+              adjustedDate: expense.adjustedDate
+            };
+            results.success.push(successItem);
+
+            logger.debug(`Successfully generated ${type} expense`, {
+              source_id: expense.id,
+              gasto_id: gasto.id,
+              monto: gasto.monto_ars,
+              reason: expense.generationReason
+            });
+          } else {
+            logger.debug(`${type} expense generation skipped`, {
+              source_id: expense.id,
+              reason: 'Generator returned null (should not generate today)'
+            });
+          }
+        } catch (error) {
+          const errorItem = {
+            type: type === 'recurrente' ? 'recurrente' : type,
+            id: expense.id,
+            error: error.message,
+            descripcion: expense.descripcion,
+            timestamp: new Date().toISOString()
+          };
+          results.errors.push(errorItem);
+
+          logger.error(`Error generating ${type} expense`, {
+            source_id: expense.id,
+            descripcion: expense.descripcion,
+            error: error.message,
+            stack: error.stack
+          });
+        }
+      });
+
+      // Wait for batch to complete
+      await Promise.all(batchPromises);
+
+      // Small delay between batches to prevent overwhelming the database
+      if (batchIndex < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    const batchEndTime = Date.now();
+    logger.debug(`Completed ${type} batch processing`, {
+      total_items: expenses.length,
+      batches_count: batches.length,
+      processing_time_ms: batchEndTime - batchStartTime
+    });
   }
 
   /**

@@ -1,5 +1,6 @@
 import { BaseExpenseGenerationStrategy } from './baseStrategy.js';
 import { Gasto } from '../../models/index.js';
+import { CreditCardDateService } from '../../services/creditCardDate.service.js';
 import moment from 'moment-timezone';
 import logger from '../../utils/logger.js';
 
@@ -141,46 +142,57 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
   /**
    * Verifica si debe generar en el día de vencimiento de la tarjeta de crédito
+   * Utiliza el CreditCardDateService para cálculos inteligentes
    */
   shouldGenerateOnCreditCardDueDate(compra, today, cuotaNumero = 0) {
-    if (!compra.tarjeta || !compra.tarjeta.dia_vencimiento) {
-      logger.error('Tarjeta de crédito sin día de vencimiento configurado:', {
+    if (!compra.tarjeta || compra.tarjeta.tipo !== 'credito') {
+      logger.error('Tarjeta de crédito inválida o no configurada:', {
         compra_id: compra.id,
-        tarjeta_id: compra.tarjeta_id
+        tarjeta_id: compra.tarjeta_id,
+        tipo: compra.tarjeta?.tipo
       });
       return false;
     }
 
-    const diaVencimiento = compra.tarjeta.dia_vencimiento;
-    const diaHoy = today.date();
-
-    // Para la primera cuota, calcular el mes de vencimiento según día de cierre
-    if (cuotaNumero === 0) {
-      const fechaCompra = moment(compra.fecha);
-      const diaCompra = fechaCompra.date();
-      const diaCierre = compra.tarjeta.dia_mes_cierre || 28; // Default si no está configurado
-
-      let mesVencimiento = fechaCompra.month();
-      let anioVencimiento = fechaCompra.year();
-
-      // Si la compra fue después del día de cierre, vence el mes siguiente
-      if (diaCompra > diaCierre) {
-        if (mesVencimiento === 11) { // Diciembre
-          mesVencimiento = 0; // Enero del año siguiente
-          anioVencimiento++;
-        } else {
-          mesVencimiento++;
-        }
+    try {
+      // Validar configuración de la tarjeta
+      const validacion = CreditCardDateService.validateCreditCardConfiguration(compra.tarjeta);
+      if (!validacion.isValid) {
+        logger.error('Configuración de tarjeta inválida:', {
+          compra_id: compra.id,
+          tarjeta_id: compra.tarjeta_id,
+          errors: validacion.errors
+        });
+        return false;
       }
 
-      // Verificar si hoy es el día de vencimiento del mes correspondiente
-      return today.date() === diaVencimiento &&
-             today.month() === mesVencimiento &&
-             today.year() === anioVencimiento;
-    }
+      // Verificar si hoy es día de vencimiento usando el servicio inteligente
+      const esHoyDiaVencimiento = CreditCardDateService.isDueDateToday(
+        compra,
+        compra.tarjeta,
+        cuotaNumero,
+        today
+      );
 
-    // Para cuotas siguientes, simplemente verificar el día de vencimiento
-    return diaHoy === diaVencimiento;
+      if (esHoyDiaVencimiento) {
+        logger.info('Día de vencimiento detectado para compra:', {
+          compra_id: compra.id,
+          tarjeta_id: compra.tarjeta_id,
+          cuotaNumero: cuotaNumero + 1,
+          fecha_hoy: today.format('YYYY-MM-DD')
+        });
+      }
+
+      return esHoyDiaVencimiento;
+    } catch (error) {
+      logger.error('Error al verificar día de vencimiento:', {
+        error: error.message,
+        compra_id: compra.id,
+        tarjeta_id: compra.tarjeta_id,
+        cuotaNumero
+      });
+      return false;
+    }
   }
 
   async calculateCurrentInstallment(compra) {
