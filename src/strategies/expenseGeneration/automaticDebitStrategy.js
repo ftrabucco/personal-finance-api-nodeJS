@@ -31,9 +31,11 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
       const today = moment().tz('America/Argentina/Buenos_Aires');
       const fechaParaBD = today.format('YYYY-MM-DD');
 
+      // 💱 Use pre-calculated multi-currency amounts (updated daily by ExchangeRateScheduler)
       const gastoData = this.createGastoData(debitoAutomatico, {
         fecha: fechaParaBD,
-        monto_ars: debitoAutomatico.monto,
+        monto_ars: debitoAutomatico.monto_ars || debitoAutomatico.monto, // Backward compatibility
+        monto_usd: debitoAutomatico.monto_usd || null,
         descripcion: debitoAutomatico.descripcion,
         frecuencia_gasto_id: debitoAutomatico.frecuencia_gasto_id
       });
@@ -46,10 +48,12 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
       // Update last generation date
       await this.updateSourceLastGenerated(debitoAutomatico, fechaParaBD, transaction);
 
-      logger.info('Automatic debit expense generated successfully', {
+      logger.info('Automatic debit expense generated successfully (multi-currency)', {
         gasto_id: gasto.id,
         debitoAutomatico_id: debitoAutomatico.id,
-        monto: gasto.monto_ars,
+        monto_ars: gasto.monto_ars,
+        monto_usd: gasto.monto_usd,
+        moneda_origen: debitoAutomatico.moneda_origen,
         frecuencia: debitoAutomatico.frecuencia?.nombre,
         generation_reason: debitoAutomatico.generationReason
       });

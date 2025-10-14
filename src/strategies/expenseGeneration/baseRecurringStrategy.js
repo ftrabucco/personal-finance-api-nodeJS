@@ -151,9 +151,11 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
       const today = moment().tz('America/Argentina/Buenos_Aires');
       const fechaParaBD = today.format('YYYY-MM-DD');
 
+      // 💱 Use pre-calculated multi-currency amounts (updated daily by ExchangeRateScheduler)
       const gastoData = this.createGastoData(source, {
         fecha: fechaParaBD,
-        monto_ars: source.monto,
+        monto_ars: source.monto_ars || source.monto, // Backward compatibility
+        monto_usd: source.monto_usd || null,
         ...additionalData
       });
 
@@ -165,11 +167,13 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
       // Update the last generated date
       await this.updateLastGeneratedDate(source, fechaParaBD, transaction);
 
-      logger.info(`${this.getType()} expense generated successfully`, {
+      logger.info(`${this.getType()} expense generated successfully (multi-currency)`, {
         gasto_id: gasto.id,
         source_id: source.id,
         type: this.getType(),
-        monto: source.monto
+        monto_ars: gasto.monto_ars,
+        monto_usd: gasto.monto_usd,
+        moneda_origen: source.moneda_origen
       });
 
       return gasto;

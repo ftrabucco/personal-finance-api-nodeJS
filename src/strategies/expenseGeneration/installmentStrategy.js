@@ -31,11 +31,14 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
       // Calcular cuál cuota corresponde
       const cuotaActual = await this.calculateCurrentInstallment(compra);
-      const montoCuota = await this.calculateInstallmentAmount(compra);
+
+      // 💱 Calculate installment amount in both currencies
+      const { montoCuotaARS, montoCuotaUSD } = await this.calculateInstallmentAmountMultiCurrency(compra);
 
       const gastoData = this.createGastoData(compra, {
         fecha: fechaParaBD,
-        monto_ars: montoCuota,
+        monto_ars: montoCuotaARS,
+        monto_usd: montoCuotaUSD,
         descripcion: `${compra.descripcion} - Cuota ${cuotaActual}/${compra.cantidad_cuotas || 1}`
       });
 
@@ -47,11 +50,13 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
       // Actualizar estado de la compra
       await this.updateCompraStatus(compra, cuotaActual, transaction);
 
-      logger.info('Gasto generado con estrategia cuotas:', {
+      logger.info('Gasto generado con estrategia cuotas (multi-moneda):', {
         gasto_id: gasto.id,
         compra_id: compra.id,
         cuota: `${cuotaActual}/${compra.cantidad_cuotas || 1}`,
-        monto: montoCuota
+        monto_ars: montoCuotaARS,
+        monto_usd: montoCuotaUSD,
+        moneda_origen: compra.moneda_origen
       });
 
       return gasto;
@@ -200,14 +205,43 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     return cuotasGeneradas + 1;
   }
 
-  async calculateInstallmentAmount(compra) {
-    // Si es cuota única, devolver el monto total
-    if (!compra.cantidad_cuotas || compra.cantidad_cuotas === 1) {
-      return compra.monto_total;
+  /**
+   * 💱 Calculate installment amount in both currencies
+   * Uses the pre-calculated monto_total_ars and monto_total_usd from the Compra
+   * (which are updated daily by ExchangeRateScheduler)
+   * @param {Object} compra - The compra object
+   * @returns {Promise<{montoCuotaARS: number, montoCuotaUSD: number|null}>}
+   */
+  async calculateInstallmentAmountMultiCurrency(compra) {
+    const cantidadCuotas = compra.cantidad_cuotas || 1;
+
+    // Si es cuota única, devolver los montos totales
+    if (cantidadCuotas === 1) {
+      return {
+        montoCuotaARS: compra.monto_total_ars || compra.monto_total, // Backward compatibility
+        montoCuotaUSD: compra.monto_total_usd || null
+      };
     }
 
-    // Para múltiples cuotas, dividir el monto
-    return Math.round((compra.monto_total / compra.cantidad_cuotas) * 100) / 100;
+    // Para múltiples cuotas, dividir ambos montos
+    const montoCuotaARS = Math.round((compra.monto_total_ars || compra.monto_total) / cantidadCuotas * 100) / 100;
+    const montoCuotaUSD = compra.monto_total_usd
+      ? Math.round((compra.monto_total_usd / cantidadCuotas) * 100) / 100
+      : null;
+
+    return {
+      montoCuotaARS,
+      montoCuotaUSD
+    };
+  }
+
+  /**
+   * @deprecated Use calculateInstallmentAmountMultiCurrency instead
+   * Kept for backward compatibility
+   */
+  async calculateInstallmentAmount(compra) {
+    const { montoCuotaARS } = await this.calculateInstallmentAmountMultiCurrency(compra);
+    return montoCuotaARS;
   }
 
   async getGeneratedInstallmentsCount(compra) {
