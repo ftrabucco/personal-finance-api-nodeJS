@@ -63,6 +63,28 @@ export function defineDebitoAutomatico(sequelize) {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se cobra el débito automático'
+    },
+    monto_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en pesos argentinos (actualizado diariamente)'
+    },
+    monto_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en dólares estadounidenses (actualizado diariamente)'
+    },
+    tipo_cambio_referencia: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio de referencia (actualizado diariamente)'
     }
   }, {
     tableName: 'debitos_automaticos',
