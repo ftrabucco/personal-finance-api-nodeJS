@@ -25,6 +25,48 @@ export class AuthService extends BaseService {
     this.JWT_SECRET = process.env.JWT_SECRET || 'tu_secret_key_aqui'; // En producción DEBE estar en .env
     this.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'; // Token expira en 7 días
     this.BCRYPT_ROUNDS = 10; // Nivel de seguridad para bcrypt
+
+    // Validar JWT_SECRET en producción
+    this._validateJWTSecret();
+  }
+
+  /**
+   * Valida que JWT_SECRET sea seguro en producción
+   * @private
+   */
+  _validateJWTSecret() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const defaultSecrets = [
+      'tu_secret_key_aqui',
+      'your_jwt_secret_here',
+      'your_jwt_secret_here_change_in_production'
+    ];
+
+    if (isProduction) {
+      // Verificar que existe
+      if (!this.JWT_SECRET) {
+        const error = new Error('JWT_SECRET is required in production environment');
+        logger.error('Security Error: Missing JWT_SECRET in production', { env: process.env.NODE_ENV });
+        throw error;
+      }
+
+      // Verificar que no sea un valor por defecto
+      if (defaultSecrets.includes(this.JWT_SECRET)) {
+        const error = new Error('JWT_SECRET must be changed from default value in production');
+        logger.error('Security Error: Using default JWT_SECRET in production', {
+          env: process.env.NODE_ENV,
+          secret: this.JWT_SECRET
+        });
+        throw error;
+      }
+
+      // Verificar longitud mínima (al menos 32 caracteres para seguridad)
+      if (this.JWT_SECRET.length < 32) {
+        logger.warn('Security Warning: JWT_SECRET should be at least 32 characters long', {
+          length: this.JWT_SECRET.length
+        });
+      }
+    }
   }
 
   /**
