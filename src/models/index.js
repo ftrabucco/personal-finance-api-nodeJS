@@ -11,6 +11,7 @@ import { defineGastoRecurrente } from './GastoRecurrente.model.js';
 import { defineGastoUnico } from './GastoUnico.model.js';
 import { defineTarjeta } from './Tarjeta.model.js';
 import { defineUsuario } from './Usuario.model.js';
+import { defineTipoCambio } from './TipoCambio.model.js';
 
 // Configuración para PostgreSQL
 const sequelize = new Sequelize({
@@ -41,7 +42,8 @@ const models = {
   GastoRecurrente: defineGastoRecurrente(sequelize),
   GastoUnico: defineGastoUnico(sequelize),
   Tarjeta: defineTarjeta(sequelize),
-  Usuario: defineUsuario(sequelize)
+  Usuario: defineUsuario(sequelize),
+  TipoCambio: defineTipoCambio(sequelize)
 };
 
 // Relacionamos los modelos
@@ -59,5 +61,6 @@ export const {
   GastoRecurrente,
   GastoUnico,
   Tarjeta,
-  Usuario
+  Usuario,
+  TipoCambio
 } = models;

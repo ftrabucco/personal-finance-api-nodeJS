@@ -68,6 +68,28 @@ export function defineGastoRecurrente(sequelize) {
       type: DataTypes.DATEONLY,
       allowNull: true,
       comment: 'Última fecha en que se generó un gasto a partir de este gasto recurrente'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se ingresó el gasto recurrente'
+    },
+    monto_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en pesos argentinos'
+    },
+    monto_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en dólares estadounidenses'
+    },
+    tipo_cambio_referencia: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio de referencia (cada gasto usa TC del día)'
     }
   }, {
     tableName: 'gastos_recurrentes',

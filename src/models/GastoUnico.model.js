@@ -28,6 +28,28 @@ export function defineGastoUnico(sequelize) {
       allowNull: false,
       defaultValue: false,
       comment: 'Indica si el gasto único ya fue procesado y convertido a un Gasto'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se ingresó el gasto originalmente'
+    },
+    monto_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true, // Se calcula automáticamente
+      comment: 'Monto en pesos argentinos'
+    },
+    monto_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true, // Se calcula automáticamente
+      comment: 'Monto en dólares estadounidenses'
+    },
+    tipo_cambio_usado: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio usado para la conversión (snapshot)'
     }
   }, {
     tableName: 'gastos_unico',
