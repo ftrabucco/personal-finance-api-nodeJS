@@ -119,23 +119,23 @@ export class TarjetaService extends BaseService {
 
     // Normalizar según tipo
     switch (normalized.tipo) {
-      case 'debito':
-        normalized.permite_cuotas = false;
-        normalized.dia_mes_cierre = null;
-        normalized.dia_mes_vencimiento = null;
-        break;
+    case 'debito':
+      normalized.permite_cuotas = false;
+      normalized.dia_mes_cierre = null;
+      normalized.dia_mes_vencimiento = null;
+      break;
 
-      case 'credito':
-        normalized.permite_cuotas = true;
-        // dia_mes_cierre y dia_mes_vencimiento se mantienen como están
-        break;
+    case 'credito':
+      normalized.permite_cuotas = true;
+      // dia_mes_cierre y dia_mes_vencimiento se mantienen como están
+      break;
 
-      case 'virtual':
-        // Para virtual, mantener permite_cuotas como se especificó
-        if (normalized.permite_cuotas === undefined) {
-          normalized.permite_cuotas = false; // Default para virtual
-        }
-        break;
+    case 'virtual':
+      // Para virtual, mantener permite_cuotas como se especificó
+      if (normalized.permite_cuotas === undefined) {
+        normalized.permite_cuotas = false; // Default para virtual
+      }
+      break;
     }
 
     // Limpiar strings

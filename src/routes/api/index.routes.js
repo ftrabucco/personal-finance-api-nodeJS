@@ -129,4 +129,4 @@ router.post('/tarjetas', authenticateToken, validateCreateTarjeta, crearTarjeta)
 router.put('/tarjetas/:id', authenticateToken, validateIdParam, validateUpdateTarjeta, actualizarTarjeta);
 router.delete('/tarjetas/:id', authenticateToken, validateIdParam, eliminarTarjeta);
 
-export default router; 
+export default router;

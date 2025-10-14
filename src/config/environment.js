@@ -39,7 +39,7 @@ const environments = {
         max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000 // Aumentado para desarrollo/testing
       },
       cors: {
-        origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+        origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : 'http://localhost:3000',
         credentials: true
       },
       helmet: {
@@ -57,7 +57,7 @@ const environments = {
       runOnStartup: process.env.SCHEDULER_RUN_ON_STARTUP === 'true' // Por defecto false
     }
   },
-  
+
   test: {
     database: {
       host: process.env.TEST_DB_HOST || process.env.DB_HOST || 'localhost',
@@ -104,7 +104,7 @@ const environments = {
       runOnStartup: false
     }
   },
-  
+
   production: {
     database: {
       host: process.env.DB_HOST,
@@ -147,10 +147,10 @@ const environments = {
         contentSecurityPolicy: {
           directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-            scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
-            imgSrc: ["'self'", "data:", "https:"],
-            fontSrc: ["'self'", "https://cdn.jsdelivr.net"]
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+            scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+            imgSrc: ["'self'", 'data:', 'https:'],
+            fontSrc: ["'self'", 'https://cdn.jsdelivr.net']
           }
         },
         hsts: {
@@ -185,7 +185,7 @@ if (!config) {
 if (currentEnv === 'production') {
   const requiredVars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
-  
+
   if (missingVars.length > 0) {
     throw new Error(`Variables de entorno requeridas faltantes: ${missingVars.join(', ')}`);
   }

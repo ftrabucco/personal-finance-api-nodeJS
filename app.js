@@ -84,7 +84,7 @@ async function startServer() {
 
     // Iniciar servidor
     app.listen(config.server.port, config.server.host, () => {
-      logger.info(`🚀 Servidor iniciado exitosamente`);
+      logger.info('🚀 Servidor iniciado exitosamente');
       logger.info(`📍 URL: ${config.app.url}`);
       logger.info(`🌍 Entorno: ${config.app.env}`);
       logger.info(`📚 Documentación API: ${config.app.url}/api-docs`);
@@ -99,7 +99,7 @@ async function startServer() {
       if (schedulerStatus.isRunning) {
         logger.info(`📅 Expense Scheduler: Activo (próxima ejecución: ${schedulerStatus.nextExecution})`);
       } else {
-        logger.info(`📅 Expense Scheduler: Inactivo`);
+        logger.info('📅 Expense Scheduler: Inactivo');
       }
     });
   } catch (error) {
@@ -110,4 +110,3 @@ async function startServer() {
 
 startServer();
 
-  

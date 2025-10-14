@@ -246,42 +246,42 @@ export class GastoRecurrenteService extends BaseService {
     const diaSemanaActual = today.day(); // 0 = Sunday, 1 = Monday, etc.
 
     switch (frecuencia.nombre?.toLowerCase()) {
-      case 'diario':
-        return {
-          matches: true,
-          reason: 'Daily frequency - generate every day',
-          adjustedDate: today.format('YYYY-MM-DD')
-        };
+    case 'diario':
+      return {
+        matches: true,
+        reason: 'Daily frequency - generate every day',
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
 
-      case 'semanal':
-        // Generate every 7 days from last generation or start date
-        return this.checkWeeklyFrequency(expense, today);
+    case 'semanal':
+      // Generate every 7 days from last generation or start date
+      return this.checkWeeklyFrequency(expense, today);
 
-      case 'quincenal':
-        // Generate on 1st and 15th of each month
-        return this.checkBiweeklyFrequency(expense, today, diaActual);
+    case 'quincenal':
+      // Generate on 1st and 15th of each month
+      return this.checkBiweeklyFrequency(expense, today, diaActual);
 
-      case 'mensual':
-        return this.checkMonthlyFrequency(expense, today, diaActual);
+    case 'mensual':
+      return this.checkMonthlyFrequency(expense, today, diaActual);
 
-      case 'bimestral':
-        return this.checkBimonthlyFrequency(expense, today, diaActual, mesActual);
+    case 'bimestral':
+      return this.checkBimonthlyFrequency(expense, today, diaActual, mesActual);
 
-      case 'trimestral':
-        return this.checkQuarterlyFrequency(expense, today, diaActual, mesActual);
+    case 'trimestral':
+      return this.checkQuarterlyFrequency(expense, today, diaActual, mesActual);
 
-      case 'semestral':
-        return this.checkSemiannualFrequency(expense, today, diaActual, mesActual);
+    case 'semestral':
+      return this.checkSemiannualFrequency(expense, today, diaActual, mesActual);
 
-      case 'anual':
-        return this.checkAnnualFrequency(expense, today, diaActual, mesActual);
+    case 'anual':
+      return this.checkAnnualFrequency(expense, today, diaActual, mesActual);
 
-      default:
-        return {
-          matches: false,
-          reason: `Unknown frequency: ${frecuencia.nombre}`,
-          adjustedDate: null
-        };
+    default:
+      return {
+        matches: false,
+        reason: `Unknown frequency: ${frecuencia.nombre}`,
+        adjustedDate: null
+      };
     }
   }
 

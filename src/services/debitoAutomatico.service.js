@@ -274,120 +274,120 @@ export class DebitoAutomaticoService extends BaseService {
     });
 
     switch (frecuenciaNombre) {
-      case 'diaria':
-        return { matches: true, reason: 'Daily frequency matches' };
+    case 'diaria':
+      return { matches: true, reason: 'Daily frequency matches' };
 
-      case 'semanal':
-        // Weekly: check if it's the same day of week as configured
-        if (diaConfigurido >= 0 && diaConfigurido <= 6) {
-          const matches = today.day() === diaConfigurido;
+    case 'semanal':
+      // Weekly: check if it's the same day of week as configured
+      if (diaConfigurido >= 0 && diaConfigurido <= 6) {
+        const matches = today.day() === diaConfigurido;
+        return {
+          matches,
+          reason: matches ? 'Weekly frequency matches' : `Weekly: today is ${today.format('dddd')}, expected day ${diaConfigurido}`
+        };
+      }
+      // Fallback to day of month for backwards compatibility
+      const weeklyTolerance = this.calculateDateTolerance(today, 'semanal');
+      const matches = this.checkDayWithTolerance(today, diaConfigurido, weeklyTolerance);
+      return {
+        matches: matches.matches,
+        reason: matches.matches ? 'Weekly frequency matches (day of month)' : matches.reason,
+        adjustedDate: matches.adjustedDate
+      };
+
+    case 'quincenal':
+      // Biweekly: 1st and 15th of month, or every 14 days from start
+      if (debit.fecha_inicio) {
+        const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
+        const daysDiff = today.diff(fechaInicio, 'days');
+        const matches = daysDiff >= 0 && daysDiff % 14 === 0;
+        return {
+          matches,
+          reason: matches ? 'Biweekly frequency matches (14-day cycle)' : 'Not on 14-day cycle'
+        };
+      }
+      // Default: 1st and 15th
+      const biweeklyMatches = today.date() === 1 || today.date() === 15;
+      return {
+        matches: biweeklyMatches,
+        reason: biweeklyMatches ? 'Biweekly frequency matches (1st/15th)' : 'Not 1st or 15th of month'
+      };
+
+    case 'mensual':
+      const monthlyTolerance = this.calculateDateTolerance(today, 'mensual');
+      const monthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, monthlyTolerance);
+      return {
+        matches: monthlyCheck.matches,
+        reason: monthlyCheck.matches ? 'Monthly frequency matches' : monthlyCheck.reason,
+        adjustedDate: monthlyCheck.adjustedDate
+      };
+
+    case 'bimestral':
+      // Every 2 months
+      if (debit.fecha_inicio) {
+        const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
+        const monthsDiff = today.diff(fechaInicio, 'months');
+        if (monthsDiff >= 0 && monthsDiff % 2 === 0) {
+          const bimonthlyTolerance = this.calculateDateTolerance(today, 'bimestral');
+          const bimonthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, bimonthlyTolerance);
           return {
-            matches,
-            reason: matches ? 'Weekly frequency matches' : `Weekly: today is ${today.format('dddd')}, expected day ${diaConfigurido}`
+            matches: bimonthlyCheck.matches,
+            reason: bimonthlyCheck.matches ? 'Bimonthly frequency matches' : bimonthlyCheck.reason,
+            adjustedDate: bimonthlyCheck.adjustedDate
           };
         }
-        // Fallback to day of month for backwards compatibility
-        const weeklyTolerance = this.calculateDateTolerance(today, 'semanal');
-        const matches = this.checkDayWithTolerance(today, diaConfigurido, weeklyTolerance);
-        return {
-          matches: matches.matches,
-          reason: matches.matches ? 'Weekly frequency matches (day of month)' : matches.reason,
-          adjustedDate: matches.adjustedDate
-        };
+      }
+      return { matches: false, reason: 'Not on bimonthly cycle' };
 
-      case 'quincenal':
-        // Biweekly: 1st and 15th of month, or every 14 days from start
-        if (debit.fecha_inicio) {
-          const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
-          const daysDiff = today.diff(fechaInicio, 'days');
-          const matches = daysDiff >= 0 && daysDiff % 14 === 0;
+    case 'trimestral':
+      // Every 3 months
+      if (debit.fecha_inicio) {
+        const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
+        const monthsDiff = today.diff(fechaInicio, 'months');
+        if (monthsDiff >= 0 && monthsDiff % 3 === 0) {
+          const quarterlyTolerance = this.calculateDateTolerance(today, 'trimestral');
+          const quarterlyCheck = this.checkDayWithTolerance(today, diaConfigurido, quarterlyTolerance);
           return {
-            matches,
-            reason: matches ? 'Biweekly frequency matches (14-day cycle)' : 'Not on 14-day cycle'
+            matches: quarterlyCheck.matches,
+            reason: quarterlyCheck.matches ? 'Quarterly frequency matches' : quarterlyCheck.reason,
+            adjustedDate: quarterlyCheck.adjustedDate
           };
         }
-        // Default: 1st and 15th
-        const biweeklyMatches = today.date() === 1 || today.date() === 15;
-        return {
-          matches: biweeklyMatches,
-          reason: biweeklyMatches ? 'Biweekly frequency matches (1st/15th)' : 'Not 1st or 15th of month'
-        };
+      }
+      return { matches: false, reason: 'Not on quarterly cycle' };
 
-      case 'mensual':
-        const monthlyTolerance = this.calculateDateTolerance(today, 'mensual');
-        const monthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, monthlyTolerance);
-        return {
-          matches: monthlyCheck.matches,
-          reason: monthlyCheck.matches ? 'Monthly frequency matches' : monthlyCheck.reason,
-          adjustedDate: monthlyCheck.adjustedDate
-        };
-
-      case 'bimestral':
-        // Every 2 months
-        if (debit.fecha_inicio) {
-          const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
-          const monthsDiff = today.diff(fechaInicio, 'months');
-          if (monthsDiff >= 0 && monthsDiff % 2 === 0) {
-            const bimonthlyTolerance = this.calculateDateTolerance(today, 'bimestral');
-            const bimonthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, bimonthlyTolerance);
-            return {
-              matches: bimonthlyCheck.matches,
-              reason: bimonthlyCheck.matches ? 'Bimonthly frequency matches' : bimonthlyCheck.reason,
-              adjustedDate: bimonthlyCheck.adjustedDate
-            };
-          }
+    case 'semestral':
+      // Every 6 months
+      if (debit.fecha_inicio) {
+        const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
+        const monthsDiff = today.diff(fechaInicio, 'months');
+        if (monthsDiff >= 0 && monthsDiff % 6 === 0) {
+          const semiannualTolerance = this.calculateDateTolerance(today, 'semestral');
+          const semiannualCheck = this.checkDayWithTolerance(today, diaConfigurido, semiannualTolerance);
+          return {
+            matches: semiannualCheck.matches,
+            reason: semiannualCheck.matches ? 'Semiannual frequency matches' : semiannualCheck.reason,
+            adjustedDate: semiannualCheck.adjustedDate
+          };
         }
-        return { matches: false, reason: 'Not on bimonthly cycle' };
+      }
+      return { matches: false, reason: 'Not on semiannual cycle' };
 
-      case 'trimestral':
-        // Every 3 months
-        if (debit.fecha_inicio) {
-          const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
-          const monthsDiff = today.diff(fechaInicio, 'months');
-          if (monthsDiff >= 0 && monthsDiff % 3 === 0) {
-            const quarterlyTolerance = this.calculateDateTolerance(today, 'trimestral');
-            const quarterlyCheck = this.checkDayWithTolerance(today, diaConfigurido, quarterlyTolerance);
-            return {
-              matches: quarterlyCheck.matches,
-              reason: quarterlyCheck.matches ? 'Quarterly frequency matches' : quarterlyCheck.reason,
-              adjustedDate: quarterlyCheck.adjustedDate
-            };
-          }
-        }
-        return { matches: false, reason: 'Not on quarterly cycle' };
+    case 'anual':
+      // Annual: check month and day
+      if (mesConfigurado && today.month() + 1 !== mesConfigurado) {
+        return { matches: false, reason: `Annual: current month ${today.month() + 1}, expected ${mesConfigurado}` };
+      }
+      const annualTolerance = this.calculateDateTolerance(today, 'anual');
+      const annualCheck = this.checkDayWithTolerance(today, diaConfigurido, annualTolerance);
+      return {
+        matches: annualCheck.matches,
+        reason: annualCheck.matches ? 'Annual frequency matches' : annualCheck.reason,
+        adjustedDate: annualCheck.adjustedDate
+      };
 
-      case 'semestral':
-        // Every 6 months
-        if (debit.fecha_inicio) {
-          const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
-          const monthsDiff = today.diff(fechaInicio, 'months');
-          if (monthsDiff >= 0 && monthsDiff % 6 === 0) {
-            const semiannualTolerance = this.calculateDateTolerance(today, 'semestral');
-            const semiannualCheck = this.checkDayWithTolerance(today, diaConfigurido, semiannualTolerance);
-            return {
-              matches: semiannualCheck.matches,
-              reason: semiannualCheck.matches ? 'Semiannual frequency matches' : semiannualCheck.reason,
-              adjustedDate: semiannualCheck.adjustedDate
-            };
-          }
-        }
-        return { matches: false, reason: 'Not on semiannual cycle' };
-
-      case 'anual':
-        // Annual: check month and day
-        if (mesConfigurado && today.month() + 1 !== mesConfigurado) {
-          return { matches: false, reason: `Annual: current month ${today.month() + 1}, expected ${mesConfigurado}` };
-        }
-        const annualTolerance = this.calculateDateTolerance(today, 'anual');
-        const annualCheck = this.checkDayWithTolerance(today, diaConfigurido, annualTolerance);
-        return {
-          matches: annualCheck.matches,
-          reason: annualCheck.matches ? 'Annual frequency matches' : annualCheck.reason,
-          adjustedDate: annualCheck.adjustedDate
-        };
-
-      default:
-        return { matches: false, reason: `Unsupported frequency: ${frecuenciaNombre}` };
+    default:
+      return { matches: false, reason: `Unsupported frequency: ${frecuenciaNombre}` };
     }
   }
 
@@ -443,22 +443,22 @@ export class DebitoAutomaticoService extends BaseService {
     const baseWeekendTolerance = isWeekend ? 2 : 1;
 
     switch (frequency) {
-      case 'diaria':
-        return 0; // No tolerance for daily
-      case 'semanal':
-        return baseWeekendTolerance;
-      case 'quincenal':
-        return Math.max(baseWeekendTolerance, 1);
-      case 'mensual':
-        return Math.max(baseWeekendTolerance, 2);
-      case 'bimestral':
-      case 'trimestral':
-        return Math.max(baseWeekendTolerance, 3);
-      case 'semestral':
-      case 'anual':
-        return Math.max(baseWeekendTolerance, 5);
-      default:
-        return baseWeekendTolerance;
+    case 'diaria':
+      return 0; // No tolerance for daily
+    case 'semanal':
+      return baseWeekendTolerance;
+    case 'quincenal':
+      return Math.max(baseWeekendTolerance, 1);
+    case 'mensual':
+      return Math.max(baseWeekendTolerance, 2);
+    case 'bimestral':
+    case 'trimestral':
+      return Math.max(baseWeekendTolerance, 3);
+    case 'semestral':
+    case 'anual':
+      return Math.max(baseWeekendTolerance, 5);
+    default:
+      return baseWeekendTolerance;
     }
   }
 

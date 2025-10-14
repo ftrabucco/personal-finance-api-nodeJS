@@ -59,7 +59,7 @@ export class DebitoAutomaticoController extends BaseController {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });
-      
+
       // 2. Recargar con includes para tener frecuencia disponible
       const debitoAutomaticoCompleto = await this.model.findByPk(debitoAutomatico.id, {
         include: this.getIncludes(),
@@ -69,9 +69,9 @@ export class DebitoAutomaticoController extends BaseController {
       // 3. La generación de gastos se hará vía job diario (business rule)
       // No generar gasto inmediatamente para éviter problemas de transacciones
       const gasto = null;
-      
+
       await transaction.commit();
-      logger.info('Débito automático creado exitosamente:', { 
+      logger.info('Débito automático creado exitosamente:', {
         debitoAutomatico_id: debitoAutomatico.id,
         gasto_id: gasto?.id,
         primera_generacion: !!gasto
@@ -121,10 +121,10 @@ export class DebitoAutomaticoController extends BaseController {
 
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== debitoAutomatico.activo) {
-        logger.info('Cambiando estado de débito automático:', { 
-          id: debitoAutomatico.id, 
+        logger.info('Cambiando estado de débito automático:', {
+          id: debitoAutomatico.id,
           estado_anterior: debitoAutomatico.activo,
-          nuevo_estado: cleanData.activo 
+          nuevo_estado: cleanData.activo
         });
       }
 
@@ -163,11 +163,11 @@ export class DebitoAutomaticoController extends BaseController {
       // ✅ BUSINESS RULE: Solo eliminar DebitoAutomatico, NO los Gastos generados
       await debitoAutomatico.destroy();
 
-      logger.info('Débito automático eliminado exitosamente:', { 
+      logger.info('Débito automático eliminado exitosamente:', {
         debitoAutomatico_id: req.params.id
       });
 
-      return sendSuccess(res, { 
+      return sendSuccess(res, {
         message: 'Débito automático eliminado correctamente',
         nota: 'Los gastos ya generados se mantienen como histórico'
       });
@@ -180,7 +180,7 @@ export class DebitoAutomaticoController extends BaseController {
   // Helper para limpiar datos del formulario
   cleanFormData(body) {
     const cleaned = { ...body };
-    
+
     // Convertir strings vacíos a null para campos opcionales
     if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
       cleaned.tarjeta_id = null;
@@ -188,7 +188,7 @@ export class DebitoAutomaticoController extends BaseController {
     if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
       cleaned.mes_de_pago = null;
     }
-    
+
     // Asegurar tipos numéricos correctos
     if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
     if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
@@ -198,11 +198,11 @@ export class DebitoAutomaticoController extends BaseController {
     if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
     if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
     if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-    
+
     // Manejar checkbox de activo
     if (cleaned.activo === 'on') cleaned.activo = true;
     if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
-    
+
     return cleaned;
   }
 
@@ -290,7 +290,7 @@ export class DebitoAutomaticoController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const debitosAutomaticos = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: debitosAutomaticos.count,
@@ -299,7 +299,7 @@ export class DebitoAutomaticoController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < debitosAutomaticos.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, debitosAutomaticos.rows, pagination);
       } else {
         const debitosAutomaticos = await this.model.findAll(queryOptions);

@@ -131,9 +131,9 @@ async function seedInitialData() {
     logger.info('💡 Insertando ejemplos de gastos...');
 
     // Obtener IDs para referencias
-    const [categorias] = await sequelize.query(`SELECT id, nombre_categoria FROM finanzas.categorias_gasto WHERE nombre_categoria IN ('Supermercado', 'Alquiler', 'Netflix', 'Streaming / Suscripciones', 'Transporte público');`);
-    const [importancias] = await sequelize.query(`SELECT id, nombre_importancia FROM finanzas.importancias_gasto WHERE nombre_importancia IN ('Esencial', 'Important', 'Nice to have');`);
-    const [tiposPago] = await sequelize.query(`SELECT id, nombre FROM finanzas.tipos_pago WHERE nombre IN ('Efectivo', 'Débito', 'Crédito');`);
+    const [categorias] = await sequelize.query('SELECT id, nombre_categoria FROM finanzas.categorias_gasto WHERE nombre_categoria IN (\'Supermercado\', \'Alquiler\', \'Netflix\', \'Streaming / Suscripciones\', \'Transporte público\');');
+    const [importancias] = await sequelize.query('SELECT id, nombre_importancia FROM finanzas.importancias_gasto WHERE nombre_importancia IN (\'Esencial\', \'Important\', \'Nice to have\');');
+    const [tiposPago] = await sequelize.query('SELECT id, nombre FROM finanzas.tipos_pago WHERE nombre IN (\'Efectivo\', \'Débito\', \'Crédito\');');
 
     const supermercadoId = categorias.find(c => c.nombre_categoria === 'Supermercado')?.id || 1;
     const alquilerId = categorias.find(c => c.nombre_categoria === 'Alquiler')?.id || 2;

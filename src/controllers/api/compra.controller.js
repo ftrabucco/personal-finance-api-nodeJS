@@ -53,7 +53,7 @@ export class CompraController extends BaseController {
         usuario_id: req.user.id,
         pendiente_cuotas: true
       }, { transaction });
-      
+
       // 2. Recargar con includes para tener datos completos
       const compraCompleta = await this.model.findByPk(compra.id, {
         include: this.getIncludes(),
@@ -66,15 +66,15 @@ export class CompraController extends BaseController {
         try {
           gasto = await GastoGeneratorService.generateFromCompra(compraCompleta);
         } catch (error) {
-          logger.warn('No se pudo generar gasto inmediato para compra:', { 
-            compra_id: compra.id, 
-            error: error.message 
+          logger.warn('No se pudo generar gasto inmediato para compra:', {
+            compra_id: compra.id,
+            error: error.message
           });
         }
       }
-      
+
       await transaction.commit();
-      logger.info('Compra creada exitosamente:', { 
+      logger.info('Compra creada exitosamente:', {
         compra_id: compra.id,
         gasto_id: gasto?.id,
         primera_generacion: !!gasto,
@@ -112,7 +112,7 @@ export class CompraController extends BaseController {
       }
 
       // Si se está actualizando el número de cuotas, validar con gastos existentes
-      if (req.body.cantidad_cuotas !== undefined && 
+      if (req.body.cantidad_cuotas !== undefined &&
           req.body.cantidad_cuotas !== compra.cantidad_cuotas) {
         const validationResult = await this.validateCuotasUpdate(req.body.cantidad_cuotas, compra);
         if (!validationResult.isValid) {
@@ -159,11 +159,11 @@ export class CompraController extends BaseController {
       // ✅ BUSINESS RULE: Solo eliminar Compra, NO los Gastos generados
       await compra.destroy();
 
-      logger.info('Compra eliminada exitosamente:', { 
+      logger.info('Compra eliminada exitosamente:', {
         compra_id: req.params.id
       });
 
-      return sendSuccess(res, { 
+      return sendSuccess(res, {
         message: 'Compra eliminada correctamente',
         nota: 'Los gastos ya generados se mantienen como histórico'
       });
@@ -176,12 +176,12 @@ export class CompraController extends BaseController {
   // Helper para limpiar datos del formulario
   cleanFormData(body) {
     const cleaned = { ...body };
-    
+
     // Convertir strings vacíos a null para campos opcionales
     if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
       cleaned.tarjeta_id = null;
     }
-    
+
     // Asegurar tipos numéricos correctos
     if (cleaned.monto_total) cleaned.monto_total = parseFloat(cleaned.monto_total);
     if (cleaned.cantidad_cuotas) cleaned.cantidad_cuotas = parseInt(cleaned.cantidad_cuotas);
@@ -189,11 +189,11 @@ export class CompraController extends BaseController {
     if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
     if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
     if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-    
+
     // Manejar checkbox de pendiente_cuotas
     if (cleaned.pendiente_cuotas === 'on') cleaned.pendiente_cuotas = true;
     if (cleaned.pendiente_cuotas === '' || cleaned.pendiente_cuotas === undefined || cleaned.pendiente_cuotas === 'off') cleaned.pendiente_cuotas = false;
-    
+
     return cleaned;
   }
 
@@ -313,7 +313,7 @@ export class CompraController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const compras = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: compras.count,
@@ -322,7 +322,7 @@ export class CompraController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < compras.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, compras.rows, pagination);
       } else {
         const compras = await this.model.findAll(queryOptions);
@@ -343,4 +343,4 @@ export const obtenerCompraPorId = compraController.getById.bind(compraController
 export const obtenerComprasConFiltros = compraController.getWithFilters.bind(compraController);
 export const crearCompra = compraController.create.bind(compraController);
 export const actualizarCompra = compraController.update.bind(compraController);
-export const eliminarCompra = compraController.delete.bind(compraController); 
+export const eliminarCompra = compraController.delete.bind(compraController);

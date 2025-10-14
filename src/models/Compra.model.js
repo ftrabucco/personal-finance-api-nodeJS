@@ -5,26 +5,26 @@ export function defineCompra(sequelize) {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true,
+      autoIncrement: true
     },
-    descripcion: { 
-      type: DataTypes.STRING(255), 
+    descripcion: {
+      type: DataTypes.STRING(255),
       allowNull: false,
       validate: {
         notEmpty: true,
         len: [3, 255]
       }
     },
-    monto_total: { 
-      type: DataTypes.DECIMAL(10, 2), 
+    monto_total: {
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
         min: 0.01,
         isDecimal: true
       }
     },
-    cantidad_cuotas: { 
-      type: DataTypes.INTEGER, 
+    cantidad_cuotas: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 1,
       validate: {
@@ -32,8 +32,8 @@ export function defineCompra(sequelize) {
         max: 60
       }
     },
-    fecha_compra: { 
-      type: DataTypes.DATEONLY, 
+    fecha_compra: {
+      type: DataTypes.DATEONLY,
       allowNull: false,
       validate: {
         isDate: true,
@@ -44,24 +44,24 @@ export function defineCompra(sequelize) {
         }
       }
     },
-    categoria_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    categoria_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'categorias_gasto',
         key: 'id'
       }
     },
-    importancia_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    importancia_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'importancias_gasto',
         key: 'id'
       }
     },
-    tipo_pago_id: { 
-      type: DataTypes.INTEGER, 
+    tipo_pago_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'tipos_pago',
@@ -93,6 +93,6 @@ export function defineCompra(sequelize) {
     }
   }, {
     tableName: 'compras',
-    timestamps: false,
+    timestamps: false
   });
 }

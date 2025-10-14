@@ -4,8 +4,8 @@ import { DataTypes } from 'sequelize';
 
 export function defineGasto(sequelize) {
   return sequelize.define('Gasto', {
-    fecha: { 
-      type: DataTypes.DATEONLY, 
+    fecha: {
+      type: DataTypes.DATEONLY,
       allowNull: false,
       validate: {
         isDate: true,
@@ -16,7 +16,7 @@ export function defineGasto(sequelize) {
         }
       }
     },
-    monto_ars: { 
+    monto_ars: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       validate: {
@@ -24,7 +24,7 @@ export function defineGasto(sequelize) {
         isDecimal: true
       }
     },
-    monto_usd: { 
+    monto_usd: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       validate: {
@@ -32,15 +32,15 @@ export function defineGasto(sequelize) {
         isDecimal: true
       }
     },
-    descripcion: { 
-      type: DataTypes.STRING(255), 
+    descripcion: {
+      type: DataTypes.STRING(255),
       allowNull: false,
       validate: {
         notEmpty: true,
         len: [3, 255]
       }
     },
-    categoria_gasto_id: { 
+    categoria_gasto_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -48,7 +48,7 @@ export function defineGasto(sequelize) {
         key: 'id'
       }
     },
-    importancia_gasto_id: { 
+    importancia_gasto_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -56,16 +56,16 @@ export function defineGasto(sequelize) {
         key: 'id'
       }
     },
-    frecuencia_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    frecuencia_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: 'frecuencias_gasto',
         key: 'id'
       }
     },
-    cantidad_cuotas_totales: { 
-      type: DataTypes.INTEGER, 
+    cantidad_cuotas_totales: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: null,
       comment: 'Número total de cuotas para gastos a plazos',
@@ -74,8 +74,8 @@ export function defineGasto(sequelize) {
         max: 60
       }
     },
-    cantidad_cuotas_pagadas: { 
-      type: DataTypes.INTEGER, 
+    cantidad_cuotas_pagadas: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: null,
       comment: 'Número de cuotas ya pagadas para gastos a plazos',
@@ -88,7 +88,7 @@ export function defineGasto(sequelize) {
         }
       }
     },
-    tipo_pago_id: { 
+    tipo_pago_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
@@ -96,7 +96,7 @@ export function defineGasto(sequelize) {
         key: 'id'
       }
     },
-    tarjeta_id: { 
+    tarjeta_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
@@ -104,7 +104,7 @@ export function defineGasto(sequelize) {
         key: 'id'
       }
     },
-    usuario_id: { 
+    usuario_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
@@ -112,18 +112,18 @@ export function defineGasto(sequelize) {
         key: 'id'
       }
     },
-    tipo_origen: { 
+    tipo_origen: {
       type: DataTypes.ENUM('recurrente', 'debito_automatico', 'compra', 'unico'),
       allowNull: false,
       comment: 'Tipo de origen del gasto (recurrente, debito_automatico, compra, unico)'
     },
-    id_origen: { 
+    id_origen: {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'ID de la entidad origen (gasto_recurrente, debito_automatico, compra o gasto_unico)'
     }
   }, {
     tableName: 'gastos',
-    timestamps: true,
+    timestamps: true
   });
 }

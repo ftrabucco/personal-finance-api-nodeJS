@@ -192,21 +192,21 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
     const baseWeekendTolerance = isWeekend ? 2 : 1;
 
     switch (frecuenciaNombre.toLowerCase()) {
-      case 'diaria':
-        return 0;
-      case 'semanal':
-        return baseWeekendTolerance;
-      case 'quincenal':
-      case 'mensual':
-        return Math.max(baseWeekendTolerance, 2);
-      case 'bimestral':
-      case 'trimestral':
-        return Math.max(baseWeekendTolerance, 3);
-      case 'semestral':
-      case 'anual':
-        return Math.max(baseWeekendTolerance, 5);
-      default:
-        return baseWeekendTolerance;
+    case 'diaria':
+      return 0;
+    case 'semanal':
+      return baseWeekendTolerance;
+    case 'quincenal':
+    case 'mensual':
+      return Math.max(baseWeekendTolerance, 2);
+    case 'bimestral':
+    case 'trimestral':
+      return Math.max(baseWeekendTolerance, 3);
+    case 'semestral':
+    case 'anual':
+      return Math.max(baseWeekendTolerance, 5);
+    default:
+      return baseWeekendTolerance;
     }
   }
 

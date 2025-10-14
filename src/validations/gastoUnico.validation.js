@@ -6,7 +6,7 @@ export const createGastoUnicoSchema = Joi.object({
   fecha: Joi.date().required(),
   categoria_gasto_id: Joi.number().integer().required(),
   importancia_gasto_id: Joi.number().integer().required(),
-  tipo_pago_id: Joi.number().integer().required(),
+  tipo_pago_id: Joi.number().integer().required()
 });
 
 export const updateGastoUnicoSchema = Joi.object({
@@ -15,5 +15,5 @@ export const updateGastoUnicoSchema = Joi.object({
   fecha: Joi.date(),
   categoria_id: Joi.number().integer(),
   importancia_id: Joi.number().integer(),
-  tipo_pago_id: Joi.number().integer(),
+  tipo_pago_id: Joi.number().integer()
 });

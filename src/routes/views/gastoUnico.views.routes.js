@@ -28,4 +28,4 @@ router.put('/:id', handleFormEditarGastoUnico);
 // Eliminar gasto único
 router.delete('/:id', handleDeleteGastoUnico);
 
-export default router; 
+export default router;

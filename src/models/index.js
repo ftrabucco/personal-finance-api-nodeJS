@@ -41,23 +41,23 @@ const models = {
   GastoRecurrente: defineGastoRecurrente(sequelize),
   GastoUnico: defineGastoUnico(sequelize),
   Tarjeta: defineTarjeta(sequelize),
-  Usuario: defineUsuario(sequelize),
+  Usuario: defineUsuario(sequelize)
 };
 
 // Relacionamos los modelos
 setupAssociations(models);
 
 export { sequelize };
-export const { 
-  Gasto, 
-  TipoPago, 
-  CategoriaGasto, 
+export const {
+  Gasto,
+  TipoPago,
+  CategoriaGasto,
   FrecuenciaGasto,
-  ImportanciaGasto, 
-  Compra, 
-  DebitoAutomatico, 
+  ImportanciaGasto,
+  Compra,
+  DebitoAutomatico,
   GastoRecurrente,
-  GastoUnico, 
-  Tarjeta, 
-  Usuario 
+  GastoUnico,
+  Tarjeta,
+  Usuario
 } = models;

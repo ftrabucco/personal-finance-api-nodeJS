@@ -37,13 +37,13 @@ export async function connectDatabase() {
   try {
     await sequelize.authenticate();
     logger.info('Conexión a PostgreSQL establecida correctamente');
-    
+
     // Sincronizar modelos (en desarrollo)
     if (process.env.NODE_ENV === 'development') {
       await sequelize.sync({ alter: true });
       logger.info('Modelos sincronizados con PostgreSQL');
     }
-    
+
     return sequelize;
   } catch (error) {
     logger.error('Error al conectar a PostgreSQL:', error);

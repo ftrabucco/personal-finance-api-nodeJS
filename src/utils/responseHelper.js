@@ -10,18 +10,18 @@
  * @param {string|Array} details - Error details
  */
 export function sendError(res, status = 500, error = 'Error del servidor', details = null) {
-  const response = { 
+  const response = {
     success: false,
-    error 
+    error
   };
-  
+
   if (details) {
     response.details = details;
   }
-  
+
   // Include timestamp for debugging
   response.timestamp = new Date().toISOString();
-  
+
   return res.status(status).json(response);
 }
 
@@ -37,11 +37,11 @@ export function sendSuccess(res, data, status = 200, message = null) {
     success: true,
     data
   };
-  
+
   if (message) {
     response.message = message;
   }
-  
+
   // Include metadata for arrays (collections)
   if (Array.isArray(data)) {
     response.meta = {
@@ -49,7 +49,7 @@ export function sendSuccess(res, data, status = 200, message = null) {
       type: 'collection'
     };
   }
-  
+
   return res.status(status).json(response);
 }
 
@@ -83,7 +83,7 @@ export function sendPaginatedSuccess(res, data, pagination, status = 200) {
  * @param {Array} errors - Validation errors
  */
 export function sendValidationError(res, errors) {
-  return res.status(400).json({ 
+  return res.status(400).json({
     success: false,
     error: 'Error de validación',
     details: errors,

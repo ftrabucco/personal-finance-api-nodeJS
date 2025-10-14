@@ -20,18 +20,18 @@ export const renderDashboard = async (req, res) => {
     logger.debug('Obteniendo gastos del mes actual');
     let gastos = [];
     let totalGastos = 0;
-    
+
     try {
       const fechaInicio = format(start, 'yyyy-MM-dd');
       const fechaFin = format(end, 'yyyy-MM-dd');
-      
+
       logger.debug(`Buscando gastos entre ${fechaInicio} y ${fechaFin}`);
 
       // Obtener gastos con sus categorías
       logger.debug('Buscando gastos con los siguientes parámetros:');
       logger.debug('- Fecha inicio:', fechaInicio);
       logger.debug('- Fecha fin:', fechaFin);
-      
+
       gastos = await Gasto.findAll({
         where: {
           fecha: {
@@ -49,7 +49,7 @@ export const renderDashboard = async (req, res) => {
         raw: true,
         nest: true
       });
-      
+
       // Mapear los resultados para usar 'nombre' en lugar de 'nombre_categoria'
       gastos = gastos.map(gasto => ({
         ...gasto,
@@ -58,7 +58,7 @@ export const renderDashboard = async (req, res) => {
           nombre: gasto.categoria.nombre_categoria
         } : null
       }));
-      
+
       logger.debug(`Se encontraron ${gastos.length} gastos`);
 
       // Calcular el total de gastos
@@ -72,11 +72,11 @@ export const renderDashboard = async (req, res) => {
       logger.error('Error al obtener gastos:', error);
       logger.error('Error al obtener gastos', { error: error.message });
     }
-    
+
     // Obtener próximos vencimientos
     const hoy = new Date();
     const proximoMes = addMonths(hoy, 1);
-    
+
     // Obtener compras con cuotas pendientes
     let compras = [];
     try {
@@ -107,7 +107,7 @@ export const renderDashboard = async (req, res) => {
       logger.error('Error al obtener compras:', error);
       compras = [];
     }
-    
+
     // Obtener gastos recurrentes
     let gastosRecurrentes = [];
     try {
@@ -115,7 +115,7 @@ export const renderDashboard = async (req, res) => {
         where: { activo: true },
         raw: true
       });
-      
+
       // Calcular próximos vencimientos para gastos recurrentes
       logger.debug(`Total gastos recurrentes activos encontrados: ${allGastosRecurrentes.length}`);
 
@@ -127,13 +127,13 @@ export const renderDashboard = async (req, res) => {
           logger.warn(`Gasto recurrente con día de pago inválido: ${gasto.descripcion}, día: ${diaPago}`);
           return null;
         }
-        
+
         let proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth(), diaPago);
-        
+
         if (hoy.getDate() > diaPago) {
           proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth() + 1, diaPago);
         }
-        
+
         const item = {
           ...gasto,
           tipo: 'gasto recurrente',
@@ -142,7 +142,7 @@ export const renderDashboard = async (req, res) => {
           monto_ars: gasto.monto || 0,
           descripcion: gasto.descripcion || 'Gasto recurrente'
         };
-        
+
         logger.debug(`Gasto recurrente procesado: ${item.descripcion}, vencimiento: ${item.fecha_vencimiento}`);
         return item;
       }).filter(gasto => {
@@ -161,7 +161,7 @@ export const renderDashboard = async (req, res) => {
       logger.error('Error al obtener gastos recurrentes:', error);
       gastosRecurrentes = [];
     }
-    
+
     // Obtener débitos automáticos
     let debitos = [];
     try {
@@ -184,13 +184,13 @@ export const renderDashboard = async (req, res) => {
           logger.warn(`Débito automático con día de pago inválido: ${debito.descripcion}, día: ${diaPago}`);
           return null;
         }
-        
+
         let proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth(), diaPago);
-        
+
         if (hoy.getDate() > diaPago) {
           proximoVencimiento = new Date(hoy.getFullYear(), hoy.getMonth() + 1, diaPago);
         }
-        
+
         const item = {
           ...debito,
           tipo: 'débito automático',
@@ -199,7 +199,7 @@ export const renderDashboard = async (req, res) => {
           monto_ars: debito.monto || 0,
           descripcion: debito.descripcion || 'Débito automático'
         };
-        
+
         logger.debug(`Débito automático procesado: ${item.descripcion}, vencimiento: ${item.fecha_vencimiento}`);
         return item;
       }).filter(debito => {
@@ -218,14 +218,14 @@ export const renderDashboard = async (req, res) => {
       logger.error('Error al obtener débitos automáticos:', error);
       debitos = [];
     }
-    
+
     // Procesar compras para mostrar información de cuotas
     const comprasProcesadas = [];
-    
+
     for (const compra of compras) {
       const esCredito = compra.tipoPago && compra.tipoPago.nombre.toLowerCase().includes('crédito');
       const cuotasTotales = compra.cantidad_cuotas || 1;
-      
+
       // Contar cuántas cuotas ya se generaron para esta compra
       const gastosGenerados = await sequelize.models.Gasto.count({
         where: {
@@ -233,7 +233,7 @@ export const renderDashboard = async (req, res) => {
           id_origen: compra.id
         }
       });
-      
+
       const cuotasPagadas = gastosGenerados;
       const cuotasPendientes = cuotasTotales - cuotasPagadas;
       const montoCuota = compra.monto_total / cuotasTotales;
@@ -241,14 +241,14 @@ export const renderDashboard = async (req, res) => {
       logger.debug(`Procesando compra ${compra.id}: ${compra.descripcion}`);
       logger.debug(`  - Cuotas totales: ${cuotasTotales}, Cuotas pagadas: ${cuotasPagadas}, Pendientes: ${cuotasPendientes}`);
       logger.debug(`  - Monto total: ${compra.monto_total}, Monto por cuota: ${montoCuota.toFixed(2)}`);
-      
+
       // Determinar fechas de vencimiento según el tipo de pago
       if (esCredito && compra.tarjeta && compra.tarjeta.dia_vencimiento) {
         // Para tarjetas de crédito, generar una cuota por mes en la fecha de vencimiento de la tarjeta
         const hoy = new Date();
         let mesVencimiento = hoy.getMonth();
         let anioVencimiento = hoy.getFullYear();
-        
+
         // Ajustar para el próximo vencimiento si ya pasó este mes
         if (hoy.getDate() > compra.tarjeta.dia_vencimiento) {
           mesVencimiento++;
@@ -257,12 +257,12 @@ export const renderDashboard = async (req, res) => {
             anioVencimiento++;
           }
         }
-        
+
         // Generar solo la próxima cuota pendiente
         if (cuotasPendientes > 0) {
           const fechaVencimiento = new Date(anioVencimiento, mesVencimiento, compra.tarjeta.dia_vencimiento);
           const numCuota = cuotasPagadas + 1;
-          
+
           const itemProcesado = {
             ...compra,
             tipo: 'compra',
@@ -280,12 +280,12 @@ export const renderDashboard = async (req, res) => {
         if (cuotasPendientes > 0) {
           const numCuota = cuotasPagadas + 1;
           let fechaVencimiento = new Date(compra.fecha_compra);
-          
+
           // Si es una cuota posterior, calcular la fecha sumando los meses
           if (numCuota > 1) {
             fechaVencimiento.setMonth(fechaVencimiento.getMonth() + (numCuota - 1));
           }
-          
+
           const itemProcesado = {
             ...compra,
             tipo: 'compra',
@@ -300,7 +300,7 @@ export const renderDashboard = async (req, res) => {
         }
       }
     }
-    
+
     // Log para depuración
     logger.debug('Débitos antes de combinar:', JSON.stringify(debitos, null, 2));
 
@@ -320,7 +320,7 @@ export const renderDashboard = async (req, res) => {
         monto_ars: parseFloat(debito.monto_ars || 0).toFixed(2)
       }))
     ];
-    
+
     logger.debug(`Items antes del sort: ${todosLosItems.length}`);
     todosLosItems.forEach(item => {
       logger.debug(`- ${item.tipo}: ${item.descripcion} - ${item.fecha_comparacion} (${item.fecha_vencimiento})`);
@@ -336,15 +336,15 @@ export const renderDashboard = async (req, res) => {
     });
 
     logger.debug(`Total de vencimientos próximos: ${todosLosVencimientos.length}`);
-    
+
     // Calcular gastos por categoría
     const gastosPorCategoria = {};
-    
+
     gastos.forEach((gasto, index) => {
       const categoriaId = gasto.categoria?.id || 'sin-categoria';
       const categoriaNombre = gasto.categoria?.nombre || 'Sin categoría';
       const monto = parseFloat(gasto.monto_ars) || 0;
-      
+
       if (!gastosPorCategoria[categoriaId]) {
         gastosPorCategoria[categoriaId] = {
           id: categoriaId,
@@ -352,9 +352,9 @@ export const renderDashboard = async (req, res) => {
           total: 0
         };
       }
-      
+
       gastosPorCategoria[categoriaId].total += monto;
-      
+
       // Solo mostrar detalles de los primeros 3 gastos para no saturar los logs
       if (index < 3) {
         logger.debug(`Gasto ${index + 1}:`, {
@@ -367,7 +367,7 @@ export const renderDashboard = async (req, res) => {
         });
       }
     });
-    
+
     // Preparar datos para el gráfico
     const gastosGrafico = Object.values(gastosPorCategoria)
       .filter(cat => cat && cat.total > 0)
@@ -375,15 +375,15 @@ export const renderDashboard = async (req, res) => {
         categoria: cat.nombre,
         monto: parseFloat(cat.total.toFixed(2))
       }));
-    
+
     logger.debug('Datos para el gráfico:', JSON.stringify(gastosGrafico, null, 2));
 
     // Obtener el total de categorías existentes
     const totalCategorias = await sequelize.models.CategoriaGasto.count();
-    
+
     // Contar categorías con gastos este mes (no enviar el array completo como length)
     const categoriasConGastos = gastosGrafico.length;
-    
+
     // Debug: Log the upcoming payments data
     logger.debug('Próximos vencimientos para la vista:', JSON.stringify(todosLosVencimientos.map(v => ({
       descripcion: v.descripcion,
@@ -405,7 +405,7 @@ export const renderDashboard = async (req, res) => {
       categoriasConGastos: categoriasConGastos,
       totalTransacciones: gastos.length
     });
-    
+
   } catch (error) {
     logger.error('Error en renderDashboard:', error);
     logger.error('Error en renderDashboard', { error: error.message, stack: error.stack });

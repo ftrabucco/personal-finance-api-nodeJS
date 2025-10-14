@@ -309,7 +309,7 @@ export class ExpenseScheduler {
       '05-25', // Revolución de Mayo
       '07-09', // Día de la Independencia
       '12-08', // Inmaculada Concepción
-      '12-25', // Navidad
+      '12-25' // Navidad
     ];
 
     const monthDay = date.format('MM-DD');

@@ -6,6 +6,6 @@ export function defineTipoPago(sequelize) {
     permite_cuotas: { type: DataTypes.BOOLEAN, allowNull: false }
   }, {
     tableName: 'tipos_pago',
-    timestamps: false,
+    timestamps: false
   });
 }

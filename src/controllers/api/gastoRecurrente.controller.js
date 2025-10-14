@@ -59,7 +59,7 @@ export class GastoRecurrenteController extends BaseController {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });
-      
+
       // 2. Recargar con includes para tener frecuencia disponible
       const gastoRecurrenteCompleto = await this.model.findByPk(gastoRecurrente.id, {
         include: this.getIncludes(),
@@ -68,9 +68,9 @@ export class GastoRecurrenteController extends BaseController {
 
       // 3. Intentar generar primer gasto si corresponde (business rule: job diario)
       const gasto = await GastoGeneratorService.generateFromGastoRecurrente(gastoRecurrenteCompleto);
-      
+
       await transaction.commit();
-      logger.info('Gasto recurrente creado exitosamente:', { 
+      logger.info('Gasto recurrente creado exitosamente:', {
         gastoRecurrente_id: gastoRecurrente.id,
         gasto_id: gasto?.id,
         primera_generacion: !!gasto
@@ -120,10 +120,10 @@ export class GastoRecurrenteController extends BaseController {
 
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== gastoRecurrente.activo) {
-        logger.info('Cambiando estado de gasto recurrente:', { 
-          id: gastoRecurrente.id, 
+        logger.info('Cambiando estado de gasto recurrente:', {
+          id: gastoRecurrente.id,
           estado_anterior: gastoRecurrente.activo,
-          nuevo_estado: cleanData.activo 
+          nuevo_estado: cleanData.activo
         });
       }
 
@@ -162,11 +162,11 @@ export class GastoRecurrenteController extends BaseController {
       // ✅ BUSINESS RULE: Solo eliminar GastoRecurrente, NO los Gastos generados
       await gastoRecurrente.destroy();
 
-      logger.info('Gasto recurrente eliminado exitosamente:', { 
+      logger.info('Gasto recurrente eliminado exitosamente:', {
         gastoRecurrente_id: req.params.id
       });
 
-      return sendSuccess(res, { 
+      return sendSuccess(res, {
         message: 'Gasto recurrente eliminado correctamente',
         nota: 'Los gastos ya generados se mantienen como histórico'
       });
@@ -179,7 +179,7 @@ export class GastoRecurrenteController extends BaseController {
   // Helper para limpiar datos del formulario
   cleanFormData(body) {
     const cleaned = { ...body };
-    
+
     // Convertir strings vacíos a null para campos opcionales
     if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
       cleaned.tarjeta_id = null;
@@ -187,7 +187,7 @@ export class GastoRecurrenteController extends BaseController {
     if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
       cleaned.mes_de_pago = null;
     }
-    
+
     // Asegurar tipos numéricos correctos
     if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
     if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
@@ -197,11 +197,11 @@ export class GastoRecurrenteController extends BaseController {
     if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
     if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
     if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-    
+
     // Manejar checkbox de activo
     if (cleaned.activo === 'on') cleaned.activo = true;
     if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
-    
+
     return cleaned;
   }
 
@@ -291,7 +291,7 @@ export class GastoRecurrenteController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const gastosRecurrentes = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: gastosRecurrentes.count,
@@ -300,7 +300,7 @@ export class GastoRecurrenteController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < gastosRecurrentes.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, gastosRecurrentes.rows, pagination);
       } else {
         const gastosRecurrentes = await this.model.findAll(queryOptions);

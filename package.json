@@ -10,6 +10,11 @@
     "test:debug": "node --inspect-brk --experimental-vm-modules node_modules/.bin/jest --runInBand",
     "test:setup": "cp env.test .env.test && npm run docker:up && sleep 30 && npm run seed-db:test",
     "start": "node app.js",
+    "build": "echo 'No build step required for Node.js app' && exit 0",
+    "lint": "eslint . --ext .js --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .js --ignore-path .gitignore --fix",
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\" \"*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\" \"*.js\"",
     "reset-db": "docker-compose down -v && docker-compose up -d",
     "seed-db": "node ./src/db/seed.js",
     "seed-db:test": "NODE_ENV=test node ./src/db/seed.js",
@@ -50,7 +55,9 @@
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
+    "eslint": "^8.57.1",
     "jest": "^30.0.5",
+    "prettier": "^3.6.2",
     "supertest": "^7.1.4"
   }
 }

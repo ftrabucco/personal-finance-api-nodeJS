@@ -244,7 +244,7 @@ export class GastoController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const gastos = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: gastos.count,
@@ -253,7 +253,7 @@ export class GastoController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < gastos.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, gastos.rows, pagination);
       } else {
         const gastos = await this.model.findAll(queryOptions);
@@ -371,7 +371,7 @@ export class GastoController extends BaseController {
         const now = new Date();
         firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        
+
         whereClause = {
           usuario_id: req.user.id,
           fecha: {
@@ -403,7 +403,7 @@ export class GastoController extends BaseController {
       gastos.forEach(gasto => {
         const montoArs = parseFloat(gasto.monto_ars) || 0;
         const montoUsd = parseFloat(gasto.monto_usd) || 0;
-        
+
         // Acumular totales generales
         resumen.total_ars += montoArs;
         resumen.total_usd += montoUsd;
@@ -456,4 +456,4 @@ export const eliminarGasto = gastoController.delete.bind(gastoController);
 export const obtenerGastosConFiltros = gastoController.getWithFilters.bind(gastoController);
 export const obtenerResumenGastos = gastoController.getSummary.bind(gastoController);
 export const generarGastosPendientes = gastoController.generatePendingGastos.bind(gastoController);
-export const buscarGastos = gastoController.searchGastos.bind(gastoController); 
+export const buscarGastos = gastoController.searchGastos.bind(gastoController);

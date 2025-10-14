@@ -10,7 +10,7 @@ const baseGastoSchema = {
       'number.positive': 'El monto debe ser positivo',
       'any.required': 'El monto es requerido'
     }),
-  
+
   descripcion: Joi.string().trim().min(3).max(255).required()
     .messages({
       'string.min': 'La descripción debe tener al menos 3 caracteres',
@@ -334,11 +334,11 @@ const idParamSchema = Joi.object({
 // Middleware genérico para validación
 const createValidationMiddleware = (schema, location = 'body') => {
   return (req, res, next) => {
-    const dataToValidate = location === 'body' ? req.body : 
-                          location === 'query' ? req.query : 
-                          location === 'params' ? req.params : {};
-    
-    const { error, value } = schema.validate(dataToValidate, { 
+    const dataToValidate = location === 'body' ? req.body :
+      location === 'query' ? req.query :
+        location === 'params' ? req.params : {};
+
+    const { error, value } = schema.validate(dataToValidate, {
       abortEarly: false,
       stripUnknown: true,
       convert: true
@@ -351,10 +351,10 @@ const createValidationMiddleware = (schema, location = 'body') => {
         value: detail.context?.value
       }));
 
-      logger.warn('Errores de validación:', { 
-        path: req.path, 
+      logger.warn('Errores de validación:', {
+        path: req.path,
         method: req.method,
-        errors: validationErrors 
+        errors: validationErrors
       });
 
       return sendValidationError(res, validationErrors);

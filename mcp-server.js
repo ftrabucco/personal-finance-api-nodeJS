@@ -10,9 +10,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import cors from 'cors';
-import { 
+import {
   CallToolRequestSchema,
-  ListToolsRequestSchema,
+  ListToolsRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -26,12 +26,12 @@ class FinanzasApiMCPServer {
     this.server = new Server(
       {
         name: 'finanzas-api-mcp',
-        version: '1.0.0',
+        version: '1.0.0'
       },
       {
         capabilities: {
-          tools: {},
-        },
+          tools: {}
+        }
       }
     );
 
@@ -48,32 +48,32 @@ class FinanzasApiMCPServer {
             description: 'Retorna las reglas de negocio completas del sistema',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_api_endpoints',
             description: 'Retorna lista de endpoints disponibles para testing',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_gastos_api_docs',
             description: 'Retorna documentación detallada de /api/gastos endpoints con casos de uso, parámetros y escenarios de prueba',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_swagger_docs',
             description: 'Retorna documentación Swagger/OpenAPI para los endpoints de gastos y gastos únicos',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_test_scenarios',
@@ -86,8 +86,8 @@ class FinanzasApiMCPServer {
                   description: 'Categoría de tests: gastos_unicos, compras, recurrentes, tarjetas, job, auth',
                   enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'auth', 'all']
                 }
-              },
-            },
+              }
+            }
           },
           {
             name: 'get_validation_schemas',
@@ -100,32 +100,32 @@ class FinanzasApiMCPServer {
                   description: 'Entidad específica: gasto_unico, compra, gasto_recurrente, debito_automatico, tarjeta',
                   enum: ['gasto_unico', 'compra', 'gasto_recurrente', 'debito_automatico', 'tarjeta']
                 }
-              },
-            },
+              }
+            }
           },
           {
             name: 'get_database_schema',
             description: 'Retorna estructura de base de datos y relaciones',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_auth_endpoints',
             description: 'Retorna documentación de endpoints de autenticación JWT',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_auth_schemas',
             description: 'Retorna esquemas Swagger para autenticación y JWT',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'execute_api_call',
@@ -148,9 +148,9 @@ class FinanzasApiMCPServer {
                 }
               },
               required: ['method', 'endpoint']
-            },
+            }
           }
-        ],
+        ]
       };
     });
 
@@ -160,47 +160,47 @@ class FinanzasApiMCPServer {
 
       try {
         switch (name) {
-          case 'get_business_rules':
-            return await this.getBusinessRules();
-          
-          case 'get_api_endpoints':
-            return await this.getApiEndpoints();
-            
-          case 'get_gastos_api_docs':
-            return await this.getGastosApiDocs();
-            
-          case 'get_swagger_docs':
-            return await this.getSwaggerDocs();
-          
-          case 'get_test_scenarios':
-            return await this.getTestScenarios(args.category || 'all');
-          
-          case 'get_validation_schemas':
-            return await this.getValidationSchemas(args.entity);
-          
-          case 'get_database_schema':
-            return await this.getDatabaseSchema();
+        case 'get_business_rules':
+          return await this.getBusinessRules();
 
-          case 'get_auth_endpoints':
-            return await this.getAuthEndpoints();
+        case 'get_api_endpoints':
+          return await this.getApiEndpoints();
 
-          case 'get_auth_schemas':
-            return await this.getAuthSchemas();
+        case 'get_gastos_api_docs':
+          return await this.getGastosApiDocs();
 
-          case 'execute_api_call':
-            return await this.executeApiCall(args);
-          
-          default:
-            throw new Error(`Herramienta desconocida: ${name}`);
+        case 'get_swagger_docs':
+          return await this.getSwaggerDocs();
+
+        case 'get_test_scenarios':
+          return await this.getTestScenarios(args.category || 'all');
+
+        case 'get_validation_schemas':
+          return await this.getValidationSchemas(args.entity);
+
+        case 'get_database_schema':
+          return await this.getDatabaseSchema();
+
+        case 'get_auth_endpoints':
+          return await this.getAuthEndpoints();
+
+        case 'get_auth_schemas':
+          return await this.getAuthSchemas();
+
+        case 'execute_api_call':
+          return await this.executeApiCall(args);
+
+        default:
+          throw new Error(`Herramienta desconocida: ${name}`);
         }
       } catch (error) {
         return {
           content: [
             {
               type: 'text',
-              text: `Error ejecutando ${name}: ${error.message}`,
-            },
-          ],
+              text: `Error ejecutando ${name}: ${error.message}`
+            }
+          ]
         };
       }
     });
@@ -215,20 +215,20 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# Business Rules (Strategy Pattern + BaseService Architecture)\n\n` +
-                  `> Last Updated: September 2025 - Post Major Migration\n` +
-                  `> Architecture: Clean Architecture with Strategy Pattern\n\n${content}`,
-          },
-        ],
+            text: '# Business Rules (Strategy Pattern + BaseService Architecture)\n\n' +
+                  '> Last Updated: September 2025 - Post Major Migration\n' +
+                  `> Architecture: Clean Architecture with Strategy Pattern\n\n${content}`
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error reading business rules: ${error.message}\nPath: docs/architecture/business-rules.md`,
-          },
-        ],
+            text: `Error reading business rules: ${error.message}\nPath: docs/architecture/business-rules.md`
+          }
+        ]
       };
     }
   }
@@ -242,20 +242,20 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# API Endpoints Documentation (Current)\n\n` +
-                  `> Strategy Pattern + BaseService Architecture\n` +
-                  `> All endpoints verified and functional\n\n${content}`,
-          },
-        ],
+            text: '# API Endpoints Documentation (Current)\n\n' +
+                  '> Strategy Pattern + BaseService Architecture\n' +
+                  `> All endpoints verified and functional\n\n${content}`
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error reading API documentation: ${error.message}\nPath: docs/api/endpoints.md`,
-          },
-        ],
+            text: `Error reading API documentation: ${error.message}\nPath: docs/api/endpoints.md`
+          }
+        ]
       };
     }
   }
@@ -269,20 +269,20 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# OpenAPI/Swagger Specification (Current)\n` +
-                  `# Architecture: Strategy Pattern + BaseService\n` +
-                  `# Last Updated: September 2025\n\n${content}`,
-          },
-        ],
+            text: '# OpenAPI/Swagger Specification (Current)\n' +
+                  '# Architecture: Strategy Pattern + BaseService\n' +
+                  `# Last Updated: September 2025\n\n${content}`
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error reading Swagger documentation: ${error.message}\nPath: docs/api/swagger.yaml`,
-          },
-        ],
+            text: `Error reading Swagger documentation: ${error.message}\nPath: docs/api/swagger.yaml`
+          }
+        ]
       };
     }
   }
@@ -373,9 +373,9 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(endpoints, null, 2),
-        },
-      ],
+          text: JSON.stringify(endpoints, null, 2)
+        }
+      ]
     };
   }
 
@@ -422,8 +422,8 @@ class FinanzasApiMCPServer {
             response_structure: {
               success: true,
               data: 'array',
-              meta: { 
-                total: 'number', 
+              meta: {
+                total: 'number',
                 type: 'collection',
                 pagination: {
                   limit: 3,
@@ -814,77 +814,77 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
   async getValidationSchemas(entity) {
     try {
       let schemaPath;
-      
+
       switch (entity) {
-        case 'compra':
-          schemaPath = 'src/validations/compra.validation.js';
-          break;
-        case 'gasto_recurrente':
-          schemaPath = 'src/validations/gastoRecurrente.validation.js';
-          break;
-        case 'debito_automatico':
-          schemaPath = 'src/validations/debitoAutomatico.validation.js';
-          break;
-        case 'tarjeta':
-          // Tarjetas usan validation.middleware.js que contiene todos los esquemas de validación
-          const validationPath = path.join(__dirname, 'src/middlewares/validation.middleware.js');
-          const validationContent = await fs.readFile(validationPath, 'utf-8');
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `# Esquemas de Validación de Tarjetas (Joi)\n` +
-                      `# Validación condicional por tipo: crédito requiere fechas, débito no\n` +
-                      `# Normalización automática de datos según tipo\n\n` +
-                      validationContent.split('// Tarjeta validation')[1]?.split('// Export')[0] || 'Esquemas de tarjeta no encontrados',
-              },
-            ],
-          };
-        default:
-          // Retornar todos los esquemas
-          const allSchemas = await Promise.all([
-            fs.readFile(path.join(__dirname, 'src/validations/compra.validation.js'), 'utf-8'),
-            fs.readFile(path.join(__dirname, 'src/validations/gastoRecurrente.validation.js'), 'utf-8'),
-            fs.readFile(path.join(__dirname, 'src/validations/debitoAutomatico.validation.js'), 'utf-8')
-          ]);
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `// Compra Validation\n${allSchemas[0]}\n\n// Gasto Recurrente Validation\n${allSchemas[1]}\n\n// Débito Automático Validation\n${allSchemas[2]}`,
-              },
-            ],
-          };
+      case 'compra':
+        schemaPath = 'src/validations/compra.validation.js';
+        break;
+      case 'gasto_recurrente':
+        schemaPath = 'src/validations/gastoRecurrente.validation.js';
+        break;
+      case 'debito_automatico':
+        schemaPath = 'src/validations/debitoAutomatico.validation.js';
+        break;
+      case 'tarjeta':
+        // Tarjetas usan validation.middleware.js que contiene todos los esquemas de validación
+        const validationPath = path.join(__dirname, 'src/middlewares/validation.middleware.js');
+        const validationContent = await fs.readFile(validationPath, 'utf-8');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '# Esquemas de Validación de Tarjetas (Joi)\n' +
+                      '# Validación condicional por tipo: crédito requiere fechas, débito no\n' +
+                      '# Normalización automática de datos según tipo\n\n' +
+                      validationContent.split('// Tarjeta validation')[1]?.split('// Export')[0] || 'Esquemas de tarjeta no encontrados'
+            }
+          ]
+        };
+      default:
+        // Retornar todos los esquemas
+        const allSchemas = await Promise.all([
+          fs.readFile(path.join(__dirname, 'src/validations/compra.validation.js'), 'utf-8'),
+          fs.readFile(path.join(__dirname, 'src/validations/gastoRecurrente.validation.js'), 'utf-8'),
+          fs.readFile(path.join(__dirname, 'src/validations/debitoAutomatico.validation.js'), 'utf-8')
+        ]);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `// Compra Validation\n${allSchemas[0]}\n\n// Gasto Recurrente Validation\n${allSchemas[1]}\n\n// Débito Automático Validation\n${allSchemas[2]}`
+            }
+          ]
+        };
       }
 
       const content = await fs.readFile(path.join(__dirname, schemaPath), 'utf-8');
-      
+
       return {
         content: [
           {
             type: 'text',
-            text: content,
-          },
-        ],
+            text: content
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error leyendo esquemas de validación: ${error.message}`,
-          },
-        ],
+            text: `Error leyendo esquemas de validación: ${error.message}`
+          }
+        ]
       };
     }
   }
@@ -993,9 +993,9 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(schema, null, 2),
-        },
-      ],
+          text: JSON.stringify(schema, null, 2)
+        }
+      ]
     };
   }
 
@@ -1117,9 +1117,9 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(endpoints, null, 2),
-        },
-      ],
+          text: JSON.stringify(endpoints, null, 2)
+        }
+      ]
     };
   }
 
@@ -1131,21 +1131,21 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# Authentication Schemas (Swagger/OpenAPI)\n` +
-                  `# JWT-based authentication system with bcrypt password hashing\n` +
-                  `# Extends BaseService pattern for consistent CRUD operations\n\n` +
-                  content,
-          },
-        ],
+            text: '# Authentication Schemas (Swagger/OpenAPI)\n' +
+                  '# JWT-based authentication system with bcrypt password hashing\n' +
+                  '# Extends BaseService pattern for consistent CRUD operations\n\n' +
+                  content
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error cargando esquemas de autenticación: ${error.message}`,
-          },
-        ],
+            text: `Error cargando esquemas de autenticación: ${error.message}`
+          }
+        ]
       };
     }
   }
@@ -1154,12 +1154,12 @@ class FinanzasApiMCPServer {
     try {
       const baseUrl = process.env.API_BASE_URL || 'http://localhost:3030';
       const url = `${baseUrl}${endpoint}`;
-      
+
       const options = {
         method,
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json'
+        }
       };
 
       if (body && (method === 'POST' || method === 'PUT')) {
@@ -1177,18 +1177,18 @@ class FinanzasApiMCPServer {
               status: response.status,
               headers: Object.fromEntries(response.headers.entries()),
               data: data
-            }, null, 2),
-          },
-        ],
+            }, null, 2)
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error ejecutando API call: ${error.message}`,
-          },
-        ],
+            text: `Error ejecutando API call: ${error.message}`
+          }
+        ]
       };
     }
   }
@@ -1197,13 +1197,13 @@ class FinanzasApiMCPServer {
     // Determinar el transport según argumentos de línea de comandos
     const useHttp = process.argv.includes('--http');
     const port = process.env.MCP_PORT || 3031;
-    
+
     if (useHttp) {
       // HTTP Transport para RestAssured
       const app = express();
       app.use(cors());
       app.use(express.json());
-      
+
       // Endpoint para obtener herramientas disponibles
       app.get('/mcp/tools', async (req, res) => {
         try {
@@ -1270,59 +1270,59 @@ class FinanzasApiMCPServer {
           res.status(500).json({ error: error.message });
         }
       });
-      
+
       // Endpoint para ejecutar herramientas
       app.post('/mcp/tools/:toolName', async (req, res) => {
         try {
           const { toolName } = req.params;
           const args = req.body || {};
-          
+
           let result;
           switch (toolName) {
-            case 'get_business_rules':
-              result = await this.getBusinessRules();
-              break;
-            case 'get_api_endpoints':
-              result = await this.getApiEndpoints();
-              break;
-            case 'get_gastos_api_docs':
-              result = await this.getGastosApiDocs();
-              break;
-            case 'get_swagger_docs':
-              result = await this.getSwaggerDocs();
-              break;
-            case 'get_test_scenarios':
-              result = await this.getTestScenarios(args.category || 'all');
-              break;
-            case 'get_auth_endpoints':
-              result = await this.getAuthEndpoints();
-              break;
-            case 'get_auth_schemas':
-              result = await this.getAuthSchemas();
-              break;
-            case 'execute_api_call':
-              result = await this.executeApiCall(args);
-              break;
-            default:
-              throw new Error(`Herramienta desconocida: ${toolName}`);
+          case 'get_business_rules':
+            result = await this.getBusinessRules();
+            break;
+          case 'get_api_endpoints':
+            result = await this.getApiEndpoints();
+            break;
+          case 'get_gastos_api_docs':
+            result = await this.getGastosApiDocs();
+            break;
+          case 'get_swagger_docs':
+            result = await this.getSwaggerDocs();
+            break;
+          case 'get_test_scenarios':
+            result = await this.getTestScenarios(args.category || 'all');
+            break;
+          case 'get_auth_endpoints':
+            result = await this.getAuthEndpoints();
+            break;
+          case 'get_auth_schemas':
+            result = await this.getAuthSchemas();
+            break;
+          case 'execute_api_call':
+            result = await this.executeApiCall(args);
+            break;
+          default:
+            throw new Error(`Herramienta desconocida: ${toolName}`);
           }
-          
+
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
         }
       });
-      
+
       // Endpoint de salud
       app.get('/mcp/health', (req, res) => {
-        res.json({ 
-          status: 'ok', 
+        res.json({
+          status: 'ok',
           server: 'finanzas-api-mcp',
           version: '1.0.0',
           timestamp: new Date().toISOString()
         });
       });
-      
+
       // Endpoint para obtener documentación OpenAPI/Swagger
       app.get('/mcp/api-docs', async (req, res) => {
         try {
@@ -1333,10 +1333,10 @@ class FinanzasApiMCPServer {
           res.status(500).json({ error: error.message });
         }
       });
-      
+
       app.listen(port, () => {
         console.error(`Finanzas API MCP Server (HTTP) iniciado en puerto ${port}`);
-        console.error(`Endpoints disponibles:`);
+        console.error('Endpoints disponibles:');
         console.error(`  GET  http://localhost:${port}/mcp/health`);
         console.error(`  GET  http://localhost:${port}/mcp/tools`);
         console.error(`  POST http://localhost:${port}/mcp/tools/{toolName}`);
