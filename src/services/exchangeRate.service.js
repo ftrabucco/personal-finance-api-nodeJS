@@ -404,6 +404,65 @@ export class ExchangeRateService {
   }
 
   /**
+   * Obtiene el historial de tipos de cambio con filtros opcionales
+   * @param {Object} filters - Filtros para la consulta
+   * @param {string} filters.fecha_desde - Fecha desde (YYYY-MM-DD)
+   * @param {string} filters.fecha_hasta - Fecha hasta (YYYY-MM-DD)
+   * @param {string} filters.fuente - Fuente del tipo de cambio
+   * @param {number} filters.limit - Límite de resultados (default: 30)
+   * @returns {Promise<Array>} Array de tipos de cambio históricos
+   */
+  static async getHistoricalRates(filters = {}) {
+    try {
+      const {
+        fecha_desde,
+        fecha_hasta,
+        fuente,
+        limit = 30
+      } = filters;
+
+      const where = { activo: true };
+
+      // Filtro por rango de fechas
+      if (fecha_desde || fecha_hasta) {
+        where.fecha = {};
+
+        if (fecha_desde) {
+          where.fecha[Op.gte] = moment(fecha_desde).format('YYYY-MM-DD');
+        }
+
+        if (fecha_hasta) {
+          where.fecha[Op.lte] = moment(fecha_hasta).format('YYYY-MM-DD');
+        }
+      }
+
+      // Filtro por fuente
+      if (fuente) {
+        where.fuente = fuente;
+      }
+
+      const historico = await TipoCambio.findAll({
+        where,
+        order: [['fecha', 'DESC']],
+        limit: parseInt(limit)
+      });
+
+      logger.debug('Histórico de tipos de cambio obtenido', {
+        total: historico.length,
+        filtros: filters
+      });
+
+      return historico;
+    } catch (error) {
+      logger.error('Error al obtener histórico de tipos de cambio', {
+        error: error.message,
+        filters
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Verifica si el cache es válido
    * @private
    */
