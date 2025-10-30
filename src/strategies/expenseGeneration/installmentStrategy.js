@@ -39,6 +39,8 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
         fecha: fechaParaBD,
         monto_ars: montoCuotaARS,
         monto_usd: montoCuotaUSD,
+        moneda_origen: compra.moneda_origen || 'ARS',
+        tipo_cambio_usado: compra.tipo_cambio_usado || null,
         descripcion: `${compra.descripcion} - Cuota ${cuotaActual}/${compra.cantidad_cuotas || 1}`
       });
 

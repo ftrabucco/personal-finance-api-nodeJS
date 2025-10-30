@@ -100,8 +100,8 @@ export function defineCompra(sequelize) {
     },
     monto_total_ars: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-      comment: 'Monto total en pesos argentinos'
+      allowNull: false,
+      comment: 'Monto total en pesos argentinos (calculado automáticamente)'
     },
     monto_total_usd: {
       type: DataTypes.DECIMAL(10, 2),

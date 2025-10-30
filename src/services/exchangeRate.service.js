@@ -314,7 +314,7 @@ export class ExchangeRateService {
 
   /**
    * Actualiza tipo de cambio desde DolarAPI (alternativa gratuita)
-   * Endpoint: https://dolarapi.com/v1/dolares/oficial
+   * Endpoint: https://dolarapi.com/v1/dolares/blue
    */
   static async updateFromDolarAPI() {
     try {
@@ -330,8 +330,8 @@ export class ExchangeRateService {
         return existing;
       }
 
-      // Llamar a DolarAPI (gratuita, no requiere token)
-      const response = await axios.get('https://dolarapi.com/v1/dolares/oficial', {
+      // Llamar a DolarAPI (gratuita, no requiere token) - Dólar Blue
+      const response = await axios.get('https://dolarapi.com/v1/dolares/blue', {
         timeout: 10000
       });
 

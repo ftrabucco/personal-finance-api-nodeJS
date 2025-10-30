@@ -23,7 +23,9 @@ export class ImmediateExpenseStrategy extends BaseExpenseGenerationStrategy {
       const gastoData = this.createGastoData(gastoUnico, {
         fecha: fechaParaBD,
         monto_ars: gastoUnico.monto_ars || gastoUnico.monto, // Backward compatibility
-        monto_usd: gastoUnico.monto_usd || null
+        monto_usd: gastoUnico.monto_usd || null,
+        moneda_origen: gastoUnico.moneda_origen || 'ARS',
+        tipo_cambio_usado: gastoUnico.tipo_cambio_usado || null
       });
 
       const gasto = await Gasto.create(gastoData, {

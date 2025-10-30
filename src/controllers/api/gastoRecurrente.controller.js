@@ -1,6 +1,7 @@
 import { BaseController } from './base.controller.js';
 import { GastoRecurrente, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
+import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
@@ -49,13 +50,47 @@ export class GastoRecurrenteController extends BaseController {
         return sendError(res, 400, 'Campos inválidos', validationResult.message);
       }
 
-      // 1. Crear el gasto recurrente
-      const gastoRecurrente = await this.model.create({
+      // 💱 Calculate multi-currency fields
+      const monto = req.body.monto;
+      const monedaOrigen = req.body.moneda_origen || 'ARS';
+
+      let gastoData = {
         ...req.body,
         usuario_id: req.user.id,
-        activo: true, // Por defecto activo
-        ultima_fecha_generado: null // Inicialmente no se ha generado ningún gasto
-      }, {
+        activo: true,
+        ultima_fecha_generado: null,
+        moneda_origen: monedaOrigen
+      };
+
+      // Calculate monto_ars, monto_usd, tipo_cambio_referencia
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        gastoData = {
+          ...gastoData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado  // Note: 'referencia' for recurring
+        };
+
+        logger.debug('Multi-currency conversion applied to GastoRecurrente', {
+          moneda_origen: monedaOrigen,
+          monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        logger.warn('Exchange rate conversion failed for GastoRecurrente', {
+          error: exchangeError.message
+        });
+        gastoData.monto_ars = monto;
+        gastoData.monto_usd = null;
+      }
+
+      // 1. Crear el gasto recurrente
+      const gastoRecurrente = await this.model.create(gastoData, {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });

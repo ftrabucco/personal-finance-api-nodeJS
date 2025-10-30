@@ -156,6 +156,8 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
         fecha: fechaParaBD,
         monto_ars: source.monto_ars || source.monto, // Backward compatibility
         monto_usd: source.monto_usd || null,
+        moneda_origen: source.moneda_origen || 'ARS',
+        tipo_cambio_usado: source.tipo_cambio_referencia || null, // Para recurrentes usa tipo_cambio_referencia
         ...additionalData
       });
 

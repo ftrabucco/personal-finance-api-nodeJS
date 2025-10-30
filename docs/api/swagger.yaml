@@ -26,6 +26,8 @@ tags:
     description: Operaciones con débitos automáticos (suscripciones, servicios)
   - name: tarjetas
     description: Gestión de tarjetas de débito y crédito del usuario
+  - name: tipo-cambio
+    description: Sistema multi-moneda - Gestión de tipos de cambio USD/ARS
 
 components:
   securitySchemes:
@@ -229,7 +231,7 @@ components:
         monto:
           type: number
           minimum: 0.01
-          description: Monto del gasto
+          description: Monto del gasto (en la moneda especificada en moneda_origen)
           example: 2500.75
         fecha:
           type: string
@@ -257,6 +259,26 @@ components:
           type: boolean
           description: Indica si ya fue procesado para generar gasto real
           example: true
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto originalmente
+          example: "ARS"
+        monto_ars:
+          type: number
+          description: Monto calculado en pesos argentinos (calculado automáticamente)
+          example: 2500.75
+        monto_usd:
+          type: number
+          nullable: true
+          description: Monto calculado en dólares estadounidenses (calculado automáticamente)
+          example: 2.50
+        tipo_cambio_usado:
+          type: number
+          nullable: true
+          description: Tipo de cambio usado para la conversión (snapshot histórico)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -288,7 +310,7 @@ components:
         monto_total:
           type: number
           minimum: 0.01
-          description: Monto total de la compra
+          description: Monto total de la compra (en la moneda especificada en moneda_origen)
           example: 120000.00
         fecha_compra:
           type: string
@@ -319,6 +341,26 @@ components:
           type: integer
           nullable: true
           description: ID de la tarjeta (opcional)
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto total originalmente
+          example: "ARS"
+        monto_total_ars:
+          type: number
+          description: Monto total calculado en pesos argentinos (calculado automáticamente)
+          example: 120000.00
+        monto_total_usd:
+          type: number
+          nullable: true
+          description: Monto total calculado en dólares (calculado automáticamente)
+          example: 120.00
+        tipo_cambio_usado:
+          type: number
+          nullable: true
+          description: Tipo de cambio usado para la conversión (snapshot histórico)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -350,7 +392,7 @@ components:
         monto:
           type: number
           minimum: 0.01
-          description: Monto del gasto
+          description: Monto del gasto (en la moneda especificada en moneda_origen)
           example: 50000.00
         dia_de_pago:
           type: integer
@@ -391,6 +433,26 @@ components:
         frecuencia_gasto_id:
           type: integer
           description: ID de la frecuencia (mensual, anual, etc.)
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto originalmente
+          example: "ARS"
+        monto_ars:
+          type: number
+          description: Monto calculado en pesos argentinos (calculado automáticamente)
+          example: 50000.00
+        monto_usd:
+          type: number
+          nullable: true
+          description: Monto calculado en dólares (calculado automáticamente)
+          example: 50.00
+        tipo_cambio_referencia:
+          type: number
+          nullable: true
+          description: Tipo de cambio de referencia usado (se actualiza diariamente)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -424,7 +486,7 @@ components:
         monto:
           type: number
           minimum: 0.01
-          description: Monto del débito
+          description: Monto del débito (en la moneda especificada en moneda_origen)
           example: 1200.00
         dia_de_pago:
           type: integer
@@ -453,6 +515,26 @@ components:
         frecuencia_gasto_id:
           type: integer
           description: ID de la frecuencia
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto originalmente
+          example: "ARS"
+        monto_ars:
+          type: number
+          description: Monto calculado en pesos argentinos (calculado automáticamente)
+          example: 1200.00
+        monto_usd:
+          type: number
+          nullable: true
+          description: Monto calculado en dólares (calculado automáticamente)
+          example: 1.20
+        tipo_cambio_referencia:
+          type: number
+          nullable: true
+          description: Tipo de cambio de referencia usado (se actualiza diariamente)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -892,6 +974,59 @@ components:
             - INVALID_CURRENT_PASSWORD
             - INSUFFICIENT_PERMISSIONS
           example: "INVALID_CREDENTIALS"
+
+    # Multi-Currency Schemas
+    TipoCambio:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del registro de tipo de cambio
+          example: 1
+        fecha:
+          type: string
+          format: date
+          description: Fecha del tipo de cambio
+          example: "2024-01-15"
+        valor_compra:
+          type: number
+          format: decimal
+          description: Valor de compra del dólar (lo que pagas para comprar USD)
+          example: 995.50
+        valor_venta:
+          type: number
+          format: decimal
+          description: Valor de venta del dólar (lo que recibes al vender USD)
+          example: 1005.50
+        fuente:
+          type: string
+          description: Fuente de donde se obtuvo el tipo de cambio
+          example: "BCRA"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Token de autenticación inválido o ausente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          example:
+            success: false
+            message: "Token de acceso requerido"
+            error: "MISSING_TOKEN"
+
+    ValidationError:
+      description: Error de validación en los datos de entrada
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
 
   parameters:
     GastoIdParam:
@@ -3296,3 +3431,688 @@ paths:
           description: Tarjeta no encontrada
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  # =============================================================================
+  # TIPO DE CAMBIO ENDPOINTS (Multi-Currency System)
+  # =============================================================================
+  /tipo-cambio:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipos de cambio con filtros
+      description: |
+        Obtiene registros históricos de tipos de cambio USD/ARS con filtros opcionales.
+
+        **Casos de uso:**
+        - Ver historial de tipos de cambio por fecha
+        - Filtrar por fuente (BCRA, DolarAPI)
+        - Obtener el tipo de cambio actual (fecha más reciente)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filtrar por fecha específica
+          example: "2024-01-15"
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de inicio del rango
+          example: "2024-01-01"
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de fin del rango
+          example: "2024-01-31"
+        - name: fuente
+          in: query
+          schema:
+            type: string
+          description: Filtrar por fuente (BCRA, DolarAPI)
+          example: "BCRA"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+          description: Límite de resultados
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Offset para paginación
+      responses:
+        '200':
+          description: Lista de tipos de cambio
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TipoCambio'
+              example:
+                success: true
+                data:
+                  - id: 1
+                    fecha: "2024-01-15"
+                    valor_compra: 995.50
+                    valor_venta: 1005.50
+                    fuente: "BCRA"
+                    createdAt: "2024-01-15T00:05:00Z"
+                    updatedAt: "2024-01-15T00:05:00Z"
+                meta:
+                  total: 1
+                  type: collection
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/actual:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipo de cambio actual
+      description: |
+        Obtiene el tipo de cambio más reciente (última fecha registrada).
+
+        **Uso típico:** Consultar el tipo de cambio antes de crear un gasto/compra.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tipo de cambio actual obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TipoCambio'
+              example:
+                success: true
+                data:
+                  id: 1
+                  fecha: "2024-01-15"
+                  valor_compra: 995.50
+                  valor_venta: 1005.50
+                  fuente: "BCRA"
+                  createdAt: "2024-01-15T00:05:00Z"
+                  updatedAt: "2024-01-15T00:05:00Z"
+                meta:
+                  type: single
+        '404':
+          description: No hay tipos de cambio registrados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "No se encontró ningún tipo de cambio"
+                timestamp: "2024-01-15T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/fecha/{fecha}:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipo de cambio por fecha
+      description: |
+        Obtiene el tipo de cambio de una fecha específica.
+
+        **Reglas:**
+        - Si existe registro para esa fecha: lo devuelve
+        - Si NO existe: devuelve el más cercano anterior (fallback)
+        - Si no hay ninguno anterior: error 404
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Fecha del tipo de cambio (YYYY-MM-DD)
+          example: "2024-01-15"
+      responses:
+        '200':
+          description: Tipo de cambio encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TipoCambio'
+              example:
+                success: true
+                data:
+                  id: 1
+                  fecha: "2024-01-15"
+                  valor_compra: 995.50
+                  valor_venta: 1005.50
+                  fuente: "BCRA"
+                meta:
+                  type: single
+        '404':
+          description: No hay tipo de cambio disponible para esa fecha
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/{id}:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipo de cambio por ID
+      description: Obtiene un tipo de cambio específico por su ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID del tipo de cambio
+          example: 1
+      responses:
+        '200':
+          description: Tipo de cambio encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TipoCambio'
+        '404':
+          description: Tipo de cambio no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - tipo-cambio
+      summary: Eliminar tipo de cambio
+      description: |
+        Elimina un registro de tipo de cambio.
+
+        **Advertencia:** Eliminar tipos de cambio históricos puede afectar
+        la integridad de los registros de gastos que los utilizaron.
+        Solo usar en casos de corrección de errores.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID del tipo de cambio
+          example: 1
+      responses:
+        '200':
+          description: Tipo de cambio eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tipo de cambio eliminado correctamente"
+        '404':
+          description: Tipo de cambio no encontrado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/actualizar:
+    post:
+      tags:
+        - tipo-cambio
+      summary: Actualizar tipo de cambio desde APIs externas
+      description: |
+        Fuerza una actualización del tipo de cambio desde las APIs externas.
+
+        **Fuentes:**
+        1. DolarAPI.com (primaria)
+        2. BCRA (fallback)
+
+        **Nota:** Normalmente el scheduler ejecuta esto automáticamente a las 00:00 diariamente.
+        Este endpoint es útil para actualizaciones manuales.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tipo de cambio actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tipo de cambio actualizado exitosamente"
+                          tipoCambio:
+                            $ref: '#/components/schemas/TipoCambio'
+                          fuente:
+                            type: string
+                            example: "DolarAPI"
+              example:
+                success: true
+                data:
+                  message: "Tipo de cambio actualizado exitosamente"
+                  tipoCambio:
+                    id: 1
+                    fecha: "2024-01-15"
+                    valor_compra: 995.50
+                    valor_venta: 1005.50
+                    fuente: "DolarAPI"
+                  fuente: "DolarAPI"
+        '500':
+          description: Error al obtener tipo de cambio desde APIs externas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Error al obtener tipo de cambio desde APIs externas"
+                details: "Ambas fuentes (DolarAPI y BCRA) fallaron"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/manual:
+    post:
+      tags:
+        - tipo-cambio
+      summary: Configurar tipo de cambio manualmente
+      description: |
+        Configura un nuevo tipo de cambio manualmente para una fecha específica.
+
+        **Nota:** Normalmente los tipos de cambio se obtienen automáticamente
+        mediante el scheduler diario. Este endpoint es útil para:
+        - Corregir datos históricos
+        - Agregar tipos de cambio manualmente cuando falla la API externa
+        - Configurar TC para fechas específicas
+
+        **Validaciones:**
+        - valor_venta_usd_ars es requerido
+        - valor_compra_usd_ars es opcional (si no se provee, usa el de venta)
+        - Ambos valores deben ser números positivos
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - valor_venta_usd_ars
+              properties:
+                fecha:
+                  type: string
+                  format: date
+                  description: Fecha del tipo de cambio (opcional, por defecto usa hoy)
+                  example: "2024-01-15"
+                valor_compra_usd_ars:
+                  type: number
+                  minimum: 0.01
+                  description: Valor de compra USD-ARS (opcional, por defecto usa el de venta)
+                  example: 995.50
+                valor_venta_usd_ars:
+                  type: number
+                  minimum: 0.01
+                  description: Valor de venta USD-ARS (requerido)
+                  example: 1005.50
+            example:
+              fecha: "2024-01-15"
+              valor_compra_usd_ars: 995.50
+              valor_venta_usd_ars: 1005.50
+      responses:
+        '201':
+          description: Tipo de cambio configurado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mensaje:
+                            type: string
+                            example: "Tipo de cambio configurado exitosamente"
+                          tipo_cambio:
+                            type: object
+                            properties:
+                              fecha:
+                                type: string
+                                format: date
+                              valor_compra_usd_ars:
+                                type: number
+                              valor_venta_usd_ars:
+                                type: number
+                              fuente:
+                                type: string
+                                example: "manual"
+                              activo:
+                                type: boolean
+              example:
+                success: true
+                data:
+                  mensaje: "Tipo de cambio configurado exitosamente"
+                  tipo_cambio:
+                    fecha: "2024-01-15"
+                    valor_compra_usd_ars: 995.50
+                    valor_venta_usd_ars: 1005.50
+                    fuente: "manual"
+                    activo: true
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              examples:
+                missing_field:
+                  summary: Campo requerido faltante
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "El campo valor_venta_usd_ars es requerido"
+                invalid_value:
+                  summary: Valor inválido
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "valor_venta_usd_ars debe ser un número positivo"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tipo-cambio/historico:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener histórico de tipos de cambio
+      description: |
+        Obtiene el historial de tipos de cambio con filtros opcionales.
+
+        **Filtros disponibles:**
+        - `fecha_desde`: Filtrar desde una fecha específica
+        - `fecha_hasta`: Filtrar hasta una fecha específica
+        - `fuente`: Filtrar por fuente (manual, api_dolar_api, api_bcra)
+        - `limit`: Limitar cantidad de resultados (default: 30)
+
+        **Orden:** Los resultados se devuelven ordenados por fecha descendente (más recientes primero)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha desde (YYYY-MM-DD)
+          example: "2024-01-01"
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha hasta (YYYY-MM-DD)
+          example: "2024-01-31"
+        - name: fuente
+          in: query
+          schema:
+            type: string
+            enum: [manual, api_dolar_api, api_bcra]
+          description: Filtrar por fuente del tipo de cambio
+          example: "api_dolar_api"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+          description: Límite de resultados a devolver
+          example: 30
+      responses:
+        '200':
+          description: Histórico obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                            description: Total de registros encontrados
+                          filtros:
+                            type: object
+                            properties:
+                              fecha_desde:
+                                type: string
+                              fecha_hasta:
+                                type: string
+                              fuente:
+                                type: string
+                              limit:
+                                type: integer
+                          datos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                fecha:
+                                  type: string
+                                  format: date
+                                valor_compra_usd_ars:
+                                  type: number
+                                valor_venta_usd_ars:
+                                  type: number
+                                fuente:
+                                  type: string
+                                activo:
+                                  type: boolean
+              example:
+                success: true
+                data:
+                  total: 15
+                  filtros:
+                    fecha_desde: "2024-01-01"
+                    fecha_hasta: "2024-01-31"
+                    fuente: null
+                    limit: 30
+                  datos:
+                    - fecha: "2024-01-15"
+                      valor_compra_usd_ars: 995.50
+                      valor_venta_usd_ars: 1005.50
+                      fuente: "api_dolar_api"
+                      activo: true
+                    - fecha: "2024-01-14"
+                      valor_compra_usd_ars: 992.00
+                      valor_venta_usd_ars: 1002.00
+                      fuente: "api_dolar_api"
+                      activo: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tipo-cambio/convertir:
+    post:
+      tags:
+        - tipo-cambio
+      summary: Convertir monto entre monedas
+      description: |
+        Convierte un monto entre ARS y USD usando el tipo de cambio actual.
+
+        **Reglas de conversión:**
+        - ARS → USD: Usa `valor_venta_usd_ars` (lo que el banco "vende" dólares)
+        - USD → ARS: Usa `valor_compra_usd_ars` (lo que el banco "compra" dólares)
+
+        **Nota:** Usa el tipo de cambio más reciente disponible en el sistema.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - monto
+                - moneda_origen
+              properties:
+                monto:
+                  type: number
+                  minimum: 0.01
+                  description: Monto a convertir
+                  example: 100000
+                moneda_origen:
+                  type: string
+                  enum: [ARS, USD]
+                  description: Moneda del monto original
+                  example: "ARS"
+            example:
+              monto: 100000
+              moneda_origen: "ARS"
+      responses:
+        '200':
+          description: Conversión realizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          monto_original:
+                            type: number
+                            description: Monto original proporcionado
+                          moneda_origen:
+                            type: string
+                            description: Moneda origen
+                          conversion:
+                            type: object
+                            properties:
+                              monto_ars:
+                                type: number
+                                description: Monto equivalente en pesos argentinos
+                              monto_usd:
+                                type: number
+                                description: Monto equivalente en dólares
+                              tipo_cambio_usado:
+                                type: number
+                                description: Tipo de cambio usado para la conversión
+                              fecha_tipo_cambio:
+                                type: string
+                                format: date
+                                description: Fecha del tipo de cambio usado
+              example:
+                success: true
+                data:
+                  monto_original: 100000
+                  moneda_origen: "ARS"
+                  conversion:
+                    monto_ars: 100000
+                    monto_usd: 99.50
+                    tipo_cambio_usado: 1005.50
+                    fecha_tipo_cambio: "2024-01-15"
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              examples:
+                missing_fields:
+                  summary: Campos requeridos faltantes
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "Los campos monto y moneda_origen son requeridos"
+                invalid_currency:
+                  summary: Moneda inválida
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "moneda_origen debe ser ARS o USD"
+                invalid_amount:
+                  summary: Monto inválido
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "monto debe ser un número positivo"
+        '404':
+          description: Tipo de cambio no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Tipo de cambio no disponible"
+                details: "No hay tipo de cambio configurado"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'

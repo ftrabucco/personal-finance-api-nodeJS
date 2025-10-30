@@ -61,6 +61,7 @@ export function defineTipoCambio(sequelize) {
     tableName: 'tipos_cambio',
     schema: 'finanzas',
     timestamps: true,
+    underscored: false,
     indexes: [
       {
         name: 'idx_tipos_cambio_fecha',

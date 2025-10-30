@@ -35,8 +35,8 @@ const environments = {
     },
     security: {
       rateLimit: {
-        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-        max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000 // Aumentado para desarrollo/testing
+        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 1 * 60 * 1000, // 1 minuto (reseteo rápido)
+        max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000 // 10k requests por minuto
       },
       cors: {
         origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : 'http://localhost:3000',

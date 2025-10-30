@@ -1,5 +1,6 @@
 import { BaseService } from './base.service.js';
 import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../models/index.js';
+import ExchangeRateService from './exchangeRate.service.js';
 import { Op } from 'sequelize';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
@@ -56,24 +57,68 @@ export class DebitoAutomaticoService extends BaseService {
   /**
    * Create automatic debit with validation
    * Adds business logic specific to automatic debits
+   * 💱 Handles multi-currency conversion automatically
    */
   async create(data) {
     // Validate automatic debit specific rules
     this.validateAutomaticDebitData(data);
 
+    // 💱 Calculate both currencies based on moneda_origen
+    const monedaOrigen = data.moneda_origen || 'ARS';
+    const monto = data.monto;
+
     // Set default values for automatic debits
-    const processedData = {
+    let processedData = {
       ...data,
+      moneda_origen: monedaOrigen,
       activo: data.activo ?? true,
       ultima_fecha_generado: null
     };
 
+    // Only calculate if not already provided
+    if (!data.monto_ars || !data.monto_usd) {
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        processedData = {
+          ...processedData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to DebitoAutomatico', {
+          moneda_origen: monedaOrigen,
+          monto_original: monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        // If exchange rate service fails, use backward compatibility
+        logger.warn('Exchange rate conversion failed, using backward compatibility', {
+          error: exchangeError.message
+        });
+
+        if (monedaOrigen === 'ARS') {
+          processedData.monto_ars = monto;
+          processedData.monto_usd = null;
+        } else {
+          processedData.monto_ars = monto; // Fallback
+          processedData.monto_usd = null;
+        }
+      }
+    }
+
     const automaticDebit = await super.create(processedData);
 
-    logger.info('Automatic debit created successfully', {
+    logger.info('Automatic debit created successfully (multi-currency)', {
       id: automaticDebit.id,
       descripcion: automaticDebit.descripcion,
-      monto: automaticDebit.monto,
+      monto_ars: automaticDebit.monto_ars,
+      monto_usd: automaticDebit.monto_usd,
+      moneda_origen: automaticDebit.moneda_origen,
       frecuencia_id: automaticDebit.frecuencia_gasto_id
     });
 
