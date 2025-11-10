@@ -210,11 +210,10 @@ export class GastoRecurrenteService extends BaseService {
       try {
         const shouldGenerate = await this.shouldGenerateExpense(expense, today);
         if (shouldGenerate.canGenerate) {
-          readyExpenses.push({
-            ...expense.toJSON(),
-            generationReason: shouldGenerate.reason,
-            adjustedDate: shouldGenerate.adjustedDate
-          });
+          // Keep the Sequelize instance, add metadata as properties
+          expense.generationReason = shouldGenerate.reason;
+          expense.adjustedDate = shouldGenerate.adjustedDate;
+          readyExpenses.push(expense);
         }
       } catch (error) {
         logger.error('Error checking expense generation readiness', {
@@ -288,9 +287,16 @@ export class GastoRecurrenteService extends BaseService {
   checkFrequencyMatch(expense, today, frecuencia) {
     const diaActual = today.date();
     const mesActual = today.month() + 1;
-    const diaSemanaActual = today.day(); // 0 = Sunday, 1 = Monday, etc.
 
-    switch (frecuencia.nombre?.toLowerCase()) {
+    switch (frecuencia.nombre_frecuencia?.toLowerCase()) {
+    case 'único':
+    case 'unico':
+      return {
+        matches: false,
+        reason: 'One-time frequency - should not generate recurring expenses',
+        adjustedDate: null
+      };
+
     case 'diario':
       return {
         matches: true,
@@ -324,7 +330,7 @@ export class GastoRecurrenteService extends BaseService {
     default:
       return {
         matches: false,
-        reason: `Unknown frequency: ${frecuencia.nombre}`,
+        reason: `Unknown frequency: ${frecuencia.nombre_frecuencia}`,
         adjustedDate: null
       };
     }
@@ -429,7 +435,7 @@ export class GastoRecurrenteService extends BaseService {
   /**
    * Check bimonthly frequency (every 2 months)
    */
-  checkBimonthlyFrequency(expense, today, diaActual, mesActual) {
+  checkBimonthlyFrequency(expense, today, diaActual, _mesActual) {
     const targetDay = expense.dia_de_pago;
     const adjustedDate = this.getValidMonthlyDate(today, targetDay);
     const adjustedDay = adjustedDate.date();
@@ -652,7 +658,7 @@ export class GastoRecurrenteService extends BaseService {
    * @param {Object} data - Expense data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
    */
-  validateRecurringExpenseData(data, isUpdate = false) {
+  validateRecurringExpenseData(data, _isUpdate = false) {
     const errors = [];
 
     // Amount validation
