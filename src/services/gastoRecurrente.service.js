@@ -380,7 +380,19 @@ export class GastoRecurrenteService extends BaseService {
       };
     }
 
-    // Tolerance: if it's a few days past 1st or 15th and not generated yet
+    // CATCH-UP LOGIC: If never generated and we're past one of the valid days
+    if (!expense.ultima_fecha_generado) {
+      const lastValidDay = validDays.filter(d => d < diaActual).pop();
+      if (lastValidDay) {
+        return {
+          matches: true,
+          reason: `Biweekly frequency - catch-up for day ${lastValidDay} (never generated before, currently day ${diaActual})`,
+          adjustedDate: today.clone().date(lastValidDay).format('YYYY-MM-DD')
+        };
+      }
+    }
+
+    // Regular tolerance: if it's a few days past 1st or 15th and not generated yet
     const tolerance = this.calculateDateTolerance(diaActual, validDays);
     if (tolerance.withinTolerance) {
       return {
@@ -415,7 +427,16 @@ export class GastoRecurrenteService extends BaseService {
       };
     }
 
-    // Tolerance for missed dates
+    // CATCH-UP LOGIC: If never generated before and target day has passed this month
+    if (!expense.ultima_fecha_generado && diaActual > adjustedDay) {
+      return {
+        matches: true,
+        reason: `Monthly frequency - catch-up for day ${targetDay} (never generated before, currently day ${diaActual})`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    // Regular tolerance for missed dates (3 days)
     const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
     if (tolerance.withinTolerance) {
       return {

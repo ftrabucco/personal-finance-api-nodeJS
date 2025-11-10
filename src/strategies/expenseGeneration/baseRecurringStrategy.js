@@ -137,13 +137,19 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
   /**
    * Generate recurring expense with common pattern
    * Subclasses should call this method and provide specific data
+   *
+   * IMPORTANT: This method is called AFTER findReadyForGeneration has already
+   * filtered sources, so we don't check shouldGenerate here. We only validate
+   * the source data structure.
+   *
    * @param {Object} source - The recurring expense source object
    * @param {Object} additionalData - Additional data specific to the strategy
    * @param {Object} transaction - Database transaction object
    * @returns {Promise<Object|null>} Generated expense or null
    */
   async generateRecurringExpense(source, additionalData, transaction) {
-    if (!this.validateSource(source) || !await this.shouldGenerate(source)) {
+    // Only validate source structure, skip shouldGenerate check
+    if (!this.validateSource(source)) {
       return null;
     }
 
