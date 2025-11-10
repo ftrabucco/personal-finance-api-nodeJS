@@ -8,6 +8,7 @@ import { DebitoAutomaticoService } from './debitoAutomatico.service.js';
 import { ComprasService } from './compras.service.js';
 import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
+import moment from 'moment-timezone';
 
 /**
  * Servicio principal para generación de gastos reales desde diferentes fuentes
@@ -64,14 +65,20 @@ export class GastoGeneratorService {
       // NOTE: We skip shouldGenerate check because findReadyForGeneration
       // already filtered expenses. This ensures catch-up logic works correctly.
 
-      // Generar el gasto usando la estrategia
-      const gasto = await recurringStrategy.generate(gastoRecurrente, transaction);
+      // Use adjustedDate if provided by catch-up logic, otherwise use today
+      const targetDate = gastoRecurrente.adjustedDate ||
+                        moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
+
+      // Generar el gasto usando la estrategia con la fecha correcta
+      const gasto = await recurringStrategy.generateWithDate(gastoRecurrente, targetDate, transaction);
 
       await transaction.commit();
       logger.info('Gasto generado desde gasto recurrente con estrategia:', {
         gasto_id: gasto.id,
         gastoRecurrente_id: gastoRecurrente.id,
-        frecuencia: gastoRecurrente.frecuencia?.nombre_frecuencia
+        frecuencia: gastoRecurrente.frecuencia?.nombre_frecuencia,
+        fecha_generada: targetDate,
+        is_catchup: !!gastoRecurrente.adjustedDate
       });
       return gasto;
     } catch (error) {

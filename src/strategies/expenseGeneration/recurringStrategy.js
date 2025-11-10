@@ -18,6 +18,19 @@ export class RecurringExpenseStrategy extends BaseRecurringStrategy {
     }, transaction);
   }
 
+  /**
+   * Generate with a specific target date (for catch-up logic)
+   * @param {Object} gastoRecurrente - The recurring expense source
+   * @param {string} targetDate - Target date in YYYY-MM-DD format
+   * @param {Object} transaction - Database transaction
+   * @returns {Promise<Object>} Generated expense
+   */
+  async generateWithDate(gastoRecurrente, targetDate, transaction = null) {
+    return this.generateRecurringExpenseWithDate(gastoRecurrente, {
+      frecuencia_gasto_id: gastoRecurrente.frecuencia_gasto_id
+    }, targetDate, transaction);
+  }
+
   getType() {
     return 'recurrente';
   }

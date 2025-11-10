@@ -64,6 +64,11 @@ export function defineDebitoAutomatico(sequelize) {
       allowNull: false,
       defaultValue: true
     },
+    ultima_fecha_generado: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Última fecha en que se generó un gasto desde este débito automático'
+    },
     // 💱 Multi-currency fields
     moneda_origen: {
       type: DataTypes.ENUM('ARS', 'USD'),
