@@ -1,9 +1,8 @@
 import cron from 'node-cron';
-import { GastoRecurrente, DebitoAutomatico, Compra, Gasto } from '../models/index.js';
+import { GastoRecurrente, DebitoAutomatico, Compra } from '../models/index.js';
 import ExchangeRateService from '../services/exchangeRate.service.js';
 import logger from '../utils/logger.js';
 import config from '../config/environment.js';
-import { Op } from 'sequelize';
 
 /**
  * 💱 Exchange Rate Scheduler - Actualización automática de tipos de cambio

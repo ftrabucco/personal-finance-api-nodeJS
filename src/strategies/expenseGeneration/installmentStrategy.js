@@ -10,13 +10,15 @@ import logger from '../../utils/logger.js';
  * REGLAS DE GENERACIÓN:
  *
  * Para 1 cuota:
- * - Efectivo/Débito/Transferencia: Se genera en fecha_compra
+ * - Efectivo/Débito/Transferencia/MercadoPago: Se genera inmediatamente (en fecha_compra o al correr scheduler)
  * - Tarjeta de Crédito: Se genera en dia_vencimiento de la tarjeta
  *   - Si compra antes del dia_cierre: vence este mes
  *   - Si compra después del dia_cierre: vence el mes siguiente
  *
  * Para múltiples cuotas:
- * - Efectivo/Débito/Transferencia: Cada cuota el mismo día del mes de la compra
+ * - Efectivo/Débito/Transferencia/MercadoPago:
+ *   - Primera cuota: Se genera inmediatamente (en fecha_compra o al correr scheduler)
+ *   - Cuotas siguientes: Se generan el mismo día del mes de la compra
  * - Tarjeta de Crédito: Cada cuota en el dia_vencimiento de la tarjeta
  */
 export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
@@ -110,12 +112,21 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     // Para otros medios de pago (efectivo, débito, transferencia)
     // Se genera inmediatamente (en la fecha de compra)
-    const fechaCompra = moment(compra.fecha);
+    const fechaCompra = moment(compra.fecha_compra);
     return today.isSameOrAfter(fechaCompra, 'day');
   }
 
   /**
    * Verifica si debe generar una cuota de múltiples cuotas
+   *
+   * REGLAS:
+   * - Primera cuota (cuotasGeneradas === 0):
+   *   - Efectivo/Débito/Transferencia: Generar inmediatamente (si hoy >= fecha_compra)
+   *   - Tarjeta de Crédito: Generar en día de vencimiento de la tarjeta
+   *
+   * - Cuotas siguientes (cuotasGeneradas > 0):
+   *   - Efectivo/Débito/Transferencia: Generar el mismo día del mes de la compra
+   *   - Tarjeta de Crédito: Generar en día de vencimiento de la tarjeta
    */
   shouldGenerateMultipleInstallment(compra, today, cuotasGeneradas) {
     // Verificar que no se haya generado cuota este mes
@@ -126,17 +137,21 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
       }
     }
 
-    // Si es tarjeta de crédito, usar día de vencimiento de la tarjeta
+    // Si es tarjeta de crédito, siempre usar día de vencimiento
     if (this.isCreditCardPayment(compra)) {
       return this.shouldGenerateOnCreditCardDueDate(compra, today, cuotasGeneradas);
     }
 
-    // Para otros medios de pago, usar el mismo día del mes de la compra
-    const fechaCompra = moment(compra.fecha);
-    const diaCompra = fechaCompra.date();
-    const diaHoy = today.date();
+    // Para otros medios de pago (efectivo, débito, transferencia):
+    const fechaCompra = moment(compra.fecha_compra);
 
-    return diaHoy === diaCompra;
+    if (cuotasGeneradas === 0) {
+      // Primera cuota: generar inmediatamente (si hoy >= fecha_compra)
+      return today.isSameOrAfter(fechaCompra, 'day');
+    }
+
+    // Cuotas siguientes: mismo día del mes que la fecha de compra
+    return today.date() === fechaCompra.date();
   }
 
   /**
@@ -278,6 +293,6 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
   validateSource(compra) {
     return super.validateSource(compra) &&
            compra.monto_total &&
-           compra.fecha;
+           compra.fecha_compra;
   }
 }

@@ -258,6 +258,20 @@ describe('TarjetaService', () => {
 
       expect(errors).toHaveLength(0);
     });
+
+    test('should pass validation for card with ultimos_4_digitos', () => {
+      const validData = {
+        nombre: 'Visa Credit',
+        banco: 'Banco Nacion',
+        tipo: 'credito',
+        dia_mes_cierre: 15,
+        dia_mes_vencimiento: 10,
+        ultimos_4_digitos: '1234'
+      };
+      const errors = tarjetaService.validateTarjetaData(validData);
+
+      expect(errors).toHaveLength(0);
+    });
   });
 
   describe('normalizeTarjetaData', () => {
@@ -281,6 +295,21 @@ describe('TarjetaService', () => {
         dia_mes_cierre: null,
         dia_mes_vencimiento: null
       });
+    });
+
+    test('should preserve ultimos_4_digitos when normalizing', () => {
+      const cardData = {
+        nombre: '  Visa Credit  ',
+        banco: '  Banco Nacion  ',
+        tipo: 'credito',
+        dia_mes_cierre: 15,
+        dia_mes_vencimiento: 10,
+        ultimos_4_digitos: '5678'
+      };
+
+      const normalized = tarjetaService.normalizeTarjetaData(cardData);
+
+      expect(normalized.ultimos_4_digitos).toBe('5678');
     });
 
     test('should normalize credit card data', () => {

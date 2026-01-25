@@ -242,12 +242,36 @@ export class GastoRecurrenteService extends BaseService {
       adjustedDate: null
     };
 
-    // Check if already generated today
+    // Get frequency information first to determine how to check duplicates
+    const frecuencia = expense.frecuencia;
+    if (!frecuencia) {
+      result.reason = 'No frequency defined';
+      return result;
+    }
+
+    // Check if already generated (period depends on frequency)
     if (expense.ultima_fecha_generado) {
       const ultimaFecha = moment(expense.ultima_fecha_generado);
-      if (ultimaFecha.isSame(today, 'day')) {
-        result.reason = 'Already generated today';
-        return result;
+      const frecuenciaNombre = frecuencia.nombre_frecuencia?.toLowerCase();
+
+      // For monthly/biweekly frequencies, check if already generated this month
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this month';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        // For weekly, check if already generated this week
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this week';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        // For daily, check if already generated today
+        if (ultimaFecha.isSame(today, 'day')) {
+          result.reason = 'Already generated today';
+          return result;
+        }
       }
     }
 
@@ -258,13 +282,6 @@ export class GastoRecurrenteService extends BaseService {
         result.reason = 'Start date not reached';
         return result;
       }
-    }
-
-    // Get frequency information
-    const frecuencia = expense.frecuencia;
-    if (!frecuencia) {
-      result.reason = 'No frequency defined';
-      return result;
     }
 
     // Handle different frequency types

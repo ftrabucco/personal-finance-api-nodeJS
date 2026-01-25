@@ -3,7 +3,6 @@ import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, Gasto } fr
 import { InstallmentExpenseStrategy } from '../strategies/expenseGeneration/installmentStrategy.js';
 import { CreditCardDateService } from './creditCardDate.service.js';
 import ExchangeRateService from './exchangeRate.service.js';
-import { Op } from 'sequelize';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
 
@@ -390,7 +389,7 @@ export class ComprasService extends BaseService {
    * @param {Object} data - Purchase data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
    */
-  validatePurchaseData(data, isUpdate = false) {
+  validatePurchaseData(data, _isUpdate = false) {
     const errors = [];
 
     // Amount validation

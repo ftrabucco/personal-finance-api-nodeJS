@@ -332,7 +332,7 @@ export class ExpenseScheduler {
   /**
    * Actualiza las métricas de rendimiento
    */
-  static updatePerformanceMetrics(startTime, success, results) {
+  static updatePerformanceMetrics(startTime, success, _results) {
     const duration = Date.now() - startTime;
 
     this.performanceMetrics.totalRuns++;
@@ -701,7 +701,7 @@ export class ExpenseScheduler {
   /**
    * Event emitter para extensiones futuras (Pub/Sub pattern)
    */
-  static emitGenerationComplete(summary, results) {
+  static emitGenerationComplete(summary, _results) {
     // Placeholder para futuras implementaciones event-driven
     // Aquí se podría integrar con sistemas como Redis Pub/Sub, EventEmitter, etc.
 

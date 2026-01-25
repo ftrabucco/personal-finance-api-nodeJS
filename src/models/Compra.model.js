@@ -91,6 +91,11 @@ export function defineCompra(sequelize) {
       defaultValue: true,
       comment: 'Indica si aún quedan cuotas por generar'
     },
+    fecha_ultima_cuota_generada: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Última fecha en que se generó una cuota desde esta compra'
+    },
     // 💱 Multi-currency fields
     moneda_origen: {
       type: DataTypes.ENUM('ARS', 'USD'),

@@ -535,7 +535,7 @@ export class GastoUnicoService extends BaseService {
 
     const sanitized = {};
     allowedFields.forEach(field => {
-      if (data.hasOwnProperty(field)) {
+      if (Object.prototype.hasOwnProperty.call(data, field)) {
         sanitized[field] = data[field];
       }
     });

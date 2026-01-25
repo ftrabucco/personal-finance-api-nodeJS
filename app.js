@@ -1,4 +1,4 @@
-import express, { json } from 'express';
+import express from 'express';
 const app = express();
 import { connectDatabase } from './src/db/postgres.js';
 import apiRouter from './src/routes/api/index.routes.js';

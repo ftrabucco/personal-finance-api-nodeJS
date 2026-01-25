@@ -1,5 +1,5 @@
 import { BaseController } from './base.controller.js';
-import { GastoRecurrente, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
+import { GastoRecurrente, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';

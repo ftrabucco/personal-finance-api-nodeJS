@@ -3,7 +3,7 @@ import { Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaG
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
-import { sendError, sendSuccess, sendPaginatedSuccess } from '../../utils/responseHelper.js';
+import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 
 export class GastoController extends BaseController {
   constructor() {

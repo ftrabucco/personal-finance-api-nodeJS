@@ -437,6 +437,12 @@ const tarjetaSchema = Joi.object({
       'any.required': 'El banco es requerido'
     }),
 
+  ultimos_4_digitos: Joi.string().length(4).pattern(/^\d{4}$/).optional().allow(null, '')
+    .messages({
+      'string.length': 'Debe ingresar exactamente 4 dígitos',
+      'string.pattern.base': 'Solo se permiten números'
+    }),
+
   dia_mes_cierre: Joi.when('tipo', {
     is: 'credito',
     then: Joi.number().integer().min(1).max(31).required()

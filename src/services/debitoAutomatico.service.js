@@ -243,11 +243,29 @@ export class DebitoAutomaticoService extends BaseService {
    * @returns {Object} Generation decision with reason
    */
   async shouldGenerateExpense(debit, today) {
-    // Check if already generated today
-    if (debit.ultima_fecha_generado) {
+    // Get frequency information first to determine how to check duplicates
+    const frecuencia = debit.frecuencia;
+
+    // Check if already generated (period depends on frequency)
+    if (debit.ultima_fecha_generado && frecuencia) {
       const ultimaFecha = moment(debit.ultima_fecha_generado).tz('America/Argentina/Buenos_Aires');
-      if (ultimaFecha.isSame(today, 'day')) {
-        return { should: false, reason: 'Already generated today' };
+      const frecuenciaNombre = frecuencia.nombre_frecuencia?.toLowerCase();
+
+      // For monthly/biweekly frequencies, check if already generated this month
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this month' };
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        // For weekly, check if already generated this week
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this week' };
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        // For daily, check if already generated today
+        if (ultimaFecha.isSame(today, 'day')) {
+          return { should: false, reason: 'Already generated today' };
+        }
       }
     }
 

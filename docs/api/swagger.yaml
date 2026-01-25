@@ -602,6 +602,14 @@ components:
           maxLength: 100
           description: Nombre del banco emisor
           example: "ICBC"
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: '^\d{4}$'
+          nullable: true
+          description: Últimos 4 dígitos de la tarjeta para identificación
+          example: "1234"
         dia_mes_cierre:
           type: integer
           minimum: 1
@@ -646,6 +654,13 @@ components:
           maxLength: 100
           description: Nombre del banco emisor
           example: "ICBC"
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: '^\d{4}$'
+          description: Últimos 4 dígitos de la tarjeta para identificación (opcional)
+          example: "1234"
         dia_mes_cierre:
           type: integer
           minimum: 1

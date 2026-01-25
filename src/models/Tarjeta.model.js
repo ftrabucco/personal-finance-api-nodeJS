@@ -8,6 +8,15 @@ export function defineTarjeta(sequelize) {
       autoIncrement: true
     },
     nombre: { type: DataTypes.STRING, allowNull: false },
+    ultimos_4_digitos: {
+      type: DataTypes.STRING(4),
+      allowNull: true,
+      validate: {
+        len: [4, 4],
+        isNumeric: true
+      },
+      comment: 'Últimos 4 dígitos de la tarjeta para identificación'
+    },
     tipo: {
       type: DataTypes.STRING,
       allowNull: false,

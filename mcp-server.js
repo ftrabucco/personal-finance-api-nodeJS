@@ -7,7 +7,6 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import cors from 'cors';
 import {
@@ -510,7 +509,8 @@ class FinanzasApiMCPServer {
             tipo: 'credito',
             banco: 'Banco Nación',
             dia_mes_cierre: 15,
-            dia_mes_vencimiento: 10
+            dia_mes_vencimiento: 10,
+            ultimos_4_digitos: '1234'
           },
           expected: {
             status: 201,
@@ -523,7 +523,8 @@ class FinanzasApiMCPServer {
                 banco: 'Banco Nación',
                 dia_mes_cierre: 15,
                 dia_mes_vencimiento: 10,
-                permite_cuotas: true
+                permite_cuotas: true,
+                ultimos_4_digitos: '1234'
               }
             }
           }
@@ -535,7 +536,8 @@ class FinanzasApiMCPServer {
           payload: {
             nombre: 'Mastercard Débito Test',
             tipo: 'debito',
-            banco: 'Banco Santander'
+            banco: 'Banco Santander',
+            ultimos_4_digitos: '5678'
           },
           expected: {
             status: 201,
@@ -548,7 +550,8 @@ class FinanzasApiMCPServer {
                 banco: 'Banco Santander',
                 dia_mes_cierre: null,
                 dia_mes_vencimiento: null,
-                permite_cuotas: false
+                permite_cuotas: false,
+                ultimos_4_digitos: '5678'
               }
             }
           }
@@ -845,7 +848,7 @@ class FinanzasApiMCPServer {
       case 'debito_automatico':
         schemaPath = 'src/validations/debitoAutomatico.validation.js';
         break;
-      case 'tarjeta':
+      case 'tarjeta': {
         // Tarjetas usan validation.middleware.js que contiene todos los esquemas de validación
         const validationPath = path.join(__dirname, 'src/middlewares/validation.middleware.js');
         const validationContent = await fs.readFile(validationPath, 'utf-8');
@@ -860,7 +863,8 @@ class FinanzasApiMCPServer {
             }
           ]
         };
-      default:
+      }
+      default: {
         // Retornar todos los esquemas
         const allSchemas = await Promise.all([
           fs.readFile(path.join(__dirname, 'src/validations/compra.validation.js'), 'utf-8'),
@@ -876,6 +880,7 @@ class FinanzasApiMCPServer {
             }
           ]
         };
+      }
       }
 
       const content = await fs.readFile(path.join(__dirname, schemaPath), 'utf-8');
@@ -955,6 +960,7 @@ class FinanzasApiMCPServer {
           description: 'Tarjetas con billing cycle logic for InstallmentStrategy + User isolation',
           fields: [
             'id (PK)', 'nombre', 'tipo (debito|credito|virtual)', 'banco',
+            'ultimos_4_digitos (últimos 4 dígitos para identificación - opcional)',
             'dia_mes_cierre (billing close - required for credito)',
             'dia_mes_vencimiento (due date - required for credito)',
             'permite_cuotas (auto-normalized by tipo)',
