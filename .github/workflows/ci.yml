@@ -96,6 +96,23 @@ jobs:
         env:
           PGPASSWORD: postgres123
 
+      - name: Sync database tables
+        run: |
+          node -e "
+            import('./src/models/index.js').then(async ({ sequelize }) => {
+              await sequelize.sync();
+              console.log('Tables synced!');
+              await sequelize.close();
+            });
+          "
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: finanzas_personal_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres123
+
       - name: Run database seed
         run: npm run seed-db:test
         env:
@@ -187,6 +204,23 @@ jobs:
           PGPASSWORD=postgres123 psql -h localhost -U postgres -d finanzas_personal_test -c "CREATE SCHEMA IF NOT EXISTS finanzas;"
         env:
           PGPASSWORD: postgres123
+
+      - name: Sync database tables
+        run: |
+          node -e "
+            import('./src/models/index.js').then(async ({ sequelize }) => {
+              await sequelize.sync();
+              console.log('Tables synced!');
+              await sequelize.close();
+            });
+          "
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: finanzas_personal_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres123
 
       - name: Run database seed
         run: npm run seed-db:test
