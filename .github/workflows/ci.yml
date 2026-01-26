@@ -100,6 +100,11 @@ jobs:
         run: npm run seed-db:test
         env:
           NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: finanzas_personal_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres123
 
       - name: Run tests
         run: npm test
@@ -187,6 +192,11 @@ jobs:
         run: npm run seed-db:test
         env:
           NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: finanzas_personal_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres123
 
       - name: Generate coverage report
         run: npm run test:coverage
