@@ -2,6 +2,8 @@ import { Sequelize } from 'sequelize';
 import logger from '../utils/logger.js';
 
 // Configuración para PostgreSQL
+const isProduction = process.env.NODE_ENV === 'production';
+
 const sequelize = new Sequelize({
   dialect: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -15,7 +17,14 @@ const sequelize = new Sequelize({
   dialectOptions: {
     useUTC: false, // No usar UTC para las fechas
     dateStrings: true, // Usar cadenas de fecha en lugar de objetos Date
-    typeCast: true // Permitir el casteo de tipos
+    typeCast: true, // Permitir el casteo de tipos
+    // SSL requerido para Render y otros proveedores cloud
+    ...(isProduction && {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    })
   },
   pool: {
     max: 5,
