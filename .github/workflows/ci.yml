@@ -90,6 +90,12 @@ jobs:
             sleep 2
           done
 
+      - name: Create database schema
+        run: |
+          PGPASSWORD=postgres123 psql -h localhost -U postgres -d finanzas_personal_test -c "CREATE SCHEMA IF NOT EXISTS finanzas;"
+        env:
+          PGPASSWORD: postgres123
+
       - name: Run database seed
         run: npm run seed-db:test
         env:
@@ -163,6 +169,19 @@ jobs:
           MCP_ENABLED=false
           LOG_LEVEL=error
           EOF
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+
+      - name: Create database schema
+        run: |
+          PGPASSWORD=postgres123 psql -h localhost -U postgres -d finanzas_personal_test -c "CREATE SCHEMA IF NOT EXISTS finanzas;"
+        env:
+          PGPASSWORD: postgres123
 
       - name: Run database seed
         run: npm run seed-db:test
