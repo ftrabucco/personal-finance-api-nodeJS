@@ -69,6 +69,11 @@ export function defineGastoRecurrente(sequelize) {
       allowNull: true,
       comment: 'Última fecha en que se generó un gasto a partir de este gasto recurrente'
     },
+    fecha_inicio: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Fecha a partir de la cual se empezará a generar el gasto recurrente'
+    },
     // 💱 Multi-currency fields
     moneda_origen: {
       type: DataTypes.ENUM('ARS', 'USD'),
