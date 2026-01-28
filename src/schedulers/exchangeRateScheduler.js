@@ -62,6 +62,9 @@ export class ExchangeRateScheduler {
       if (config.scheduler?.runOnStartup) {
         logger.info('🔄 Ejecutando actualización inicial de tipo de cambio...');
         setTimeout(() => this.executeDailyUpdate(), 5000);
+      } else {
+        // Siempre verificar si existe tipo de cambio al iniciar
+        setTimeout(() => this.ensureExchangeRateExists(), 5000);
       }
 
     } catch (error) {
@@ -360,6 +363,64 @@ export class ExchangeRateScheduler {
   static async executeManualUpdate() {
     logger.info('🔧 Ejecutando actualización manual de tipo de cambio...');
     await this.executeDailyUpdate();
+  }
+
+  /**
+   * Verifica si existe un tipo de cambio en la BD, si no existe lo carga
+   * Se ejecuta siempre al iniciar la app para asegurar que haya un TC disponible
+   */
+  static async ensureExchangeRateExists() {
+    try {
+      logger.info('💱 Verificando si existe tipo de cambio en la BD...');
+
+      // Intentar obtener el tipo de cambio actual
+      const tipoCambio = await ExchangeRateService.getCurrentRate();
+
+      if (tipoCambio) {
+        logger.info('✅ Tipo de cambio existente encontrado', {
+          fecha: tipoCambio.fecha,
+          venta: tipoCambio.valor_venta_usd_ars,
+          fuente: tipoCambio.fuente
+        });
+        return tipoCambio;
+      }
+    } catch (error) {
+      // Si no existe tipo de cambio, el servicio lanza error con código NO_EXCHANGE_RATE
+      if (error.code === 'NO_EXCHANGE_RATE') {
+        logger.warn('⚠️ No hay tipo de cambio configurado, cargando desde API...');
+
+        try {
+          // Intentar cargar desde DolarAPI
+          let tipoCambio = await ExchangeRateService.updateFromDolarAPI();
+
+          if (!tipoCambio) {
+            logger.warn('⚠️ DolarAPI falló, intentando con BCRA...');
+            tipoCambio = await ExchangeRateService.updateFromBCRAAPI();
+          }
+
+          if (tipoCambio) {
+            logger.info('✅ Tipo de cambio inicial cargado exitosamente', {
+              fecha: tipoCambio.fecha,
+              venta: tipoCambio.valor_venta_usd_ars,
+              fuente: tipoCambio.fuente
+            });
+            return tipoCambio;
+          } else {
+            logger.error('❌ No se pudo cargar tipo de cambio inicial desde ninguna API');
+          }
+        } catch (apiError) {
+          logger.error('❌ Error al cargar tipo de cambio inicial', {
+            error: apiError.message
+          });
+        }
+      } else {
+        logger.error('❌ Error inesperado al verificar tipo de cambio', {
+          error: error.message
+        });
+      }
+    }
+
+    return null;
   }
 }
 
