@@ -398,13 +398,26 @@ export class GastoRecurrenteService extends BaseService {
     }
 
     // CATCH-UP LOGIC: If never generated and we're past one of the valid days
+    // BUT only if that day is on or after fecha_inicio
     if (!expense.ultima_fecha_generado) {
       const lastValidDay = validDays.filter(d => d < diaActual).pop();
       if (lastValidDay) {
+        const catchUpDate = today.clone().date(lastValidDay);
+        // Check fecha_inicio constraint
+        if (expense.fecha_inicio) {
+          const fechaInicio = moment(expense.fecha_inicio);
+          if (catchUpDate.isBefore(fechaInicio, 'day')) {
+            return {
+              matches: false,
+              reason: `Biweekly frequency - catch-up day ${lastValidDay} is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+              adjustedDate: null
+            };
+          }
+        }
         return {
           matches: true,
           reason: `Biweekly frequency - catch-up for day ${lastValidDay} (never generated before, currently day ${diaActual})`,
-          adjustedDate: today.clone().date(lastValidDay).format('YYYY-MM-DD')
+          adjustedDate: catchUpDate.format('YYYY-MM-DD')
         };
       }
     }
@@ -445,7 +458,21 @@ export class GastoRecurrenteService extends BaseService {
     }
 
     // CATCH-UP LOGIC: If never generated before and target day has passed this month
+    // BUT only if the target day this month is ON or AFTER fecha_inicio
     if (!expense.ultima_fecha_generado && diaActual > adjustedDay) {
+      // If there's a fecha_inicio, check if the target day this month was after fecha_inicio
+      if (expense.fecha_inicio) {
+        const fechaInicio = moment(expense.fecha_inicio);
+        // The adjusted date (target day this month) must be on or after fecha_inicio
+        // Otherwise, the first generation should be next month
+        if (adjustedDate.isBefore(fechaInicio, 'day')) {
+          return {
+            matches: false,
+            reason: `Monthly frequency - target day ${targetDay} this month (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+            adjustedDate: null
+          };
+        }
+      }
       return {
         matches: true,
         reason: `Monthly frequency - catch-up for day ${targetDay} (never generated before, currently day ${diaActual})`,

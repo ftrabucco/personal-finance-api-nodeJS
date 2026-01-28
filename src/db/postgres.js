@@ -47,8 +47,8 @@ export async function connectDatabase() {
     await sequelize.authenticate();
     logger.info('Conexión a PostgreSQL establecida correctamente');
 
-    // Sincronizar modelos (en desarrollo)
-    if (process.env.NODE_ENV === 'development') {
+    // Sincronizar modelos (en desarrollo y producción, no en test)
+    if (process.env.NODE_ENV !== 'test') {
       await sequelize.sync({ alter: true });
       logger.info('Modelos sincronizados con PostgreSQL');
     }
