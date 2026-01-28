@@ -101,17 +101,17 @@ export class GastoRecurrenteController extends BaseController {
         transaction
       });
 
-      // 3. Intentar generar primer gasto si corresponde (business rule: job diario)
-      const gasto = await GastoGeneratorService.generateFromGastoRecurrente(gastoRecurrenteCompleto);
+      // 3. NO generar gasto inmediatamente - el scheduler lo hará cuando corresponda
+      // según fecha_inicio y dia_de_pago
 
       await transaction.commit();
       logger.info('Gasto recurrente creado exitosamente:', {
         gastoRecurrente_id: gastoRecurrente.id,
-        gasto_id: gasto?.id,
-        primera_generacion: !!gasto
+        fecha_inicio: gastoRecurrenteCompleto.fecha_inicio,
+        dia_de_pago: gastoRecurrenteCompleto.dia_de_pago
       });
 
-      return sendSuccess(res, { gastoRecurrente: gastoRecurrenteCompleto, gasto }, 201);
+      return sendSuccess(res, { gastoRecurrente: gastoRecurrenteCompleto }, 201);
     } catch (error) {
       await transaction.rollback();
       logger.error('Error al crear gasto recurrente:', { error });
