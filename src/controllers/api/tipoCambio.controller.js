@@ -31,6 +31,13 @@ export class TipoCambioController {
       });
     } catch (error) {
       logger.error('Error al obtener tipo de cambio actual:', { error: error.message });
+
+      // Manejar error específico de tipo de cambio no configurado
+      if (error.code === 'NO_EXCHANGE_RATE') {
+        return sendError(res, 404, 'No hay tipo de cambio configurado',
+          'Por favor configure un tipo de cambio manualmente o ejecute la actualización desde API');
+      }
+
       return sendError(res, 500, 'Error al obtener tipo de cambio', error.message);
     }
   }
@@ -248,6 +255,13 @@ export class TipoCambioController {
       });
     } catch (error) {
       logger.error('Error al convertir monto:', { error: error.message });
+
+      // Manejar error específico de tipo de cambio no configurado
+      if (error.code === 'NO_EXCHANGE_RATE') {
+        return sendError(res, 404, 'Tipo de cambio no disponible',
+          'No hay tipo de cambio configurado');
+      }
+
       return sendError(res, 500, 'Error al convertir monto', error.message);
     }
   }
