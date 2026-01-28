@@ -62,6 +62,14 @@ import {
 } from '../../controllers/api/tipoCambio.controller.js';
 
 import {
+  obtenerCategorias,
+  obtenerImportancias,
+  obtenerTiposPago,
+  obtenerFrecuencias,
+  obtenerTodosCatalogos
+} from '../../controllers/api/catalogo.controller.js';
+
+import {
   validateGastoFilters,
   validateIdParam,
   validateCreateGasto,
@@ -143,5 +151,12 @@ router.get('/tipo-cambio/historico', authenticateToken, obtenerHistoricoTipoCamb
 router.post('/tipo-cambio/manual', authenticateToken, configurarTipoCambioManual); // Configurar TC manualmente
 router.post('/tipo-cambio/actualizar', authenticateToken, actualizarTipoCambioDesdeAPI); // Actualizar desde API externa
 router.post('/tipo-cambio/convertir', authenticateToken, convertirMonto); // Convertir monto entre monedas
+
+// 📚 Rutas para Catálogos - Requieren autenticación
+router.get('/catalogos', authenticateToken, obtenerTodosCatalogos); // Todos los catálogos en una sola llamada
+router.get('/catalogos/categorias', authenticateToken, obtenerCategorias);
+router.get('/catalogos/importancias', authenticateToken, obtenerImportancias);
+router.get('/catalogos/tipos-pago', authenticateToken, obtenerTiposPago);
+router.get('/catalogos/frecuencias', authenticateToken, obtenerFrecuencias);
 
 export default router;
