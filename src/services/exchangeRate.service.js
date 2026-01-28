@@ -486,6 +486,61 @@ export class ExchangeRateService {
     this.cache.lastUpdate = null;
     logger.debug('Cache de tipo de cambio invalidado');
   }
+
+  /**
+   * Obtiene y guarda el tipo de cambio desde APIs externas
+   * Intenta DolarAPI primero, luego BCRA como fallback
+   * @returns {Promise<Object|null>} El tipo de cambio guardado o null si falla
+   */
+  static async fetchAndSaveFromExternalAPI() {
+    logger.info('💱 Obteniendo tipo de cambio desde API externa...');
+
+    // Intentar primero con DolarAPI (gratuita, más confiable)
+    let tipoCambio = await this.updateFromDolarAPI();
+
+    // Si falla, intentar con BCRA
+    if (!tipoCambio) {
+      logger.warn('⚠️ DolarAPI falló, intentando con BCRA...');
+      tipoCambio = await this.updateFromBCRAAPI();
+    }
+
+    if (tipoCambio) {
+      logger.info('✅ Tipo de cambio obtenido exitosamente', {
+        fecha: tipoCambio.fecha,
+        venta: tipoCambio.valor_venta_usd_ars,
+        fuente: tipoCambio.fuente
+      });
+    } else {
+      logger.error('❌ No se pudo obtener tipo de cambio de ninguna API externa');
+    }
+
+    return tipoCambio;
+  }
+
+  /**
+   * Verifica si existe un tipo de cambio, si no existe lo obtiene de API externa
+   * @returns {Promise<Object>} El tipo de cambio existente o recién obtenido
+   * @throws {Error} Si no existe y no se puede obtener de APIs
+   */
+  static async ensureExchangeRateExists() {
+    try {
+      return await this.getCurrentRate();
+    } catch (error) {
+      if (error.code === 'NO_EXCHANGE_RATE') {
+        logger.info('💱 No hay tipo de cambio configurado, obteniendo desde API...');
+        const tipoCambio = await this.fetchAndSaveFromExternalAPI();
+
+        if (!tipoCambio) {
+          const newError = new Error('No se pudo obtener tipo de cambio inicial');
+          newError.code = 'EXCHANGE_RATE_FETCH_FAILED';
+          throw newError;
+        }
+
+        return tipoCambio;
+      }
+      throw error;
+    }
+  }
 }
 
 export default ExchangeRateService;

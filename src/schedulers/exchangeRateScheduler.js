@@ -58,14 +58,9 @@ export class ExchangeRateScheduler {
         nextExecution: this.getNextExecutionTime()
       });
 
-      // Ejecutar una vez al inicio si está configurado
-      if (config.scheduler?.runOnStartup) {
-        logger.info('🔄 Ejecutando actualización inicial de tipo de cambio...');
-        setTimeout(() => this.executeDailyUpdate(), 5000);
-      } else {
-        // Siempre verificar si existe tipo de cambio al iniciar
-        setTimeout(() => this.ensureExchangeRateExists(), 5000);
-      }
+      // Nota: La inicialización del tipo de cambio se hace en el bootstrap
+      // (src/bootstrap/exchangeRate.bootstrap.js), no aquí.
+      // El scheduler solo se encarga de las actualizaciones diarias programadas.
 
     } catch (error) {
       logger.error('❌ Error al iniciar Exchange Rate Scheduler:', { error: error.message });
@@ -144,31 +139,20 @@ export class ExchangeRateScheduler {
 
   /**
    * Paso 1: Actualizar tipo de cambio desde API externa
+   * Usa el método centralizado del servicio
    */
   static async updateExchangeRateFromAPI() {
     logger.info('📡 Actualizando tipo de cambio desde API externa...');
 
     try {
-      // Intentar primero con DolarAPI (gratuita, más confiable)
-      let tipoCambio = await ExchangeRateService.updateFromDolarAPI();
-
-      // Si falla, intentar con BCRA
-      if (!tipoCambio) {
-        logger.warn('⚠️ DolarAPI falló, intentando con BCRA...');
-        tipoCambio = await ExchangeRateService.updateFromBCRAAPI();
-      }
+      // Usar método centralizado del servicio
+      const tipoCambio = await ExchangeRateService.fetchAndSaveFromExternalAPI();
 
       if (!tipoCambio) {
+        // Si fallan las APIs, intentar usar el último conocido
         logger.warn('⚠️ No se pudo actualizar TC desde APIs, usando último conocido');
-        tipoCambio = await ExchangeRateService.getCurrentRate();
+        return await ExchangeRateService.getCurrentRate();
       }
-
-      logger.info('✅ Tipo de cambio actualizado', {
-        fecha: tipoCambio.fecha,
-        compra: tipoCambio.valor_compra_usd_ars,
-        venta: tipoCambio.valor_venta_usd_ars,
-        fuente: tipoCambio.fuente
-      });
 
       return tipoCambio;
     } catch (error) {
@@ -363,64 +347,6 @@ export class ExchangeRateScheduler {
   static async executeManualUpdate() {
     logger.info('🔧 Ejecutando actualización manual de tipo de cambio...');
     await this.executeDailyUpdate();
-  }
-
-  /**
-   * Verifica si existe un tipo de cambio en la BD, si no existe lo carga
-   * Se ejecuta siempre al iniciar la app para asegurar que haya un TC disponible
-   */
-  static async ensureExchangeRateExists() {
-    try {
-      logger.info('💱 Verificando si existe tipo de cambio en la BD...');
-
-      // Intentar obtener el tipo de cambio actual
-      const tipoCambio = await ExchangeRateService.getCurrentRate();
-
-      if (tipoCambio) {
-        logger.info('✅ Tipo de cambio existente encontrado', {
-          fecha: tipoCambio.fecha,
-          venta: tipoCambio.valor_venta_usd_ars,
-          fuente: tipoCambio.fuente
-        });
-        return tipoCambio;
-      }
-    } catch (error) {
-      // Si no existe tipo de cambio, el servicio lanza error con código NO_EXCHANGE_RATE
-      if (error.code === 'NO_EXCHANGE_RATE') {
-        logger.warn('⚠️ No hay tipo de cambio configurado, cargando desde API...');
-
-        try {
-          // Intentar cargar desde DolarAPI
-          let tipoCambio = await ExchangeRateService.updateFromDolarAPI();
-
-          if (!tipoCambio) {
-            logger.warn('⚠️ DolarAPI falló, intentando con BCRA...');
-            tipoCambio = await ExchangeRateService.updateFromBCRAAPI();
-          }
-
-          if (tipoCambio) {
-            logger.info('✅ Tipo de cambio inicial cargado exitosamente', {
-              fecha: tipoCambio.fecha,
-              venta: tipoCambio.valor_venta_usd_ars,
-              fuente: tipoCambio.fuente
-            });
-            return tipoCambio;
-          } else {
-            logger.error('❌ No se pudo cargar tipo de cambio inicial desde ninguna API');
-          }
-        } catch (apiError) {
-          logger.error('❌ Error al cargar tipo de cambio inicial', {
-            error: apiError.message
-          });
-        }
-      } else {
-        logger.error('❌ Error inesperado al verificar tipo de cambio', {
-          error: error.message
-        });
-      }
-    }
-
-    return null;
   }
 }
 

@@ -15,6 +15,8 @@ import YAML from 'yamljs';
 import config from './src/config/environment.js';
 import security from './src/middlewares/security.middleware.js';
 import ExpenseScheduler from './src/schedulers/expenseScheduler.js';
+import ExchangeRateScheduler from './src/schedulers/exchangeRateScheduler.js';
+import { initializeExchangeRate } from './src/bootstrap/exchangeRate.bootstrap.js';
 
 // Middlewares de seguridad (antes que todo)
 app.use(security.cors);
@@ -79,7 +81,11 @@ async function startServer() {
     // Conectar a PostgreSQL
     await connectDatabase();
 
-    // Iniciar scheduler de gastos
+    // Bootstrap: Asegurar que exista tipo de cambio
+    await initializeExchangeRate();
+
+    // Iniciar schedulers
+    ExchangeRateScheduler.start();
     ExpenseScheduler.start();
 
     // Iniciar servidor
@@ -94,10 +100,17 @@ async function startServer() {
         logger.info(`🔗 MCP Server: http://localhost:${config.mcp.port}`);
       }
 
-      // Log del estado del scheduler
-      const schedulerStatus = ExpenseScheduler.getStatus();
-      if (schedulerStatus.isRunning) {
-        logger.info(`📅 Expense Scheduler: Activo (próxima ejecución: ${schedulerStatus.nextExecution})`);
+      // Log del estado de los schedulers
+      const exchangeRateStatus = ExchangeRateScheduler.getStats();
+      if (exchangeRateStatus.isRunning) {
+        logger.info(`💱 Exchange Rate Scheduler: Activo (próxima ejecución: ${exchangeRateStatus.nextExecution})`);
+      } else {
+        logger.info('💱 Exchange Rate Scheduler: Inactivo');
+      }
+
+      const expenseStatus = ExpenseScheduler.getStatus();
+      if (expenseStatus.isRunning) {
+        logger.info(`📅 Expense Scheduler: Activo (próxima ejecución: ${expenseStatus.nextExecution})`);
       } else {
         logger.info('📅 Expense Scheduler: Inactivo');
       }
