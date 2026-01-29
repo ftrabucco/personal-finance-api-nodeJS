@@ -57,59 +57,6 @@ export class TarjetaService extends BaseService {
   }
 
   /**
-   * Valida los datos específicos de una tarjeta según su tipo
-   * @param {Object} tarjetaData - Datos de la tarjeta
-   * @returns {Array} - Array de errores de validación
-   */
-  validateTarjetaData(tarjetaData) {
-    const errors = [];
-    const { tipo, dia_mes_cierre, dia_mes_vencimiento, nombre, banco } = tarjetaData;
-
-    // Validar campos requeridos
-    if (!nombre?.trim()) {
-      errors.push('El nombre de la tarjeta es requerido');
-    }
-
-    if (!banco?.trim()) {
-      errors.push('El banco es requerido');
-    }
-
-    if (!tipo) {
-      errors.push('El tipo de tarjeta es requerido');
-    }
-
-    // Validar tipo de tarjeta
-    const tiposValidos = ['debito', 'credito', 'virtual'];
-    if (tipo && !tiposValidos.includes(tipo)) {
-      errors.push(`Tipo de tarjeta inválido. Debe ser: ${tiposValidos.join(', ')}`);
-    }
-
-    // Validaciones específicas para tarjetas de crédito
-    if (tipo === 'credito') {
-      if (!dia_mes_cierre) {
-        errors.push('Las tarjetas de crédito requieren día de cierre');
-      } else if (dia_mes_cierre < 1 || dia_mes_cierre > 31) {
-        errors.push('El día de cierre debe estar entre 1 y 31');
-      }
-
-      if (!dia_mes_vencimiento) {
-        errors.push('Las tarjetas de crédito requieren día de vencimiento');
-      } else if (dia_mes_vencimiento < 1 || dia_mes_vencimiento > 31) {
-        errors.push('El día de vencimiento debe estar entre 1 y 31');
-      }
-    }
-
-    // Para tarjetas de débito, no deben tener fechas
-    if (tipo === 'debito') {
-      if (dia_mes_cierre || dia_mes_vencimiento) {
-        errors.push('Las tarjetas de débito no deben tener días de cierre o vencimiento');
-      }
-    }
-
-    return errors;
-  }
-
-  /**
    * Normaliza los datos de la tarjeta según su tipo
    * @param {Object} tarjetaData - Datos de la tarjeta
    * @returns {Object} - Datos normalizados

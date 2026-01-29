@@ -1,7 +1,7 @@
 import { BaseController } from './base.controller.js';
 import { Tarjeta } from '../../models/index.js';
 import { TarjetaService } from '../../services/tarjeta.service.js';
-import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
+import { sendError, sendSuccess, sendPaginatedSuccess } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 
 export class TarjetaController extends BaseController {
@@ -59,12 +59,6 @@ export class TarjetaController extends BaseController {
    */
   async create(req, res) {
     try {
-      // Validar datos específicos de tarjeta
-      const validationErrors = this.tarjetaService.validateTarjetaData(req.body);
-      if (validationErrors.length > 0) {
-        return sendValidationError(res, validationErrors);
-      }
-
       // Normalizar datos según tipo de tarjeta
       const normalizedData = this.tarjetaService.normalizeTarjetaData(req.body);
 
@@ -96,12 +90,6 @@ export class TarjetaController extends BaseController {
       const tarjeta = await this.tarjetaService.findByIdAndUser(req.params.id, req.user.id);
       if (!tarjeta) {
         return sendError(res, 404, 'Tarjeta no encontrada');
-      }
-
-      // Validar datos específicos de tarjeta
-      const validationErrors = this.tarjetaService.validateTarjetaData(req.body);
-      if (validationErrors.length > 0) {
-        return sendValidationError(res, validationErrors);
       }
 
       // Normalizar datos según tipo de tarjeta
