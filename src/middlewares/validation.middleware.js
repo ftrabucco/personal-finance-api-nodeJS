@@ -453,9 +453,9 @@ const tarjetaSchema = Joi.object({
         'number.max': 'El día de cierre debe ser entre 1 y 31',
         'any.required': 'Las tarjetas de crédito requieren día de cierre'
       }),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.any().valid(null).optional()
       .messages({
-        'any.unknown': 'Las tarjetas de débito no deben tener día de cierre'
+        'any.only': 'Las tarjetas de débito no deben tener día de cierre'
       })
   }),
 
@@ -469,9 +469,9 @@ const tarjetaSchema = Joi.object({
         'number.max': 'El día de vencimiento debe ser entre 1 y 31',
         'any.required': 'Las tarjetas de crédito requieren día de vencimiento'
       }),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.any().valid(null).optional()
       .messages({
-        'any.unknown': 'Las tarjetas de débito no deben tener día de vencimiento'
+        'any.only': 'Las tarjetas de débito no deben tener día de vencimiento'
       })
   }),
 
