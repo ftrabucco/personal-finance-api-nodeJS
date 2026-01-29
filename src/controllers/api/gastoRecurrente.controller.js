@@ -153,6 +153,31 @@ export class GastoRecurrenteController extends BaseController {
       // Limpiar datos del formulario (similar a GastoUnico)
       const cleanData = this.cleanFormData(req.body);
 
+      // 💱 Recalculate multi-currency if monto or moneda_origen changed
+      if (cleanData.monto !== undefined || cleanData.moneda_origen !== undefined) {
+        const monto = cleanData.monto || gastoRecurrente.monto;
+        const monedaOrigen = cleanData.moneda_origen || gastoRecurrente.moneda_origen || 'ARS';
+
+        try {
+          const { monto_ars, monto_usd, tipo_cambio_usado } =
+            await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+          cleanData.monto_ars = monto_ars;
+          cleanData.monto_usd = monto_usd;
+          cleanData.tipo_cambio_referencia = tipo_cambio_usado;
+
+          logger.debug('Multi-currency recalculated for GastoRecurrente update', {
+            id: gastoRecurrente.id, moneda_origen: monedaOrigen, monto, monto_ars, monto_usd
+          });
+        } catch (exchangeError) {
+          logger.warn('Exchange rate conversion failed during GastoRecurrente update', {
+            error: exchangeError.message
+          });
+          cleanData.monto_ars = monto;
+          cleanData.monto_usd = null;
+        }
+      }
+
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== gastoRecurrente.activo) {
         logger.info('Cambiando estado de gasto recurrente:', {

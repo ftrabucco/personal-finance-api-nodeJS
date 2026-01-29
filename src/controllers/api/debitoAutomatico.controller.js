@@ -153,6 +153,31 @@ export class DebitoAutomaticoController extends BaseController {
       // Limpiar datos del formulario (similar a GastoRecurrente)
       const cleanData = this.cleanFormData(req.body);
 
+      // 💱 Recalculate multi-currency if monto or moneda_origen changed
+      if (cleanData.monto !== undefined || cleanData.moneda_origen !== undefined) {
+        const monto = cleanData.monto || debitoAutomatico.monto;
+        const monedaOrigen = cleanData.moneda_origen || debitoAutomatico.moneda_origen || 'ARS';
+
+        try {
+          const { monto_ars, monto_usd, tipo_cambio_usado } =
+            await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+          cleanData.monto_ars = monto_ars;
+          cleanData.monto_usd = monto_usd;
+          cleanData.tipo_cambio_referencia = tipo_cambio_usado;
+
+          logger.debug('Multi-currency recalculated for DebitoAutomatico update', {
+            id: debitoAutomatico.id, moneda_origen: monedaOrigen, monto, monto_ars, monto_usd
+          });
+        } catch (exchangeError) {
+          logger.warn('Exchange rate conversion failed during DebitoAutomatico update', {
+            error: exchangeError.message
+          });
+          cleanData.monto_ars = monto;
+          cleanData.monto_usd = null;
+        }
+      }
+
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== debitoAutomatico.activo) {
         logger.info('Cambiando estado de débito automático:', {
