@@ -303,17 +303,208 @@ Sistema de middleware para proteger rutas y extraer información del usuario.
 
 ---
 
-## 4. Consideraciones Generales
+## 4. Sistema Multi-Moneda (USD/ARS)
 
-- **Origen de los gastos:**  
-  Cada gasto real en `gastos` debe tener:  
-  - `tipo_origen`: ("gasto_unico", "recurrente", "debito", "compra").  
+### 4.1 Arquitectura General
+El sistema soporta dual currency (ARS y USD) con conversión automática y almacenamiento de snapshot histórico del tipo de cambio.
+
+**Principios de diseño:**
+- **Dual Storage:** Cada transacción almacena tanto `monto_ars` como `monto_usd`
+- **Snapshot histórico:** Tipo de cambio usado se guarda para integridad temporal
+- **Moneda origen:** Se registra en qué moneda se ingresó originalmente el monto
+- **Cálculo automático:** Backend calcula la conversión, usuario solo envía `monto` + `moneda_origen`
+
+### 4.2 Modelo de Datos
+
+**Campos añadidos a todas las entidades de gastos:**
+
+**Para GastoUnico, GastoRecurrente, DebitoAutomatico:**
+```javascript
+{
+  monto: DECIMAL(10,2),              // Monto en moneda original
+  moneda_origen: ENUM('ARS','USD'),  // Moneda en que se ingresó (default: 'ARS')
+  monto_ars: DECIMAL(10,2),          // Calculado automáticamente por el backend
+  monto_usd: DECIMAL(10,2),          // Calculado automáticamente por el backend
+  tipo_cambio_usado: DECIMAL(10,2)  // Snapshot del TC al momento de creación/actualización
+}
+```
+
+**Para Compra:**
+```javascript
+{
+  monto_total: DECIMAL(10,2),             // Monto total en moneda original
+  moneda_origen: ENUM('ARS','USD'),       // Moneda en que se ingresó
+  monto_total_ars: DECIMAL(10,2),         // Calculado automáticamente
+  monto_total_usd: DECIMAL(10,2),         // Calculado automáticamente
+  tipo_cambio_usado: DECIMAL(10,2)        // Snapshot del TC
+}
+```
+
+**Tabla TipoCambio (nueva):**
+```javascript
+{
+  id: INTEGER PRIMARY KEY,
+  fecha: DATE UNIQUE NOT NULL,          // Fecha del tipo de cambio
+  valor_compra: DECIMAL(10,2),          // Valor compra del dólar (lo que pagas para comprar USD)
+  valor_venta: DECIMAL(10,2),           // Valor venta del dólar (lo que recibes al vender USD)
+  fuente: VARCHAR(50),                  // Fuente: "BCRA", "DolarAPI", "manual"
+  createdAt: TIMESTAMP,
+  updatedAt: TIMESTAMP
+}
+```
+
+### 4.3 Reglas de Conversión
+
+**Conversión ARS → USD:**
+```javascript
+monto_usd = monto_ars / tipo_cambio_venta
+```
+
+**Conversión USD → ARS:**
+```javascript
+monto_ars = monto_usd * tipo_cambio_venta
+```
+
+**Tipo de cambio usado:**
+- Para gastos en ARS: usa `valor_venta` (lo que pagarías para comprar USD)
+- Para gastos en USD: usa `valor_venta` (asume que gastas dólares que ya tenías)
+
+### 4.4 Actualización de Tipos de Cambio
+
+**Scheduler automático:**
+- **Frecuencia:** Diaria a las 00:00 AM (Argentina timezone)
+- **Job:** `ExchangeRateScheduler` (cron: `0 0 * * *`)
+- **Fuentes consultadas (en orden):**
+  1. **DolarAPI.com** (primaria) - Dólar Blue
+  2. **BCRA** (fallback) - Si falla DolarAPI
+- **Comportamiento:**
+  - Solo crea registro si no existe para esa fecha
+  - No sobreescribe tipos de cambio existentes
+  - Si ambas fuentes fallan, no crea registro (usa el último disponible)
+
+**Actualización manual:**
+- **Endpoint:** `POST /api/tipo-cambio/actualizar`
+- **Uso:** Forzar actualización inmediata desde APIs externas
+- **Casos de uso:** Testing, recuperación de fallos del scheduler
+
+**Carga manual:**
+- **Endpoint:** `POST /api/tipo-cambio`
+- **Uso:** Crear TC manualmente (correcciones, datos históricos)
+- **Validación:** fecha, valor_compra, valor_venta obligatorios y positivos
+
+### 4.5 Comportamiento por Tipo de Entidad
+
+**GastoUnico:**
+- **CREATE:** Conversión usando TC de la fecha del gasto (con fallback si no existe)
+- **UPDATE:** Recalcula montos si cambia `monto` o `moneda_origen` (nuevo snapshot de TC)
+- **Snapshot:** TC usado permanece constante (integridad histórica)
+
+**GastoRecurrente y DebitoAutomatico:**
+- **CREATE:** Conversión inicial con TC actual
+- **UPDATE (diario):** El scheduler actualiza `monto_ars` y `monto_usd` con TC actual cada día
+  - Campo `tipo_cambio_referencia` se actualiza diariamente
+  - Permite que suscripciones en USD reflejen el costo ARS actual
+- **Generación de gasto real:** Cada gasto generado usa el TC del día de generación (nuevo snapshot)
+
+**Compra:**
+- **CREATE:** Conversión del `monto_total` con TC actual
+- **Cuotas:** Cada cuota generada usa el TC del día de generación
+  - Permite que cuotas en USD reflejen el valor ARS al momento del pago
+  - Cada cuota tiene su propio snapshot de TC en la tabla `gastos`
+
+### 4.6 Validación de Datos de Usuario
+
+**Campos permitidos en requests:**
+```javascript
+{
+  monto: 100.00,              // Requerido
+  moneda_origen: "USD"        // Opcional (default: "ARS")
+}
+```
+
+**Campos prohibidos (calculados por backend):**
+```javascript
+{
+  monto_ars: Joi.forbidden(),           // Error 400 si se envía
+  monto_usd: Joi.forbidden(),           // Error 400 si se envía
+  tipo_cambio_usado: Joi.forbidden()    // Error 400 si se envía
+}
+```
+
+**Razones:**
+- Evita inconsistencias en conversiones
+- Backend es single source of truth
+- Previene manipulación de datos calculados
+- Simplifica la API para el cliente
+
+### 4.7 Obtención de Tipos de Cambio
+
+**Estrategia de fallback:**
+1. Buscar TC exacto para la fecha solicitada
+2. Si no existe → buscar el TC más cercano anterior
+3. Si no hay anterior → error 404
+
+**Caché:**
+- **ExchangeRateService** mantiene caché en memoria (1 hora)
+- Reduce consultas a BD para conversiones frecuentes
+- Se invalida al crear/actualizar TC
+
+**Endpoints disponibles:**
+- `GET /api/tipo-cambio/actual` - TC más reciente
+- `GET /api/tipo-cambio/fecha/:fecha` - TC de fecha específica (con fallback)
+- `GET /api/tipo-cambio/:id` - TC por ID
+- `GET /api/tipo-cambio?fecha_desde=...&fecha_hasta=...` - Historial con filtros
+
+### 4.8 Impacto en Reportes y Análisis
+
+**Consultas y filtros:**
+- Endpoints de gastos soportan filtros por `monto_min_ars`, `monto_max_ars`, `monto_min_usd`, `monto_max_usd`
+- Resúmenes (`/api/gastos/summary`) incluyen totales en ambas monedas
+- Ordenamiento posible por `monto_ars` o `monto_usd`
+
+**Integridad histórica:**
+- Gastos pasados mantienen su conversión original (snapshot)
+- No se recalculan aunque cambie el TC actual
+- Permite análisis temporal preciso del gasto real al momento de la transacción
+
+**Ejemplo de análisis:**
+```javascript
+// Gasto creado el 15/01/2024 con TC=1000
+{
+  monto: 100,
+  moneda_origen: "USD",
+  monto_usd: 100,
+  monto_ars: 100000,  // Snapshot: 100 * 1000
+  tipo_cambio_usado: 1000
+}
+
+// El 20/01/2024 el TC sube a 1100
+// El gasto sigue mostrando monto_ars: 100000
+// Nuevo gasto de USD 100 mostraría monto_ars: 110000
+```
+
+### 4.9 Testing y Validación
+
+**Casos de prueba críticos:**
+1. Crear gasto en USD → verificar conversión a ARS correcta
+2. Crear gasto en ARS → verificar conversión a USD correcta
+3. Intentar enviar `monto_ars` explícito → debe rechazarse (400)
+4. Actualizar TC actual → gastos pasados no deben cambiar
+5. Gastos recurrentes → deben actualizarse con TC actual diariamente
+6. Cuotas en USD → cada cuota debe usar TC del día de generación
+7. Fallback de TC → si no existe fecha exacta, usar anterior
+8. APIs externas fallan → debe usar último TC disponible sin crash
+
+---
+
+## 5. Consideraciones Generales
+
+- **Origen de los gastos:**
+  Cada gasto real en `gastos` debe tener:
+  - `tipo_origen`: ("gasto_unico", "recurrente", "debito", "compra").
   - `id_origen`: referencia al registro en su tabla origen.
 
-- **Moneda (ARS/USD):**  
-  Pendiente definir estrategia:  
-  - Opción 1: almacenar ambos campos (`monto_ars`, `monto_usd`) y calcular uno en base al otro con la cotización actual.  
-  - Opción 2: almacenar solo la moneda original y calcular conversiones en consultas.  
-  (Revisar impacto en históricos por inflación/devaluación).
+- **Sistema Multi-Moneda:**
+  Ver sección 4 para detalles completos del sistema multi-moneda USD/ARS.
 
 ---

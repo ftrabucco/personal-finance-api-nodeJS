@@ -1,6 +1,7 @@
 import { BaseController } from './base.controller.js';
 import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, Gasto } from '../../models/index.js';
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
+import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
@@ -47,12 +48,47 @@ export class CompraController extends BaseController {
         return sendError(res, 400, 'Campos inválidos', validationResult.message);
       }
 
-      // 1. Crear la compra - siempre marcar como pendiente inicialmente
-      const compra = await this.model.create({
+      // 💱 Calculate multi-currency fields
+      const montoTotal = req.body.monto_total;
+      const monedaOrigen = req.body.moneda_origen || 'ARS';
+
+      let compraData = {
         ...req.body,
         usuario_id: req.user.id,
-        pendiente_cuotas: true
-      }, { transaction });
+        pendiente_cuotas: true,
+        moneda_origen: monedaOrigen
+      };
+
+      // Calculate monto_total_ars, monto_total_usd, tipo_cambio_usado
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(montoTotal, monedaOrigen);
+
+        compraData = {
+          ...compraData,
+          monto_total_ars: monto_ars,
+          monto_total_usd: monto_usd,
+          tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to Compra', {
+          moneda_origen: monedaOrigen,
+          monto_total: montoTotal,
+          monto_total_ars: monto_ars,
+          monto_total_usd: monto_usd,
+          tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        logger.warn('Exchange rate conversion failed for Compra', {
+          error: exchangeError.message
+        });
+        // Fallback: assume ARS
+        compraData.monto_total_ars = montoTotal;
+        compraData.monto_total_usd = null;
+      }
+
+      // 1. Crear la compra - siempre marcar como pendiente inicialmente
+      const compra = await this.model.create(compraData, { transaction });
 
       // 2. Recargar con includes para tener datos completos
       const compraCompleta = await this.model.findByPk(compra.id, {

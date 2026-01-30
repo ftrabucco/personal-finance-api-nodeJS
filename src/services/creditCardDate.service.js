@@ -90,7 +90,7 @@ export class CreditCardDateService {
    * @param {moment.Moment} fechaReferencia - Fecha de referencia
    * @returns {moment.Moment} Fecha de vencimiento
    */
-  static calculateSubsequentInstallmentDueDate(fechaCompra, tarjeta, cuotaNumero, fechaReferencia) {
+  static calculateSubsequentInstallmentDueDate(fechaCompra, tarjeta, cuotaNumero, _fechaReferencia) {
     const diaVencimiento = tarjeta.dia_mes_vencimiento;
 
     // Calcular la fecha de vencimiento de la primera cuota

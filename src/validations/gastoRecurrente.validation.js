@@ -11,7 +11,13 @@ export const createGastoRecurrenteSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive().required(),
   tipo_pago_id: Joi.number().integer().positive().required(),
   tarjeta_id: Joi.number().integer().positive().optional().allow(null),
-  activo: Joi.boolean().default(true)
+  activo: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  // Estos campos son calculados por el backend:
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
 });
 
 export const updateGastoRecurrenteSchema = Joi.object({
@@ -25,5 +31,11 @@ export const updateGastoRecurrenteSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive(),
   tipo_pago_id: Joi.number().integer().positive(),
   tarjeta_id: Joi.number().integer().positive().allow(null),
-  activo: Joi.boolean()
+  activo: Joi.boolean(),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD'),
+  // Estos campos son calculados por el backend:
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
 });

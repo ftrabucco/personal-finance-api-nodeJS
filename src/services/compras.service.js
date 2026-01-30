@@ -2,7 +2,7 @@ import { BaseService } from './base.service.js';
 import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, Gasto } from '../models/index.js';
 import { InstallmentExpenseStrategy } from '../strategies/expenseGeneration/installmentStrategy.js';
 import { CreditCardDateService } from './creditCardDate.service.js';
-import { Op } from 'sequelize';
+import ExchangeRateService from './exchangeRate.service.js';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
 
@@ -57,18 +57,60 @@ export class ComprasService extends BaseService {
   /**
    * Create purchase with validation and automatic installment setup
    * Sets up purchase for future installment generation
+   * 💱 Handles multi-currency conversion automatically
    */
   async create(data) {
     // Validate purchase data
     this.validatePurchaseData(data);
 
+    // 💱 Calculate both currencies based on moneda_origen
+    const monedaOrigen = data.moneda_origen || 'ARS';
+    const montoTotal = data.monto_total;
+
     // Set default values for purchases
-    const processedData = {
+    let processedData = {
       ...data,
+      moneda_origen: monedaOrigen,
       cantidad_cuotas: data.cantidad_cuotas || 1,
       pendiente_cuotas: true,
       fecha_ultima_cuota_generada: null
     };
+
+    // Only calculate if not already provided
+    if (!data.monto_total_ars || !data.monto_total_usd) {
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(montoTotal, monedaOrigen);
+
+        processedData = {
+          ...processedData,
+          monto_total_ars: monto_ars,
+          monto_total_usd: monto_usd,
+          tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to Compra', {
+          moneda_origen: monedaOrigen,
+          monto_original: montoTotal,
+          monto_total_ars: monto_ars,
+          monto_total_usd: monto_usd,
+          tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        // If exchange rate service fails, use backward compatibility
+        logger.warn('Exchange rate conversion failed, using backward compatibility', {
+          error: exchangeError.message
+        });
+
+        if (monedaOrigen === 'ARS') {
+          processedData.monto_total_ars = montoTotal;
+          processedData.monto_total_usd = null;
+        } else {
+          processedData.monto_total_ars = montoTotal; // Fallback
+          processedData.monto_total_usd = null;
+        }
+      }
+    }
 
     // Validate purchase date is not in future
     const today = moment().tz('America/Argentina/Buenos_Aires');
@@ -80,10 +122,12 @@ export class ComprasService extends BaseService {
 
     const purchase = await super.create(processedData);
 
-    logger.info('Purchase created successfully', {
+    logger.info('Purchase created successfully (multi-currency)', {
       id: purchase.id,
       descripcion: purchase.descripcion,
-      monto_total: purchase.monto_total,
+      monto_total_ars: purchase.monto_total_ars,
+      monto_total_usd: purchase.monto_total_usd,
+      moneda_origen: purchase.moneda_origen,
       cantidad_cuotas: purchase.cantidad_cuotas,
       fecha_compra: purchase.fecha_compra
     });
@@ -197,6 +241,7 @@ export class ComprasService extends BaseService {
 
   /**
    * Get purchase installment summary
+   * 💱 Includes multi-currency information
    */
   async getInstallmentSummary(id) {
     const purchase = await this.findById(id);
@@ -207,13 +252,30 @@ export class ComprasService extends BaseService {
     const generatedCount = await this.getGeneratedInstallmentsCount(id);
     const totalInstallments = purchase.cantidad_cuotas;
     const remainingInstallments = totalInstallments - generatedCount;
-    const installmentAmount = purchase.monto_total / totalInstallments;
+
+    // 💱 Calculate installment amount in both currencies
+    const montoTotalARS = purchase.monto_total_ars || purchase.monto_total;
+    const montoTotalUSD = purchase.monto_total_usd;
+
+    const installmentAmountARS = Math.round((montoTotalARS / totalInstallments) * 100) / 100;
+    const installmentAmountUSD = montoTotalUSD
+      ? Math.round((montoTotalUSD / totalInstallments) * 100) / 100
+      : null;
 
     return {
       purchase_id: id,
       descripcion: purchase.descripcion,
+      // Legacy field for backward compatibility
       monto_total: purchase.monto_total,
-      installment_amount: Math.round(installmentAmount * 100) / 100,
+      installment_amount: installmentAmountARS,
+      // 💱 Multi-currency fields
+      moneda_origen: purchase.moneda_origen || 'ARS',
+      monto_total_ars: montoTotalARS,
+      monto_total_usd: montoTotalUSD,
+      installment_amount_ars: installmentAmountARS,
+      installment_amount_usd: installmentAmountUSD,
+      tipo_cambio_usado: purchase.tipo_cambio_usado,
+      // Summary info
       total_installments: totalInstallments,
       generated_count: generatedCount,
       remaining_count: remainingInstallments,
@@ -327,7 +389,7 @@ export class ComprasService extends BaseService {
    * @param {Object} data - Purchase data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
    */
-  validatePurchaseData(data, isUpdate = false) {
+  validatePurchaseData(data, _isUpdate = false) {
     const errors = [];
 
     // Amount validation

@@ -55,7 +55,7 @@ export class AuthService extends BaseService {
         const error = new Error('JWT_SECRET must be changed from default value in production');
         logger.error('Security Error: Using default JWT_SECRET in production', {
           env: process.env.NODE_ENV,
-          secret: this.JWT_SECRET
+          secretLength: this.JWT_SECRET.length
         });
         throw error;
       }

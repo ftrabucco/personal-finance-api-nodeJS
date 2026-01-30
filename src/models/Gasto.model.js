@@ -32,6 +32,17 @@ export function defineGasto(sequelize) {
         isDecimal: true
       }
     },
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: true,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se ingresó originalmente el gasto'
+    },
+    tipo_cambio_usado: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio usado para la conversión (snapshot histórico)'
+    },
     descripcion: {
       type: DataTypes.STRING(255),
       allowNull: false,

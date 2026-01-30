@@ -1,6 +1,6 @@
 import { BaseController } from './base.controller.js';
-import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto, Gasto } from '../../models/index.js';
-import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
+import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
+import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
@@ -49,13 +49,47 @@ export class DebitoAutomaticoController extends BaseController {
         return sendError(res, 400, 'Campos inválidos', validationResult.message);
       }
 
-      // 1. Crear el débito automático
-      const debitoAutomatico = await this.model.create({
+      // 💱 Calculate multi-currency fields
+      const monto = req.body.monto;
+      const monedaOrigen = req.body.moneda_origen || 'ARS';
+
+      let debitoData = {
         ...req.body,
         usuario_id: req.user.id,
-        activo: true, // Por defecto activo
-        ultima_fecha_generado: null // Inicialmente no se ha generado ningún gasto
-      }, {
+        activo: true,
+        ultima_fecha_generado: null,
+        moneda_origen: monedaOrigen
+      };
+
+      // Calculate monto_ars, monto_usd, tipo_cambio_referencia
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        debitoData = {
+          ...debitoData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado  // Note: 'referencia' for debitos
+        };
+
+        logger.debug('Multi-currency conversion applied to DebitoAutomatico', {
+          moneda_origen: monedaOrigen,
+          monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        logger.warn('Exchange rate conversion failed for DebitoAutomatico', {
+          error: exchangeError.message
+        });
+        debitoData.monto_ars = monto;
+        debitoData.monto_usd = null;
+      }
+
+      // 1. Crear el débito automático
+      const debitoAutomatico = await this.model.create(debitoData, {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });
@@ -118,6 +152,31 @@ export class DebitoAutomaticoController extends BaseController {
 
       // Limpiar datos del formulario (similar a GastoRecurrente)
       const cleanData = this.cleanFormData(req.body);
+
+      // 💱 Recalculate multi-currency if monto or moneda_origen changed
+      if (cleanData.monto !== undefined || cleanData.moneda_origen !== undefined) {
+        const monto = cleanData.monto || debitoAutomatico.monto;
+        const monedaOrigen = cleanData.moneda_origen || debitoAutomatico.moneda_origen || 'ARS';
+
+        try {
+          const { monto_ars, monto_usd, tipo_cambio_usado } =
+            await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+          cleanData.monto_ars = monto_ars;
+          cleanData.monto_usd = monto_usd;
+          cleanData.tipo_cambio_referencia = tipo_cambio_usado;
+
+          logger.debug('Multi-currency recalculated for DebitoAutomatico update', {
+            id: debitoAutomatico.id, moneda_origen: monedaOrigen, monto, monto_ars, monto_usd
+          });
+        } catch (exchangeError) {
+          logger.warn('Exchange rate conversion failed during DebitoAutomatico update', {
+            error: exchangeError.message
+          });
+          cleanData.monto_ars = monto;
+          cleanData.monto_usd = null;
+        }
+      }
 
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== debitoAutomatico.activo) {

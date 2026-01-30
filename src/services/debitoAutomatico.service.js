@@ -1,5 +1,6 @@
 import { BaseService } from './base.service.js';
 import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../models/index.js';
+import ExchangeRateService from './exchangeRate.service.js';
 import { Op } from 'sequelize';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
@@ -56,24 +57,68 @@ export class DebitoAutomaticoService extends BaseService {
   /**
    * Create automatic debit with validation
    * Adds business logic specific to automatic debits
+   * 💱 Handles multi-currency conversion automatically
    */
   async create(data) {
     // Validate automatic debit specific rules
     this.validateAutomaticDebitData(data);
 
+    // 💱 Calculate both currencies based on moneda_origen
+    const monedaOrigen = data.moneda_origen || 'ARS';
+    const monto = data.monto;
+
     // Set default values for automatic debits
-    const processedData = {
+    let processedData = {
       ...data,
+      moneda_origen: monedaOrigen,
       activo: data.activo ?? true,
       ultima_fecha_generado: null
     };
 
+    // Only calculate if not already provided
+    if (!data.monto_ars || !data.monto_usd) {
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        processedData = {
+          ...processedData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to DebitoAutomatico', {
+          moneda_origen: monedaOrigen,
+          monto_original: monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        // If exchange rate service fails, use backward compatibility
+        logger.warn('Exchange rate conversion failed, using backward compatibility', {
+          error: exchangeError.message
+        });
+
+        if (monedaOrigen === 'ARS') {
+          processedData.monto_ars = monto;
+          processedData.monto_usd = null;
+        } else {
+          processedData.monto_ars = monto; // Fallback
+          processedData.monto_usd = null;
+        }
+      }
+    }
+
     const automaticDebit = await super.create(processedData);
 
-    logger.info('Automatic debit created successfully', {
+    logger.info('Automatic debit created successfully (multi-currency)', {
       id: automaticDebit.id,
       descripcion: automaticDebit.descripcion,
-      monto: automaticDebit.monto,
+      monto_ars: automaticDebit.monto_ars,
+      monto_usd: automaticDebit.monto_usd,
+      moneda_origen: automaticDebit.moneda_origen,
       frecuencia_id: automaticDebit.frecuencia_gasto_id
     });
 
@@ -198,11 +243,29 @@ export class DebitoAutomaticoService extends BaseService {
    * @returns {Object} Generation decision with reason
    */
   async shouldGenerateExpense(debit, today) {
-    // Check if already generated today
-    if (debit.ultima_fecha_generado) {
+    // Get frequency information first to determine how to check duplicates
+    const frecuencia = debit.frecuencia;
+
+    // Check if already generated (period depends on frequency)
+    if (debit.ultima_fecha_generado && frecuencia) {
       const ultimaFecha = moment(debit.ultima_fecha_generado).tz('America/Argentina/Buenos_Aires');
-      if (ultimaFecha.isSame(today, 'day')) {
-        return { should: false, reason: 'Already generated today' };
+      const frecuenciaNombre = frecuencia.nombre_frecuencia?.toLowerCase();
+
+      // For monthly/biweekly frequencies, check if already generated this month
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this month' };
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        // For weekly, check if already generated this week
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this week' };
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        // For daily, check if already generated today
+        if (ultimaFecha.isSame(today, 'day')) {
+          return { should: false, reason: 'Already generated today' };
+        }
       }
     }
 
@@ -261,7 +324,7 @@ export class DebitoAutomaticoService extends BaseService {
       return { matches: false, reason: 'No frequency configured' };
     }
 
-    const frecuenciaNombre = debit.frecuencia.nombre.toLowerCase();
+    const frecuenciaNombre = debit.frecuencia.nombre_frecuencia.toLowerCase();
     const diaConfigurido = debit.dia_de_pago;
     const mesConfigurado = debit.mes_de_pago;
 
@@ -277,7 +340,7 @@ export class DebitoAutomaticoService extends BaseService {
     case 'diaria':
       return { matches: true, reason: 'Daily frequency matches' };
 
-    case 'semanal':
+    case 'semanal': {
       // Weekly: check if it's the same day of week as configured
       if (diaConfigurido >= 0 && diaConfigurido <= 6) {
         const matches = today.day() === diaConfigurido;
@@ -288,14 +351,14 @@ export class DebitoAutomaticoService extends BaseService {
       }
       // Fallback to day of month for backwards compatibility
       const weeklyTolerance = this.calculateDateTolerance(today, 'semanal');
-      const matches = this.checkDayWithTolerance(today, diaConfigurido, weeklyTolerance);
+      const weeklyMatches = this.checkDayWithTolerance(today, diaConfigurido, weeklyTolerance);
       return {
-        matches: matches.matches,
-        reason: matches.matches ? 'Weekly frequency matches (day of month)' : matches.reason,
-        adjustedDate: matches.adjustedDate
+        matches: weeklyMatches.matches,
+        reason: weeklyMatches.matches ? 'Weekly frequency matches (day of month)' : weeklyMatches.reason,
+        adjustedDate: weeklyMatches.adjustedDate
       };
-
-    case 'quincenal':
+    }
+    case 'quincenal': {
       // Biweekly: 1st and 15th of month, or every 14 days from start
       if (debit.fecha_inicio) {
         const fechaInicio = moment(debit.fecha_inicio).tz('America/Argentina/Buenos_Aires');
@@ -312,8 +375,8 @@ export class DebitoAutomaticoService extends BaseService {
         matches: biweeklyMatches,
         reason: biweeklyMatches ? 'Biweekly frequency matches (1st/15th)' : 'Not 1st or 15th of month'
       };
-
-    case 'mensual':
+    }
+    case 'mensual': {
       const monthlyTolerance = this.calculateDateTolerance(today, 'mensual');
       const monthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, monthlyTolerance);
       return {
@@ -321,7 +384,7 @@ export class DebitoAutomaticoService extends BaseService {
         reason: monthlyCheck.matches ? 'Monthly frequency matches' : monthlyCheck.reason,
         adjustedDate: monthlyCheck.adjustedDate
       };
-
+    }
     case 'bimestral':
       // Every 2 months
       if (debit.fecha_inicio) {
@@ -373,7 +436,7 @@ export class DebitoAutomaticoService extends BaseService {
       }
       return { matches: false, reason: 'Not on semiannual cycle' };
 
-    case 'anual':
+    case 'anual': {
       // Annual: check month and day
       if (mesConfigurado && today.month() + 1 !== mesConfigurado) {
         return { matches: false, reason: `Annual: current month ${today.month() + 1}, expected ${mesConfigurado}` };
@@ -385,7 +448,7 @@ export class DebitoAutomaticoService extends BaseService {
         reason: annualCheck.matches ? 'Annual frequency matches' : annualCheck.reason,
         adjustedDate: annualCheck.adjustedDate
       };
-
+    }
     default:
       return { matches: false, reason: `Unsupported frequency: ${frecuenciaNombre}` };
     }

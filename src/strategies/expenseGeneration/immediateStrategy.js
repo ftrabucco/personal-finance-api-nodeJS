@@ -5,6 +5,9 @@ import logger from '../../utils/logger.js';
 /**
  * Estrategia para gastos únicos - Generación inmediata
  * Los gastos únicos se procesan al momento de crearlos, sin programación
+ *
+ * 💱 Multi-currency: Los montos ya vienen calculados en el GastoUnico
+ * (se calculan al momento de crear el GastoUnico en el controller)
  */
 export class ImmediateExpenseStrategy extends BaseExpenseGenerationStrategy {
   async generate(gastoUnico, transaction = null) {
@@ -16,9 +19,13 @@ export class ImmediateExpenseStrategy extends BaseExpenseGenerationStrategy {
       // Normalizar fecha (YYYY-MM-DD)
       const fechaParaBD = new Date(gastoUnico.fecha).toISOString().split('T')[0];
 
+      // 💱 Usar montos ya calculados (vienen del GastoUnico con conversión hecha)
       const gastoData = this.createGastoData(gastoUnico, {
         fecha: fechaParaBD,
-        monto_ars: gastoUnico.monto
+        monto_ars: gastoUnico.monto_ars || gastoUnico.monto, // Backward compatibility
+        monto_usd: gastoUnico.monto_usd || null,
+        moneda_origen: gastoUnico.moneda_origen || 'ARS',
+        tipo_cambio_usado: gastoUnico.tipo_cambio_usado || null
       });
 
       const gasto = await Gasto.create(gastoData, {
@@ -26,9 +33,12 @@ export class ImmediateExpenseStrategy extends BaseExpenseGenerationStrategy {
         fields: Object.keys(gastoData)
       });
 
-      logger.info('Gasto generado con estrategia inmediata:', {
+      logger.info('Gasto generado con estrategia inmediata (multi-moneda):', {
         gasto_id: gasto.id,
-        gastoUnico_id: gastoUnico.id
+        gastoUnico_id: gastoUnico.id,
+        monto_ars: gasto.monto_ars,
+        monto_usd: gasto.monto_usd,
+        moneda_origen: gastoUnico.moneda_origen
       });
 
       return gasto;

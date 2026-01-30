@@ -76,7 +76,12 @@ const compraSchema = Joi.object({
       'number.integer': 'La cantidad de cuotas debe ser un número entero',
       'number.min': 'La cantidad de cuotas debe ser al menos 1',
       'number.max': 'La cantidad de cuotas no puede exceder 60'
-    })
+    }),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_total_ars: Joi.forbidden(),
+  monto_total_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
 }).unknown(false);
 
 const gastoRecurrenteSchema = Joi.object({
@@ -113,7 +118,12 @@ const gastoRecurrenteSchema = Joi.object({
       'date.base': 'La fecha de inicio debe ser una fecha válida',
       'date.format': 'La fecha de inicio debe estar en formato ISO'
     }),
-  activo: Joi.boolean().default(true)
+  activo: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
 }).unknown(false);
 
 const debitoAutomaticoSchema = Joi.object({
@@ -138,7 +148,12 @@ const debitoAutomaticoSchema = Joi.object({
       'number.positive': 'La frecuencia debe ser un ID válido',
       'any.required': 'La frecuencia es requerida'
     }),
-  activo: Joi.boolean().default(true)
+  activo: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
 }).unknown(false);
 
 const gastoUnicoSchema = Joi.object({
@@ -154,7 +169,12 @@ const gastoUnicoSchema = Joi.object({
       'date.format': 'La fecha debe estar en formato ISO',
       'date.max': 'La fecha no puede ser futura',
       'any.required': 'La fecha es requerida'
-    })
+    }),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
 }).unknown(false);
 
 const gastoUnicoFiltersSchema = Joi.object({
@@ -417,6 +437,12 @@ const tarjetaSchema = Joi.object({
       'any.required': 'El banco es requerido'
     }),
 
+  ultimos_4_digitos: Joi.string().length(4).pattern(/^\d{4}$/).optional().allow(null, '')
+    .messages({
+      'string.length': 'Debe ingresar exactamente 4 dígitos',
+      'string.pattern.base': 'Solo se permiten números'
+    }),
+
   dia_mes_cierre: Joi.when('tipo', {
     is: 'credito',
     then: Joi.number().integer().min(1).max(31).required()
@@ -427,9 +453,9 @@ const tarjetaSchema = Joi.object({
         'number.max': 'El día de cierre debe ser entre 1 y 31',
         'any.required': 'Las tarjetas de crédito requieren día de cierre'
       }),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.any().valid(null).optional()
       .messages({
-        'any.unknown': 'Las tarjetas de débito no deben tener día de cierre'
+        'any.only': 'Las tarjetas de débito no deben tener día de cierre'
       })
   }),
 
@@ -443,9 +469,9 @@ const tarjetaSchema = Joi.object({
         'number.max': 'El día de vencimiento debe ser entre 1 y 31',
         'any.required': 'Las tarjetas de crédito requieren día de vencimiento'
       }),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.any().valid(null).optional()
       .messages({
-        'any.unknown': 'Las tarjetas de débito no deben tener día de vencimiento'
+        'any.only': 'Las tarjetas de débito no deben tener día de vencimiento'
       })
   }),
 

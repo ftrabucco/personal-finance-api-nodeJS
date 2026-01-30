@@ -1,6 +1,4 @@
-import { Op } from 'sequelize';
-import moment from 'moment-timezone';
-import { Compra, GastoUnico, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../models/index.js';
+import { GastoUnico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../models/index.js';
 import { ImmediateExpenseStrategy } from '../strategies/expenseGeneration/immediateStrategy.js';
 import { RecurringExpenseStrategy } from '../strategies/expenseGeneration/recurringStrategy.js';
 import { AutomaticDebitExpenseStrategy } from '../strategies/expenseGeneration/automaticDebitStrategy.js';
@@ -10,6 +8,7 @@ import { DebitoAutomaticoService } from './debitoAutomatico.service.js';
 import { ComprasService } from './compras.service.js';
 import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
+import moment from 'moment-timezone';
 
 /**
  * Servicio principal para generación de gastos reales desde diferentes fuentes
@@ -53,27 +52,33 @@ export class GastoGeneratorService {
   /**
    * Genera un gasto real desde un gasto recurrente
    * Usa RecurringExpenseStrategy
+   *
+   * IMPORTANT: This method is called AFTER findReadyForGeneration has already
+   * determined that this expense should be generated. Therefore, we don't
+   * re-check shouldGenerate here to avoid duplicate logic and ensure catch-up works.
    */
   static async generateFromGastoRecurrente(gastoRecurrente) {
     const transaction = await sequelize.transaction();
     try {
       const recurringStrategy = new RecurringExpenseStrategy();
 
-      // Verificar si debe generar hoy
-      const shouldGenerate = await recurringStrategy.shouldGenerate(gastoRecurrente);
-      if (!shouldGenerate) {
-        await transaction.rollback();
-        return null;
-      }
+      // NOTE: We skip shouldGenerate check because findReadyForGeneration
+      // already filtered expenses. This ensures catch-up logic works correctly.
 
-      // Generar el gasto usando la estrategia
-      const gasto = await recurringStrategy.generate(gastoRecurrente, transaction);
+      // Use adjustedDate if provided by catch-up logic, otherwise use today
+      const targetDate = gastoRecurrente.adjustedDate ||
+                        moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
+
+      // Generar el gasto usando la estrategia con la fecha correcta
+      const gasto = await recurringStrategy.generateWithDate(gastoRecurrente, targetDate, transaction);
 
       await transaction.commit();
       logger.info('Gasto generado desde gasto recurrente con estrategia:', {
         gasto_id: gasto.id,
         gastoRecurrente_id: gastoRecurrente.id,
-        frecuencia: gastoRecurrente.frecuencia?.nombre
+        frecuencia: gastoRecurrente.frecuencia?.nombre_frecuencia,
+        fecha_generada: targetDate,
+        is_catchup: !!gastoRecurrente.adjustedDate
       });
       return gasto;
     } catch (error) {
@@ -89,18 +94,17 @@ export class GastoGeneratorService {
   /**
    * Genera un gasto real desde un débito automático
    * Usa AutomaticDebitExpenseStrategy
+   *
+   * IMPORTANT: Like generateFromGastoRecurrente, this is called AFTER
+   * findReadyForGeneration has filtered expenses, so we skip shouldGenerate.
    */
   static async generateFromDebitoAutomatico(debitoAutomatico) {
     const transaction = await sequelize.transaction();
     try {
       const automaticDebitStrategy = new AutomaticDebitExpenseStrategy();
 
-      // Verificar si debe generar hoy
-      const shouldGenerate = await automaticDebitStrategy.shouldGenerate(debitoAutomatico);
-      if (!shouldGenerate) {
-        await transaction.rollback();
-        return null;
-      }
+      // NOTE: We skip shouldGenerate check because findReadyForGeneration
+      // already filtered expenses. This ensures catch-up logic works correctly.
 
       // Generar el gasto usando la estrategia
       const gasto = await automaticDebitStrategy.generate(debitoAutomatico, transaction);
@@ -109,7 +113,7 @@ export class GastoGeneratorService {
       logger.info('Gasto generado desde débito automático con estrategia:', {
         gasto_id: gasto.id,
         debitoAutomatico_id: debitoAutomatico.id,
-        frecuencia: debitoAutomatico.frecuencia?.nombre
+        frecuencia: debitoAutomatico.frecuencia?.nombre_frecuencia
       });
       return gasto;
     } catch (error) {

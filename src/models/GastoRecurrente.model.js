@@ -10,6 +10,12 @@ export function defineGastoRecurrente(sequelize) {
     descripcion: { type: DataTypes.STRING, allowNull: false },
     monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     dia_de_pago: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1, max: 31 } }, // Día del mes
+    mes_de_pago: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: { min: 1, max: 12 },
+      comment: 'Mes específico para frecuencia anual (1-12)'
+    },
     frecuencia_gasto_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -68,6 +74,33 @@ export function defineGastoRecurrente(sequelize) {
       type: DataTypes.DATEONLY,
       allowNull: true,
       comment: 'Última fecha en que se generó un gasto a partir de este gasto recurrente'
+    },
+    fecha_inicio: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Fecha a partir de la cual se empezará a generar el gasto recurrente'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se ingresó el gasto recurrente'
+    },
+    monto_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en pesos argentinos'
+    },
+    monto_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en dólares estadounidenses'
+    },
+    tipo_cambio_referencia: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio de referencia (cada gasto usa TC del día)'
     }
   }, {
     tableName: 'gastos_recurrentes',

@@ -24,6 +24,8 @@
     "docker:logs": "docker-compose logs -f",
     "docker:restart": "docker-compose restart",
     "db:migrate": "node ./src/db/migrate.js",
+    "db:migrate:multi-currency": "node ./run-multi-currency-migrations.js",
+    "generate-secrets": "node ./generate-secrets.js",
     "mcp:start": "node mcp-server.js",
     "mcp:http": "node mcp-server.js --http",
     "mcp:dev": "nodemon mcp-server.js --http"
@@ -33,6 +35,7 @@
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",
+    "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",

@@ -10,13 +10,15 @@ import logger from '../../utils/logger.js';
  * REGLAS DE GENERACIÓN:
  *
  * Para 1 cuota:
- * - Efectivo/Débito/Transferencia: Se genera en fecha_compra
+ * - Efectivo/Débito/Transferencia/MercadoPago: Se genera inmediatamente (en fecha_compra o al correr scheduler)
  * - Tarjeta de Crédito: Se genera en dia_vencimiento de la tarjeta
  *   - Si compra antes del dia_cierre: vence este mes
  *   - Si compra después del dia_cierre: vence el mes siguiente
  *
  * Para múltiples cuotas:
- * - Efectivo/Débito/Transferencia: Cada cuota el mismo día del mes de la compra
+ * - Efectivo/Débito/Transferencia/MercadoPago:
+ *   - Primera cuota: Se genera inmediatamente (en fecha_compra o al correr scheduler)
+ *   - Cuotas siguientes: Se generan el mismo día del mes de la compra
  * - Tarjeta de Crédito: Cada cuota en el dia_vencimiento de la tarjeta
  */
 export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
@@ -31,11 +33,16 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
       // Calcular cuál cuota corresponde
       const cuotaActual = await this.calculateCurrentInstallment(compra);
-      const montoCuota = await this.calculateInstallmentAmount(compra);
+
+      // 💱 Calculate installment amount in both currencies
+      const { montoCuotaARS, montoCuotaUSD } = await this.calculateInstallmentAmountMultiCurrency(compra);
 
       const gastoData = this.createGastoData(compra, {
         fecha: fechaParaBD,
-        monto_ars: montoCuota,
+        monto_ars: montoCuotaARS,
+        monto_usd: montoCuotaUSD,
+        moneda_origen: compra.moneda_origen || 'ARS',
+        tipo_cambio_usado: compra.tipo_cambio_usado || null,
         descripcion: `${compra.descripcion} - Cuota ${cuotaActual}/${compra.cantidad_cuotas || 1}`
       });
 
@@ -47,11 +54,13 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
       // Actualizar estado de la compra
       await this.updateCompraStatus(compra, cuotaActual, transaction);
 
-      logger.info('Gasto generado con estrategia cuotas:', {
+      logger.info('Gasto generado con estrategia cuotas (multi-moneda):', {
         gasto_id: gasto.id,
         compra_id: compra.id,
         cuota: `${cuotaActual}/${compra.cantidad_cuotas || 1}`,
-        monto: montoCuota
+        monto_ars: montoCuotaARS,
+        monto_usd: montoCuotaUSD,
+        moneda_origen: compra.moneda_origen
       });
 
       return gasto;
@@ -103,12 +112,21 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     // Para otros medios de pago (efectivo, débito, transferencia)
     // Se genera inmediatamente (en la fecha de compra)
-    const fechaCompra = moment(compra.fecha);
+    const fechaCompra = moment(compra.fecha_compra);
     return today.isSameOrAfter(fechaCompra, 'day');
   }
 
   /**
    * Verifica si debe generar una cuota de múltiples cuotas
+   *
+   * REGLAS:
+   * - Primera cuota (cuotasGeneradas === 0):
+   *   - Efectivo/Débito/Transferencia: Generar inmediatamente (si hoy >= fecha_compra)
+   *   - Tarjeta de Crédito: Generar en día de vencimiento de la tarjeta
+   *
+   * - Cuotas siguientes (cuotasGeneradas > 0):
+   *   - Efectivo/Débito/Transferencia: Generar el mismo día del mes de la compra
+   *   - Tarjeta de Crédito: Generar en día de vencimiento de la tarjeta
    */
   shouldGenerateMultipleInstallment(compra, today, cuotasGeneradas) {
     // Verificar que no se haya generado cuota este mes
@@ -119,17 +137,21 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
       }
     }
 
-    // Si es tarjeta de crédito, usar día de vencimiento de la tarjeta
+    // Si es tarjeta de crédito, siempre usar día de vencimiento
     if (this.isCreditCardPayment(compra)) {
       return this.shouldGenerateOnCreditCardDueDate(compra, today, cuotasGeneradas);
     }
 
-    // Para otros medios de pago, usar el mismo día del mes de la compra
-    const fechaCompra = moment(compra.fecha);
-    const diaCompra = fechaCompra.date();
-    const diaHoy = today.date();
+    // Para otros medios de pago (efectivo, débito, transferencia):
+    const fechaCompra = moment(compra.fecha_compra);
 
-    return diaHoy === diaCompra;
+    if (cuotasGeneradas === 0) {
+      // Primera cuota: generar inmediatamente (si hoy >= fecha_compra)
+      return today.isSameOrAfter(fechaCompra, 'day');
+    }
+
+    // Cuotas siguientes: mismo día del mes que la fecha de compra
+    return today.date() === fechaCompra.date();
   }
 
   /**
@@ -200,14 +222,43 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     return cuotasGeneradas + 1;
   }
 
-  async calculateInstallmentAmount(compra) {
-    // Si es cuota única, devolver el monto total
-    if (!compra.cantidad_cuotas || compra.cantidad_cuotas === 1) {
-      return compra.monto_total;
+  /**
+   * 💱 Calculate installment amount in both currencies
+   * Uses the pre-calculated monto_total_ars and monto_total_usd from the Compra
+   * (which are updated daily by ExchangeRateScheduler)
+   * @param {Object} compra - The compra object
+   * @returns {Promise<{montoCuotaARS: number, montoCuotaUSD: number|null}>}
+   */
+  async calculateInstallmentAmountMultiCurrency(compra) {
+    const cantidadCuotas = compra.cantidad_cuotas || 1;
+
+    // Si es cuota única, devolver los montos totales
+    if (cantidadCuotas === 1) {
+      return {
+        montoCuotaARS: compra.monto_total_ars || compra.monto_total, // Backward compatibility
+        montoCuotaUSD: compra.monto_total_usd || null
+      };
     }
 
-    // Para múltiples cuotas, dividir el monto
-    return Math.round((compra.monto_total / compra.cantidad_cuotas) * 100) / 100;
+    // Para múltiples cuotas, dividir ambos montos
+    const montoCuotaARS = Math.round((compra.monto_total_ars || compra.monto_total) / cantidadCuotas * 100) / 100;
+    const montoCuotaUSD = compra.monto_total_usd
+      ? Math.round((compra.monto_total_usd / cantidadCuotas) * 100) / 100
+      : null;
+
+    return {
+      montoCuotaARS,
+      montoCuotaUSD
+    };
+  }
+
+  /**
+   * @deprecated Use calculateInstallmentAmountMultiCurrency instead
+   * Kept for backward compatibility
+   */
+  async calculateInstallmentAmount(compra) {
+    const { montoCuotaARS } = await this.calculateInstallmentAmountMultiCurrency(compra);
+    return montoCuotaARS;
   }
 
   async getGeneratedInstallmentsCount(compra) {
@@ -242,6 +293,6 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
   validateSource(compra) {
     return super.validateSource(compra) &&
            compra.monto_total &&
-           compra.fecha;
+           compra.fecha_compra;
   }
 }

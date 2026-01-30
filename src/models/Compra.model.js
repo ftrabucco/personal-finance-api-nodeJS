@@ -90,6 +90,33 @@ export function defineCompra(sequelize) {
       allowNull: false,
       defaultValue: true,
       comment: 'Indica si aún quedan cuotas por generar'
+    },
+    fecha_ultima_cuota_generada: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Última fecha en que se generó una cuota desde esta compra'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se ingresó la compra originalmente'
+    },
+    monto_total_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      comment: 'Monto total en pesos argentinos (calculado automáticamente)'
+    },
+    monto_total_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto total en dólares estadounidenses'
+    },
+    tipo_cambio_usado: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio usado para la conversión (snapshot)'
     }
   }, {
     tableName: 'compras',

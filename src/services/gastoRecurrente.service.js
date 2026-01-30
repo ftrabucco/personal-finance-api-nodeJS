@@ -1,5 +1,6 @@
 import { BaseService } from './base.service.js';
 import { GastoRecurrente, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../models/index.js';
+import ExchangeRateService from './exchangeRate.service.js';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
 
@@ -55,24 +56,68 @@ export class GastoRecurrenteService extends BaseService {
   /**
    * Create recurring expense with validation
    * Adds business logic specific to recurring expenses
+   * 💱 Handles multi-currency conversion automatically
    */
   async create(data) {
     // Validate recurring expense specific rules
     this.validateRecurringExpenseData(data);
 
+    // 💱 Calculate both currencies based on moneda_origen
+    const monedaOrigen = data.moneda_origen || 'ARS';
+    const monto = data.monto;
+
     // Set default values for recurring expenses
-    const processedData = {
+    let processedData = {
       ...data,
+      moneda_origen: monedaOrigen,
       activo: data.activo ?? true,
       ultima_fecha_generado: null
     };
 
+    // Only calculate if not already provided
+    if (!data.monto_ars || !data.monto_usd) {
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        processedData = {
+          ...processedData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to GastoRecurrente', {
+          moneda_origen: monedaOrigen,
+          monto_original: monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        // If exchange rate service fails, use backward compatibility
+        logger.warn('Exchange rate conversion failed, using backward compatibility', {
+          error: exchangeError.message
+        });
+
+        if (monedaOrigen === 'ARS') {
+          processedData.monto_ars = monto;
+          processedData.monto_usd = null;
+        } else {
+          processedData.monto_ars = monto; // Fallback
+          processedData.monto_usd = null;
+        }
+      }
+    }
+
     const recurringExpense = await super.create(processedData);
 
-    logger.info('Recurring expense created successfully', {
+    logger.info('Recurring expense created successfully (multi-currency)', {
       id: recurringExpense.id,
       descripcion: recurringExpense.descripcion,
-      monto: recurringExpense.monto,
+      monto_ars: recurringExpense.monto_ars,
+      monto_usd: recurringExpense.monto_usd,
+      moneda_origen: recurringExpense.moneda_origen,
       frecuencia_id: recurringExpense.frecuencia_gasto_id
     });
 
@@ -165,11 +210,10 @@ export class GastoRecurrenteService extends BaseService {
       try {
         const shouldGenerate = await this.shouldGenerateExpense(expense, today);
         if (shouldGenerate.canGenerate) {
-          readyExpenses.push({
-            ...expense.toJSON(),
-            generationReason: shouldGenerate.reason,
-            adjustedDate: shouldGenerate.adjustedDate
-          });
+          // Keep the Sequelize instance, add metadata as properties
+          expense.generationReason = shouldGenerate.reason;
+          expense.adjustedDate = shouldGenerate.adjustedDate;
+          readyExpenses.push(expense);
         }
       } catch (error) {
         logger.error('Error checking expense generation readiness', {
@@ -198,12 +242,36 @@ export class GastoRecurrenteService extends BaseService {
       adjustedDate: null
     };
 
-    // Check if already generated today
+    // Get frequency information first to determine how to check duplicates
+    const frecuencia = expense.frecuencia;
+    if (!frecuencia) {
+      result.reason = 'No frequency defined';
+      return result;
+    }
+
+    // Check if already generated (period depends on frequency)
     if (expense.ultima_fecha_generado) {
       const ultimaFecha = moment(expense.ultima_fecha_generado);
-      if (ultimaFecha.isSame(today, 'day')) {
-        result.reason = 'Already generated today';
-        return result;
+      const frecuenciaNombre = frecuencia.nombre_frecuencia?.toLowerCase();
+
+      // For monthly/biweekly frequencies, check if already generated this month
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this month';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        // For weekly, check if already generated this week
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this week';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        // For daily, check if already generated today
+        if (ultimaFecha.isSame(today, 'day')) {
+          result.reason = 'Already generated today';
+          return result;
+        }
       }
     }
 
@@ -214,13 +282,6 @@ export class GastoRecurrenteService extends BaseService {
         result.reason = 'Start date not reached';
         return result;
       }
-    }
-
-    // Get frequency information
-    const frecuencia = expense.frecuencia;
-    if (!frecuencia) {
-      result.reason = 'No frequency defined';
-      return result;
     }
 
     // Handle different frequency types
@@ -243,9 +304,16 @@ export class GastoRecurrenteService extends BaseService {
   checkFrequencyMatch(expense, today, frecuencia) {
     const diaActual = today.date();
     const mesActual = today.month() + 1;
-    const diaSemanaActual = today.day(); // 0 = Sunday, 1 = Monday, etc.
 
-    switch (frecuencia.nombre?.toLowerCase()) {
+    switch (frecuencia.nombre_frecuencia?.toLowerCase()) {
+    case 'único':
+    case 'unico':
+      return {
+        matches: false,
+        reason: 'One-time frequency - should not generate recurring expenses',
+        adjustedDate: null
+      };
+
     case 'diario':
       return {
         matches: true,
@@ -279,7 +347,7 @@ export class GastoRecurrenteService extends BaseService {
     default:
       return {
         matches: false,
-        reason: `Unknown frequency: ${frecuencia.nombre}`,
+        reason: `Unknown frequency: ${frecuencia.nombre_frecuencia}`,
         adjustedDate: null
       };
     }
@@ -329,7 +397,32 @@ export class GastoRecurrenteService extends BaseService {
       };
     }
 
-    // Tolerance: if it's a few days past 1st or 15th and not generated yet
+    // CATCH-UP LOGIC: If never generated and we're past one of the valid days
+    // BUT only if that day is on or after fecha_inicio
+    if (!expense.ultima_fecha_generado) {
+      const lastValidDay = validDays.filter(d => d < diaActual).pop();
+      if (lastValidDay) {
+        const catchUpDate = today.clone().date(lastValidDay);
+        // Check fecha_inicio constraint
+        if (expense.fecha_inicio) {
+          const fechaInicio = moment(expense.fecha_inicio);
+          if (catchUpDate.isBefore(fechaInicio, 'day')) {
+            return {
+              matches: false,
+              reason: `Biweekly frequency - catch-up day ${lastValidDay} is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+              adjustedDate: null
+            };
+          }
+        }
+        return {
+          matches: true,
+          reason: `Biweekly frequency - catch-up for day ${lastValidDay} (never generated before, currently day ${diaActual})`,
+          adjustedDate: catchUpDate.format('YYYY-MM-DD')
+        };
+      }
+    }
+
+    // Regular tolerance: if it's a few days past 1st or 15th and not generated yet
     const tolerance = this.calculateDateTolerance(diaActual, validDays);
     if (tolerance.withinTolerance) {
       return {
@@ -364,7 +457,30 @@ export class GastoRecurrenteService extends BaseService {
       };
     }
 
-    // Tolerance for missed dates
+    // CATCH-UP LOGIC: If never generated before and target day has passed this month
+    // BUT only if the target day this month is ON or AFTER fecha_inicio
+    if (!expense.ultima_fecha_generado && diaActual > adjustedDay) {
+      // If there's a fecha_inicio, check if the target day this month was after fecha_inicio
+      if (expense.fecha_inicio) {
+        const fechaInicio = moment(expense.fecha_inicio);
+        // The adjusted date (target day this month) must be on or after fecha_inicio
+        // Otherwise, the first generation should be next month
+        if (adjustedDate.isBefore(fechaInicio, 'day')) {
+          return {
+            matches: false,
+            reason: `Monthly frequency - target day ${targetDay} this month (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+            adjustedDate: null
+          };
+        }
+      }
+      return {
+        matches: true,
+        reason: `Monthly frequency - catch-up for day ${targetDay} (never generated before, currently day ${diaActual})`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    // Regular tolerance for missed dates (3 days)
     const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
     if (tolerance.withinTolerance) {
       return {
@@ -384,7 +500,7 @@ export class GastoRecurrenteService extends BaseService {
   /**
    * Check bimonthly frequency (every 2 months)
    */
-  checkBimonthlyFrequency(expense, today, diaActual, mesActual) {
+  checkBimonthlyFrequency(expense, today, diaActual, _mesActual) {
     const targetDay = expense.dia_de_pago;
     const adjustedDate = this.getValidMonthlyDate(today, targetDay);
     const adjustedDay = adjustedDate.date();
@@ -607,7 +723,7 @@ export class GastoRecurrenteService extends BaseService {
    * @param {Object} data - Expense data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
    */
-  validateRecurringExpenseData(data, isUpdate = false) {
+  validateRecurringExpenseData(data, _isUpdate = false) {
     const errors = [];
 
     // Amount validation

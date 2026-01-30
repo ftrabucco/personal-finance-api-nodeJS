@@ -153,15 +153,15 @@ async function seedInitialData() {
 
     // Gasto Recurrente de ejemplo
     await sequelize.query(`
-      INSERT INTO finanzas.gastos_recurrentes (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo) VALUES
-        ('Alquiler departamento', 180000, 5, ${alquilerId}, ${esencialId}, ${debitoId}, 4, ${userId}, true)
+      INSERT INTO finanzas.gastos_recurrentes (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo, created_at, updated_at) VALUES
+        ('Alquiler departamento', 180000, 5, ${alquilerId}, ${esencialId}, ${debitoId}, 4, ${userId}, true, NOW(), NOW())
       ON CONFLICT DO NOTHING;
     `);
 
     // Débito Automático de ejemplo
     await sequelize.query(`
-      INSERT INTO finanzas.debitos_automaticos (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo) VALUES
-        ('Netflix Premium', 5990, 12, ${streamingId}, ${niceToHaveId}, ${creditoId}, 4, ${userId}, true)
+      INSERT INTO finanzas.debitos_automaticos (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo, created_at, updated_at) VALUES
+        ('Netflix Premium', 5990, 12, ${streamingId}, ${niceToHaveId}, ${creditoId}, 4, ${userId}, true, NOW(), NOW())
       ON CONFLICT DO NOTHING;
     `);
 

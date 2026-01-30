@@ -1,6 +1,6 @@
 import logger from '../utils/logger.js';
 
-export function errorMiddleware(err, req, res, next) {
+export function errorMiddleware(err, req, res, _next) {
   //logger.error(`${err.message}`, { stack: err.stack });
   logger.error(`${err.message}`);
   logger.error('Error capturado:', err);

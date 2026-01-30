@@ -11,8 +11,11 @@ import { defineGastoRecurrente } from './GastoRecurrente.model.js';
 import { defineGastoUnico } from './GastoUnico.model.js';
 import { defineTarjeta } from './Tarjeta.model.js';
 import { defineUsuario } from './Usuario.model.js';
+import { defineTipoCambio } from './TipoCambio.model.js';
 
 // Configuración para PostgreSQL
+const isProduction = process.env.NODE_ENV === 'production';
+
 const sequelize = new Sequelize({
   dialect: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -22,6 +25,15 @@ const sequelize = new Sequelize({
   password: process.env.DB_PASSWORD || 'postgres123',
   schema: 'finanzas',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  dialectOptions: {
+    // SSL requerido para Render y otros proveedores cloud
+    ...(isProduction && {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    })
+  },
   define: {
     timestamps: true,
     underscored: true,
@@ -41,7 +53,8 @@ const models = {
   GastoRecurrente: defineGastoRecurrente(sequelize),
   GastoUnico: defineGastoUnico(sequelize),
   Tarjeta: defineTarjeta(sequelize),
-  Usuario: defineUsuario(sequelize)
+  Usuario: defineUsuario(sequelize),
+  TipoCambio: defineTipoCambio(sequelize)
 };
 
 // Relacionamos los modelos
@@ -59,5 +72,6 @@ export const {
   GastoRecurrente,
   GastoUnico,
   Tarjeta,
-  Usuario
+  Usuario,
+  TipoCambio
 } = models;

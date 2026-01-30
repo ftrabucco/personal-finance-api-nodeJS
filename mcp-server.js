@@ -7,7 +7,6 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import cors from 'cors';
 import {
@@ -128,6 +127,14 @@ class FinanzasApiMCPServer {
             }
           },
           {
+            name: 'get_multicurrency_docs',
+            description: 'Retorna documentación completa del sistema multi-moneda USD/ARS: arquitectura, endpoints, reglas de negocio, campos, ejemplos y escenarios de prueba',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
             name: 'execute_api_call',
             description: 'Ejecuta llamada a la API para testing',
             inputSchema: {
@@ -186,6 +193,9 @@ class FinanzasApiMCPServer {
 
         case 'get_auth_schemas':
           return await this.getAuthSchemas();
+
+        case 'get_multicurrency_docs':
+          return await this.getMulticurrencyDocs();
 
         case 'execute_api_call':
           return await this.executeApiCall(args);
@@ -499,7 +509,8 @@ class FinanzasApiMCPServer {
             tipo: 'credito',
             banco: 'Banco Nación',
             dia_mes_cierre: 15,
-            dia_mes_vencimiento: 10
+            dia_mes_vencimiento: 10,
+            ultimos_4_digitos: '1234'
           },
           expected: {
             status: 201,
@@ -512,7 +523,8 @@ class FinanzasApiMCPServer {
                 banco: 'Banco Nación',
                 dia_mes_cierre: 15,
                 dia_mes_vencimiento: 10,
-                permite_cuotas: true
+                permite_cuotas: true,
+                ultimos_4_digitos: '1234'
               }
             }
           }
@@ -524,7 +536,8 @@ class FinanzasApiMCPServer {
           payload: {
             nombre: 'Mastercard Débito Test',
             tipo: 'debito',
-            banco: 'Banco Santander'
+            banco: 'Banco Santander',
+            ultimos_4_digitos: '5678'
           },
           expected: {
             status: 201,
@@ -537,7 +550,8 @@ class FinanzasApiMCPServer {
                 banco: 'Banco Santander',
                 dia_mes_cierre: null,
                 dia_mes_vencimiento: null,
-                permite_cuotas: false
+                permite_cuotas: false,
+                ultimos_4_digitos: '5678'
               }
             }
           }
@@ -834,7 +848,7 @@ class FinanzasApiMCPServer {
       case 'debito_automatico':
         schemaPath = 'src/validations/debitoAutomatico.validation.js';
         break;
-      case 'tarjeta':
+      case 'tarjeta': {
         // Tarjetas usan validation.middleware.js que contiene todos los esquemas de validación
         const validationPath = path.join(__dirname, 'src/middlewares/validation.middleware.js');
         const validationContent = await fs.readFile(validationPath, 'utf-8');
@@ -849,7 +863,8 @@ class FinanzasApiMCPServer {
             }
           ]
         };
-      default:
+      }
+      default: {
         // Retornar todos los esquemas
         const allSchemas = await Promise.all([
           fs.readFile(path.join(__dirname, 'src/validations/compra.validation.js'), 'utf-8'),
@@ -865,6 +880,7 @@ class FinanzasApiMCPServer {
             }
           ]
         };
+      }
       }
 
       const content = await fs.readFile(path.join(__dirname, schemaPath), 'utf-8');
@@ -944,6 +960,7 @@ class FinanzasApiMCPServer {
           description: 'Tarjetas con billing cycle logic for InstallmentStrategy + User isolation',
           fields: [
             'id (PK)', 'nombre', 'tipo (debito|credito|virtual)', 'banco',
+            'ultimos_4_digitos (últimos 4 dígitos para identificación - opcional)',
             'dia_mes_cierre (billing close - required for credito)',
             'dia_mes_vencimiento (due date - required for credito)',
             'permite_cuotas (auto-normalized by tipo)',
@@ -1148,6 +1165,645 @@ class FinanzasApiMCPServer {
         ]
       };
     }
+  }
+
+  async getMulticurrencyDocs() {
+    const docs = `# 💱 Sistema Multi-Moneda USD/ARS - Documentación Completa
+
+## Arquitectura General
+
+El sistema multi-moneda permite manejar gastos en pesos argentinos (ARS) y dólares estadounidenses (USD) con conversión automática y actualización diaria de tipos de cambio.
+
+### Características Principales:
+- ✅ Conversión automática ARS ↔ USD al crear gastos
+- ✅ Almacenamiento dual de montos (monto_ars + monto_usd)
+- ✅ Snapshot del tipo de cambio usado en cada transacción
+- ✅ Actualización diaria automática de tipos de cambio (00:00 AM)
+- ✅ Proyecciones realistas con TC actualizado
+- ✅ Integración con APIs externas (DolarAPI + BCRA)
+- ✅ Soporte para configuración manual de TC
+- ✅ Backward compatibility con datos legacy
+
+---
+
+## Modelos con Soporte Multi-Moneda
+
+### 1. TipoCambio (Nuevo)
+**Tabla:** \`finanzas.tipos_cambio\`
+**Propósito:** Almacena histórico de tipos de cambio (un registro por día)
+
+**Campos:**
+\`\`\`javascript
+{
+  fecha: DATE (PK),                    // Fecha del TC
+  valor_compra_usd_ars: DECIMAL(10,2), // Cotización de compra
+  valor_venta_usd_ars: DECIMAL(10,2),  // Cotización de venta (usado para conversiones)
+  fuente: ENUM,                         // 'manual', 'api_bcra', 'api_dolar_api'
+  activo: BOOLEAN,                      // TC activo/inactivo
+  createdAt: TIMESTAMP,
+  updatedAt: TIMESTAMP
+}
+\`\`\`
+
+### 2. GastoUnico
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),   // Moneda en que se ingresó
+  monto_ars: DECIMAL(10,2),            // Monto en pesos
+  monto_usd: DECIMAL(10,2),            // Monto en dólares
+  tipo_cambio_usado: DECIMAL(10,2)    // Snapshot del TC usado
+}
+\`\`\`
+
+### 3. Compra
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),
+  monto_total_ars: DECIMAL(10,2),      // Monto total en pesos
+  monto_total_usd: DECIMAL(10,2),      // Monto total en dólares
+  tipo_cambio_usado: DECIMAL(10,2)
+}
+\`\`\`
+
+### 4. GastoRecurrente
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),
+  monto_ars: DECIMAL(10,2),
+  monto_usd: DECIMAL(10,2),
+  tipo_cambio_referencia: DECIMAL(10,2)  // TC de referencia (actualizado diariamente)
+}
+\`\`\`
+
+### 5. DebitoAutomatico
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),
+  monto_ars: DECIMAL(10,2),
+  monto_usd: DECIMAL(10,2),
+  tipo_cambio_referencia: DECIMAL(10,2)
+}
+\`\`\`
+
+---
+
+## API Endpoints - Tipo de Cambio
+
+### GET /api/tipo-cambio/actual
+**Descripción:** Obtiene el tipo de cambio actual (activo)
+**Auth:** Required (JWT)
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "fecha": "2025-10-15",
+    "valor_compra_usd_ars": 1195.50,
+    "valor_venta_usd_ars": 1205.50,
+    "fuente": "api_dolar_api",
+    "activo": true,
+    "ultima_actualizacion": "2025-10-15T03:00:00Z"
+  }
+}
+\`\`\`
+
+### GET /api/tipo-cambio/historico
+**Descripción:** Obtiene histórico de tipos de cambio con filtros
+**Auth:** Required (JWT)
+**Query Params:**
+- \`fecha_desde\` (YYYY-MM-DD) - Opcional
+- \`fecha_hasta\` (YYYY-MM-DD) - Opcional
+- \`fuente\` (manual|api_bcra|api_dolar_api) - Opcional
+- \`limit\` (number, default: 30) - Opcional
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "total": 15,
+    "filtros": {
+      "fecha_desde": "2025-10-01",
+      "fecha_hasta": "2025-10-15",
+      "limit": 30
+    },
+    "datos": [
+      {
+        "fecha": "2025-10-15",
+        "valor_compra_usd_ars": 1195.50,
+        "valor_venta_usd_ars": 1205.50,
+        "fuente": "api_dolar_api",
+        "activo": true
+      }
+    ]
+  }
+}
+\`\`\`
+
+### POST /api/tipo-cambio/manual
+**Descripción:** Configura un tipo de cambio manualmente
+**Auth:** Required (JWT)
+**Body:**
+\`\`\`json
+{
+  "fecha": "2025-10-15",  // Opcional (default: hoy)
+  "valor_compra_usd_ars": 1195.50,  // Opcional
+  "valor_venta_usd_ars": 1205.50    // Required
+}
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "mensaje": "Tipo de cambio configurado exitosamente",
+    "tipo_cambio": {
+      "fecha": "2025-10-15",
+      "valor_compra_usd_ars": 1195.50,
+      "valor_venta_usd_ars": 1205.50,
+      "fuente": "manual",
+      "activo": true
+    }
+  }
+}
+\`\`\`
+
+### POST /api/tipo-cambio/actualizar
+**Descripción:** Actualiza el TC desde API externa
+**Auth:** Required (JWT)
+**Body:**
+\`\`\`json
+{
+  "fuente": "auto"  // 'auto', 'bcra', 'dolarapi'
+}
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "mensaje": "Tipo de cambio actualizado exitosamente",
+    "tipo_cambio": {
+      "fecha": "2025-10-15",
+      "valor_compra_usd_ars": 1195.50,
+      "valor_venta_usd_ars": 1205.50,
+      "fuente": "api_dolar_api",
+      "activo": true
+    }
+  }
+}
+\`\`\`
+
+### POST /api/tipo-cambio/convertir
+**Descripción:** Convierte un monto entre monedas
+**Auth:** Required (JWT)
+**Body:**
+\`\`\`json
+{
+  "monto": 100,
+  "moneda_origen": "USD"  // 'ARS' o 'USD'
+}
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "monto_original": 100,
+    "moneda_origen": "USD",
+    "conversion": {
+      "monto_ars": 120550.00,
+      "monto_usd": 100.00,
+      "tipo_cambio_usado": 1205.50,
+      "fecha_tipo_cambio": "2025-10-15"
+    }
+  }
+}
+\`\`\`
+
+---
+
+## Uso en Endpoints Existentes
+
+### POST /api/gastos-unicos
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Compra en Amazon",
+  "monto": 100,
+  "moneda_origen": "USD",  // 💱 Nuevo (default: 'ARS')
+  "fecha": "2025-10-15",
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 1
+}
+\`\`\`
+
+**Conversión automática:**
+El sistema automáticamente calcula:
+- \`monto_ars\` = 100 * 1205.50 = 120,550
+- \`monto_usd\` = 100
+- \`tipo_cambio_usado\` = 1205.50
+
+### POST /api/compras
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Compra en cuotas",
+  "monto_total": 50000,
+  "moneda_origen": "ARS",  // 💱 Nuevo
+  "cantidad_cuotas": 12,
+  "fecha_compra": "2025-10-15",
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 3,
+  "tarjeta_id": 1
+}
+\`\`\`
+
+### POST /api/gastos-recurrentes
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Alquiler mensual",
+  "monto": 920000,
+  "moneda_origen": "ARS",  // 💱 Nuevo
+  "dia_de_pago": 5,
+  "frecuencia_gasto_id": 4,  // Mensual
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 4
+}
+\`\`\`
+
+### POST /api/debitos-automaticos
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Netflix",
+  "monto": 15,
+  "moneda_origen": "USD",  // 💱 Nuevo
+  "dia_de_pago": 10,
+  "frecuencia_gasto_id": 4,
+  "categoria_gasto_id": 8,
+  "importancia_gasto_id": 2,
+  "tipo_pago_id": 3,
+  "tarjeta_id": 1
+}
+\`\`\`
+
+---
+
+## Reglas de Negocio Multi-Moneda
+
+### 1. Conversión al Crear
+- Si \`moneda_origen = 'USD'\` → calcula \`monto_ars\` usando TC actual
+- Si \`moneda_origen = 'ARS'\` → calcula \`monto_usd\` usando TC actual
+- Siempre guarda \`tipo_cambio_usado\` como snapshot
+
+### 2. Actualización Diaria (Scheduler)
+**Ejecución:** Todos los días a las 00:00 AM
+**Acciones:**
+1. Actualiza TC desde DolarAPI (fallback a BCRA)
+2. Re-calcula \`monto_ars\` y \`monto_usd\` de:
+   - Gastos Recurrentes activos
+   - Débitos Automáticos activos
+   - Cuotas pendientes de Compras
+
+**Por qué:** Asegura proyecciones realistas (ej: alquiler en ARS cambia su valor en USD mes a mes)
+
+### 3. Gastos Únicos
+- **NO se actualizan** después de crearse (snapshot histórico)
+- Conversión una vez al momento de creación
+
+### 4. Backward Compatibility
+- Datos legacy sin \`moneda_origen\` → default 'ARS'
+- Datos legacy sin \`monto_ars\`/\`monto_usd\` → usa \`monto\` como ARS
+
+---
+
+## Escenarios de Prueba E2E
+
+### Escenario 1: Crear Gasto Único en USD
+\`\`\`javascript
+// POST /api/gastos-unicos
+{
+  "descripcion": "Compra Amazon",
+  "monto": 50,
+  "moneda_origen": "USD",
+  "fecha": "2025-10-15",
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 3,
+  "tarjeta_id": 1
+}
+
+// Expected Response:
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "descripcion": "Compra Amazon",
+    "monto": 50,
+    "moneda_origen": "USD",
+    "monto_ars": 60275.00,  // 50 * 1205.50
+    "monto_usd": 50.00,
+    "tipo_cambio_usado": 1205.50,
+    // ... otros campos
+  }
+}
+
+// Validaciones:
+assert response.data.moneda_origen == "USD"
+assert response.data.monto_usd == 50
+assert response.data.monto_ars == 50 * TC_actual
+assert response.data.tipo_cambio_usado == TC_actual
+\`\`\`
+
+### Escenario 2: Crear Alquiler Mensual en ARS
+\`\`\`javascript
+// POST /api/gastos-recurrentes
+{
+  "descripcion": "Alquiler",
+  "monto": 920000,
+  "moneda_origen": "ARS",
+  "dia_de_pago": 5,
+  "frecuencia_gasto_id": 4,
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 4
+}
+
+// Expected Response:
+{
+  "data": {
+    "moneda_origen": "ARS",
+    "monto_ars": 920000.00,
+    "monto_usd": 763.07,  // 920000 / 1205.50
+    "tipo_cambio_referencia": 1205.50
+  }
+}
+
+// Validaciones:
+assert response.data.monto_ars == 920000
+assert response.data.monto_usd == 920000 / TC_actual
+assert response.data.tipo_cambio_referencia == TC_actual
+\`\`\`
+
+### Escenario 3: Actualización Diaria
+\`\`\`javascript
+// 1. Crear alquiler (TC: 1200)
+POST /api/gastos-recurrentes → monto_usd = 766.67
+
+// 2. Simular cambio de TC al día siguiente (TC: 1300)
+POST /api/tipo-cambio/manual
+{
+  "valor_venta_usd_ars": 1300.00
+}
+
+// 3. Ejecutar scheduler (automático 00:00 o manual)
+// El scheduler actualiza:
+// monto_usd = 920000 / 1300 = 707.69
+
+// 4. Verificar actualización
+GET /api/gastos-recurrentes/:id
+
+// Validaciones:
+assert response.data.monto_ars == 920000  // Sin cambios
+assert response.data.monto_usd == 707.69  // Actualizado
+assert response.data.tipo_cambio_referencia == 1300.00
+\`\`\`
+
+### Escenario 4: Configurar TC Manualmente
+\`\`\`javascript
+// POST /api/tipo-cambio/manual
+{
+  "valor_venta_usd_ars": 1250.00
+}
+
+// Expected Response:
+{
+  "success": true,
+  "data": {
+    "mensaje": "Tipo de cambio configurado exitosamente",
+    "tipo_cambio": {
+      "fecha": "2025-10-15",
+      "valor_compra_usd_ars": 1250.00,
+      "valor_venta_usd_ars": 1250.00,
+      "fuente": "manual",
+      "activo": true
+    }
+  }
+}
+
+// Validaciones:
+assert response.data.tipo_cambio.fuente == "manual"
+assert response.data.tipo_cambio.valor_venta_usd_ars == 1250.00
+\`\`\`
+
+### Escenario 5: Obtener Histórico de TC
+\`\`\`javascript
+// GET /api/tipo-cambio/historico?fecha_desde=2025-10-01&limit=10
+
+// Expected Response:
+{
+  "success": true,
+  "data": {
+    "total": 10,
+    "filtros": {
+      "fecha_desde": "2025-10-01",
+      "limit": 10
+    },
+    "datos": [
+      {
+        "fecha": "2025-10-15",
+        "valor_compra_usd_ars": 1195.50,
+        "valor_venta_usd_ars": 1205.50,
+        "fuente": "api_dolar_api",
+        "activo": true
+      },
+      // ... más registros
+    ]
+  }
+}
+
+// Validaciones:
+assert response.data.total <= 10
+assert response.data.datos.length <= 10
+assert all(item.fecha >= "2025-10-01" for item in response.data.datos)
+\`\`\`
+
+---
+
+## Validaciones Joi
+
+### GastoUnico
+\`\`\`javascript
+{
+  moneda_origen: Joi.string().valid('ARS', 'USD').optional(),
+  monto_ars: Joi.number().positive().optional(),
+  monto_usd: Joi.number().positive().optional(),
+  tipo_cambio_usado: Joi.number().positive().optional()
+}
+\`\`\`
+
+### Compra
+\`\`\`javascript
+{
+  moneda_origen: Joi.string().valid('ARS', 'USD').optional(),
+  monto_total_ars: Joi.number().positive().precision(2).optional(),
+  monto_total_usd: Joi.number().positive().precision(2).optional(),
+  tipo_cambio_usado: Joi.number().positive().optional()
+}
+\`\`\`
+
+### GastoRecurrente / DebitoAutomatico
+\`\`\`javascript
+{
+  moneda_origen: Joi.string().valid('ARS', 'USD').optional(),
+  monto_ars: Joi.number().positive().optional(),
+  monto_usd: Joi.number().positive().optional(),
+  tipo_cambio_referencia: Joi.number().positive().optional()
+}
+\`\`\`
+
+---
+
+## APIs Externas Integradas
+
+### DolarAPI (Principal)
+**URL:** https://dolarapi.com/v1/dolares/oficial
+**Rate Limit:** Sin límite (gratis)
+**Response:**
+\`\`\`json
+{
+  "compra": 1195.50,
+  "venta": 1205.50,
+  "fecha": "2025-10-15"
+}
+\`\`\`
+
+### BCRA API (Fallback)
+**URL:** https://api.bcra.gob.ar/estadisticas/v1/
+**Rate Limit:** Limitado
+**Uso:** Solo cuando DolarAPI falla
+
+---
+
+## Cache y Performance
+
+### Cache de TC
+- **TTL:** 1 hora
+- **Propósito:** Evitar hits innecesarios a BD
+- **Invalidación:** Al actualizar TC
+
+### Índices en BD
+\`\`\`sql
+CREATE INDEX idx_tipos_cambio_fecha ON finanzas.tipos_cambio(fecha DESC);
+CREATE INDEX idx_tipos_cambio_activo ON finanzas.tipos_cambio(activo);
+\`\`\`
+
+---
+
+## Migraciones SQL
+
+### 005: Crear tabla tipos_cambio
+\`\`\`sql
+CREATE TABLE finanzas.tipos_cambio (
+  fecha DATE PRIMARY KEY,
+  valor_compra_usd_ars DECIMAL(10,2) NOT NULL,
+  valor_venta_usd_ars DECIMAL(10,2) NOT NULL,
+  fuente VARCHAR(20) NOT NULL,
+  activo BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+\`\`\`
+
+### 006-009: Agregar campos multi-moneda
+- 006: gastos_unico
+- 007: compras
+- 008: gastos_recurrentes
+- 009: debitos_automaticos
+
+Cada migración:
+1. Agrega nuevas columnas
+2. Migra datos legacy (monto → monto_ars)
+3. Mantiene compatibilidad
+
+---
+
+## Testing Checklist
+
+### Tests de Integración
+- [ ] Crear gasto único en USD con conversión automática
+- [ ] Crear gasto único en ARS con conversión automática
+- [ ] Crear compra en cuotas en USD
+- [ ] Crear gasto recurrente en ARS
+- [ ] Crear débito automático en USD
+- [ ] Configurar TC manualmente
+- [ ] Actualizar TC desde API
+- [ ] Obtener TC actual
+- [ ] Obtener histórico de TC con filtros
+- [ ] Convertir monto entre monedas
+- [ ] Verificar actualización diaria de gastos recurrentes
+- [ ] Verificar actualización diaria de débitos automáticos
+- [ ] Verificar actualización diaria de cuotas pendientes
+- [ ] Backward compatibility con datos legacy
+
+### Tests de Validación
+- [ ] Rechazar moneda_origen inválida
+- [ ] Rechazar montos negativos
+- [ ] Rechazar TC con fecha futura
+- [ ] Validar formato de fechas
+- [ ] Validar campos opcionales
+
+### Tests de Edge Cases
+- [ ] TC no configurado (primera vez)
+- [ ] API externa caída (fallback)
+- [ ] Conversión con TC = 0
+- [ ] Gastos con moneda_origen = null (legacy)
+- [ ] Actualización diaria sin cambios en TC
+
+---
+
+## Referencias Rápidas
+
+### Archivos Clave
+- Modelo: \`src/models/TipoCambio.model.js\`
+- Servicio: \`src/services/exchangeRate.service.js\`
+- Scheduler: \`src/schedulers/exchangeRateScheduler.js\`
+- Controller: \`src/controllers/api/tipoCambio.controller.js\`
+- Migraciones: \`migrations/005-009_*.sql\`
+
+### Comandos Útiles
+\`\`\`bash
+# Ejecutar migraciones
+npm run migrate
+
+# Ejecutar scheduler manualmente
+npm run scheduler:tc
+
+# Ver logs del scheduler
+tail -f logs/scheduler.log
+\`\`\`
+`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: docs
+        }
+      ]
+    };
   }
 
   async executeApiCall({ method, endpoint, body }) {

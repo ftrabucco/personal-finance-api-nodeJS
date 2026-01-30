@@ -10,6 +10,17 @@ export function defineDebitoAutomatico(sequelize) {
     descripcion: { type: DataTypes.STRING, allowNull: false },
     monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     dia_de_pago: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1, max: 31 } }, // Día del mes que se debita
+    mes_de_pago: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: { min: 1, max: 12 },
+      comment: 'Mes específico para frecuencia anual (1-12)'
+    },
+    fecha_fin: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Fecha hasta la cual el débito automático estará activo'
+    },
     categoria_gasto_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -63,6 +74,33 @@ export function defineDebitoAutomatico(sequelize) {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true
+    },
+    ultima_fecha_generado: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Última fecha en que se generó un gasto desde este débito automático'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se cobra el débito automático'
+    },
+    monto_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en pesos argentinos (actualizado diariamente)'
+    },
+    monto_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en dólares estadounidenses (actualizado diariamente)'
+    },
+    tipo_cambio_referencia: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio de referencia (actualizado diariamente)'
     }
   }, {
     tableName: 'debitos_automaticos',

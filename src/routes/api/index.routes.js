@@ -54,6 +54,22 @@ import {
 } from '../../controllers/api/tarjeta.controller.js';
 
 import {
+  obtenerTipoCambioActual,
+  obtenerHistoricoTipoCambio,
+  configurarTipoCambioManual,
+  actualizarTipoCambioDesdeAPI,
+  convertirMonto
+} from '../../controllers/api/tipoCambio.controller.js';
+
+import {
+  obtenerCategorias,
+  obtenerImportancias,
+  obtenerTiposPago,
+  obtenerFrecuencias,
+  obtenerTodosCatalogos
+} from '../../controllers/api/catalogo.controller.js';
+
+import {
   validateGastoFilters,
   validateIdParam,
   validateCreateGasto,
@@ -128,5 +144,19 @@ router.get('/tarjetas/:id/usage', authenticateToken, validateIdParam, validarUso
 router.post('/tarjetas', authenticateToken, validateCreateTarjeta, crearTarjeta);
 router.put('/tarjetas/:id', authenticateToken, validateIdParam, validateUpdateTarjeta, actualizarTarjeta);
 router.delete('/tarjetas/:id', authenticateToken, validateIdParam, eliminarTarjeta);
+
+// 💱 Rutas para Tipo de Cambio - Requieren autenticación
+router.get('/tipo-cambio/actual', authenticateToken, obtenerTipoCambioActual); // Obtener TC actual
+router.get('/tipo-cambio/historico', authenticateToken, obtenerHistoricoTipoCambio); // Obtener historial con filtros
+router.post('/tipo-cambio/manual', authenticateToken, configurarTipoCambioManual); // Configurar TC manualmente
+router.post('/tipo-cambio/actualizar', authenticateToken, actualizarTipoCambioDesdeAPI); // Actualizar desde API externa
+router.post('/tipo-cambio/convertir', authenticateToken, convertirMonto); // Convertir monto entre monedas
+
+// 📚 Rutas para Catálogos - Requieren autenticación
+router.get('/catalogos', authenticateToken, obtenerTodosCatalogos); // Todos los catálogos en una sola llamada
+router.get('/catalogos/categorias', authenticateToken, obtenerCategorias);
+router.get('/catalogos/importancias', authenticateToken, obtenerImportancias);
+router.get('/catalogos/tipos-pago', authenticateToken, obtenerTiposPago);
+router.get('/catalogos/frecuencias', authenticateToken, obtenerFrecuencias);
 
 export default router;

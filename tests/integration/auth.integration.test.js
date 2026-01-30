@@ -34,6 +34,7 @@ jest.unstable_mockModule('../../src/models/index.js', () => ({
   TipoPago: {},
   FrecuenciaGasto: {},
   Ingreso: {},
+  TipoCambio: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn() },
   sequelize: {
     authenticate: jest.fn().mockResolvedValue(true),
     sync: jest.fn().mockResolvedValue(true)
@@ -396,12 +397,22 @@ describe('Authentication Integration Tests', () => {
     });
 
     it('should update user profile', async () => {
+      // 1st findByPk: auth middleware verifies token user
       mockUsuario.findByPk.mockResolvedValueOnce({
         ...testUser,
         dataValues: { ...testUser.dataValues }
       });
-      mockUsuario.findOne.mockResolvedValueOnce(null); // Email not in use
-      mockUsuario.update = jest.fn().mockResolvedValueOnce([1]);
+      // 2nd findByPk: BaseService.update() fetches record, which needs instance .update()
+      mockUsuario.findByPk.mockResolvedValueOnce({
+        ...testUser,
+        dataValues: { ...testUser.dataValues },
+        update: jest.fn().mockResolvedValueOnce({
+          ...testUser,
+          nombre: 'Updated Name',
+          dataValues: { id: 1, nombre: 'Updated Name', email: 'test@example.com' }
+        })
+      });
+      // 3rd findByPk: authService.getUserById() returns updated user
       mockUsuario.findByPk.mockResolvedValueOnce({
         ...testUser,
         nombre: 'Updated Name',
@@ -590,6 +601,7 @@ describe('Authentication Integration Tests', () => {
       const response = await request(app)
         .post('/api/auth/logout')
         .set('Authorization', `Bearer ${authToken}`)
+        .send({}) // Send empty body to set Content-Type: application/json
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -601,6 +613,7 @@ describe('Authentication Integration Tests', () => {
     it('should require authentication for logout', async () => {
       const response = await request(app)
         .post('/api/auth/logout')
+        .send({}) // Send empty body to set Content-Type: application/json
         .expect(401);
 
       expect(response.body.success).toBe(false);
