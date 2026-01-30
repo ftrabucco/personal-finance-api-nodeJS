@@ -120,9 +120,9 @@ export class TipoCambioController {
       }
 
       const tipoCambio = await ExchangeRateService.setManualRate(
+        fecha,
         valorCompra,
-        valorVenta,
-        fecha
+        valorVenta
       );
 
       logger.info('Tipo de cambio manual configurado:', {

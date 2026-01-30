@@ -136,7 +136,12 @@ export class ExchangeRateService {
       ? tipoCambio.valor_compra_usd_ars || tipoCambio
       : tipoCambio.valor_venta_usd_ars || tipoCambio;
 
-    const montoUSD = parseFloat(montoARS) / parseFloat(valor);
+    const valorNum = parseFloat(valor);
+    if (!valorNum || valorNum <= 0) {
+      throw new Error('Tipo de cambio inválido: el valor debe ser mayor a cero');
+    }
+
+    const montoUSD = parseFloat(montoARS) / valorNum;
     return parseFloat(montoUSD.toFixed(2));
   }
 
@@ -152,7 +157,12 @@ export class ExchangeRateService {
       ? tipoCambio.valor_compra_usd_ars || tipoCambio
       : tipoCambio.valor_venta_usd_ars || tipoCambio;
 
-    const montoARS = parseFloat(montoUSD) * parseFloat(valor);
+    const valorNum = parseFloat(valor);
+    if (!valorNum || valorNum <= 0) {
+      throw new Error('Tipo de cambio inválido: el valor debe ser mayor a cero');
+    }
+
+    const montoARS = parseFloat(montoUSD) * valorNum;
     return parseFloat(montoARS.toFixed(2));
   }
 
@@ -168,14 +178,16 @@ export class ExchangeRateService {
       // Si no se provee TC, usar el actual
       const tc = tipoCambio || await this.getCurrentRate();
 
-      let montoARS, montoUSD;
+      let montoARS, montoUSD, tipoCambioUsado;
 
       if (monedaOrigen === 'ARS') {
         montoARS = parseFloat(monto);
         montoUSD = this.convertARStoUSD(monto, tc);
+        tipoCambioUsado = tc.valor_venta_usd_ars; // ARS→USD usa venta
       } else if (monedaOrigen === 'USD') {
         montoUSD = parseFloat(monto);
         montoARS = this.convertUSDtoARS(monto, tc);
+        tipoCambioUsado = tc.valor_compra_usd_ars; // USD→ARS usa compra
       } else {
         throw new Error(`Moneda origen inválida: ${monedaOrigen}`);
       }
@@ -183,7 +195,7 @@ export class ExchangeRateService {
       return {
         monto_ars: montoARS,
         monto_usd: montoUSD,
-        tipo_cambio_usado: tc.valor_venta_usd_ars,
+        tipo_cambio_usado: tipoCambioUsado,
         tipo_cambio_fecha: tc.fecha
       };
     } catch (error) {
@@ -219,8 +231,8 @@ export class ExchangeRateService {
       // Upsert (crear o actualizar)
       const [tipoCambio, created] = await TipoCambio.upsert({
         fecha: fechaStr,
-        valor_compra_usd_ars: parseFloat(valorCompra).toFixed(2),
-        valor_venta_usd_ars: parseFloat(valorVenta).toFixed(2),
+        valor_compra_usd_ars: parseFloat(parseFloat(valorCompra).toFixed(2)),
+        valor_venta_usd_ars: parseFloat(parseFloat(valorVenta).toFixed(2)),
         fuente: 'manual',
         observaciones,
         activo: true

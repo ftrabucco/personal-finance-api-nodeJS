@@ -85,6 +85,20 @@ describe('ExchangeRateService', () => {
 
         expect(result).toBe(0.67); // 1000 / 1490 ≈ 0.67
       });
+
+      test('should throw error for zero exchange rate', () => {
+        const zeroRate = { valor_venta_usd_ars: 0, valor_compra_usd_ars: 0 };
+
+        expect(() => ExchangeRateService.convertARStoUSD(1000, zeroRate))
+          .toThrow('Tipo de cambio inválido: el valor debe ser mayor a cero');
+      });
+
+      test('should throw error for negative exchange rate', () => {
+        const negativeRate = { valor_venta_usd_ars: -100, valor_compra_usd_ars: -100 };
+
+        expect(() => ExchangeRateService.convertARStoUSD(1000, negativeRate))
+          .toThrow('Tipo de cambio inválido: el valor debe ser mayor a cero');
+      });
     });
 
     describe('convertUSDtoARS', () => {
@@ -107,6 +121,13 @@ describe('ExchangeRateService', () => {
         const result = ExchangeRateService.convertUSDtoARS(montoUSD, mockExchangeRate);
 
         expect(result).toBe(147000.00); // 100 * 1470 = 147000
+      });
+
+      test('should throw error for zero exchange rate', () => {
+        const zeroRate = { valor_venta_usd_ars: 0, valor_compra_usd_ars: 0 };
+
+        expect(() => ExchangeRateService.convertUSDtoARS(100, zeroRate))
+          .toThrow('Tipo de cambio inválido: el valor debe ser mayor a cero');
       });
     });
 
@@ -136,7 +157,7 @@ describe('ExchangeRateService', () => {
 
         expect(result.monto_usd).toBe(100);
         expect(result.monto_ars).toBe(147000.00);
-        expect(result.tipo_cambio_usado).toBe(1490.00);
+        expect(result.tipo_cambio_usado).toBe(1470.00); // USD→ARS usa valor de compra
       });
 
       test('should throw error for invalid currency', async () => {
