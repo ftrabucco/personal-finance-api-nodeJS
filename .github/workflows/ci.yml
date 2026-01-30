@@ -99,9 +99,30 @@ jobs:
       - name: Sync database tables
         run: |
           node -e "
-            import('./src/models/index.js').then(async ({ sequelize }) => {
-              await sequelize.sync();
-              console.log('Tables synced!');
+            import('./src/models/index.js').then(async (models) => {
+              const { sequelize } = models;
+
+              // Sync independent tables first (no foreign keys)
+              const independentModels = [
+                'Usuario', 'TipoPago', 'CategoriaGasto',
+                'FrecuenciaGasto', 'ImportanciaGasto', 'TipoCambio'
+              ];
+              for (const name of independentModels) {
+                await models[name].sync();
+                console.log('Synced: ' + name);
+              }
+
+              // Then sync dependent tables (have foreign keys to the above)
+              const dependentModels = [
+                'Tarjeta', 'Gasto', 'GastoUnico',
+                'GastoRecurrente', 'DebitoAutomatico', 'Compra'
+              ];
+              for (const name of dependentModels) {
+                await models[name].sync();
+                console.log('Synced: ' + name);
+              }
+
+              console.log('All tables synced!');
               await sequelize.close();
             });
           "
@@ -208,9 +229,30 @@ jobs:
       - name: Sync database tables
         run: |
           node -e "
-            import('./src/models/index.js').then(async ({ sequelize }) => {
-              await sequelize.sync();
-              console.log('Tables synced!');
+            import('./src/models/index.js').then(async (models) => {
+              const { sequelize } = models;
+
+              // Sync independent tables first (no foreign keys)
+              const independentModels = [
+                'Usuario', 'TipoPago', 'CategoriaGasto',
+                'FrecuenciaGasto', 'ImportanciaGasto', 'TipoCambio'
+              ];
+              for (const name of independentModels) {
+                await models[name].sync();
+                console.log('Synced: ' + name);
+              }
+
+              // Then sync dependent tables (have foreign keys to the above)
+              const dependentModels = [
+                'Tarjeta', 'Gasto', 'GastoUnico',
+                'GastoRecurrente', 'DebitoAutomatico', 'Compra'
+              ];
+              for (const name of dependentModels) {
+                await models[name].sync();
+                console.log('Synced: ' + name);
+              }
+
+              console.log('All tables synced!');
               await sequelize.close();
             });
           "
