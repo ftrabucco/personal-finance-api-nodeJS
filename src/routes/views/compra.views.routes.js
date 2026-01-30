@@ -28,4 +28,4 @@ router.put('/:id', handleFormEditarCompra);
 // Eliminar compra
 router.delete('/:id', handleDeleteCompra);
 
-export default router; 
+export default router;

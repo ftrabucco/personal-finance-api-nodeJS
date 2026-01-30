@@ -49,12 +49,13 @@ export class GastoUnicoController extends BaseController {
 
       // Normalizar fecha (YYYY-MM-DD)
       const fechaParaBD = new Date(req.body.fecha).toISOString().split('T')[0];
-      
+
       // Crear gasto único y gasto real de forma transaccional usando el servicio
-      const gastoUnico = await this.gastoUnicoService.createWithGastoReal({
+      // Agregar usuario_id del usuario autenticado
+      const gastoUnico = await this.gastoUnicoService.createForUser({
         ...req.body,
         fecha: fechaParaBD
-      }, transaction);
+      }, req.user.id, transaction);
 
       await transaction.commit();
       logger.info('Gasto único creado exitosamente:', { gastoUnico_id: gastoUnico.id });
@@ -71,7 +72,8 @@ export class GastoUnicoController extends BaseController {
   async update(req, res) {
     const transaction = await sequelize.transaction();
     try {
-      const gastoUnico = await this.model.findByPk(req.params.id);
+      // Buscar el gasto único que pertenece al usuario autenticado
+      const gastoUnico = await this.gastoUnicoService.findByIdAndUser(req.params.id, req.user.id);
       if (!gastoUnico) {
         await transaction.rollback();
         return sendError(res, 404, 'Gasto único no encontrado');
@@ -111,9 +113,9 @@ export class GastoUnicoController extends BaseController {
 
       if (Object.keys(gastoUpdateData).length > 0) {
         await Gasto.update(gastoUpdateData, {
-          where: { 
-            tipo_origen: 'unico', 
-            id_origen: gastoUnico.id 
+          where: {
+            tipo_origen: 'unico',
+            id_origen: gastoUnico.id
           },
           transaction
         });
@@ -121,7 +123,7 @@ export class GastoUnicoController extends BaseController {
 
       await transaction.commit();
       logger.info('Gasto único y gasto asociado actualizados exitosamente:', { id: gastoUnico.id });
-      
+
       // Recargar datos actualizados
       const updatedGastoUnico = await this.model.findByPk(gastoUnico.id, {
         include: this.getIncludes()
@@ -139,7 +141,8 @@ export class GastoUnicoController extends BaseController {
   async delete(req, res) {
     const transaction = await sequelize.transaction();
     try {
-      const gastoUnico = await this.model.findByPk(req.params.id);
+      // Buscar el gasto único que pertenece al usuario autenticado
+      const gastoUnico = await this.gastoUnicoService.findByIdAndUser(req.params.id, req.user.id);
       if (!gastoUnico) {
         await transaction.rollback();
         return sendError(res, 404, 'Gasto único no encontrado');
@@ -147,9 +150,9 @@ export class GastoUnicoController extends BaseController {
 
       // 1. Eliminar gasto asociado primero (business rule: eliminar ambas tablas)
       const deletedGastos = await Gasto.destroy({
-        where: { 
-          tipo_origen: 'unico', 
-          id_origen: gastoUnico.id 
+        where: {
+          tipo_origen: 'unico',
+          id_origen: gastoUnico.id
         },
         transaction
       });
@@ -158,12 +161,12 @@ export class GastoUnicoController extends BaseController {
       await gastoUnico.destroy({ transaction });
 
       await transaction.commit();
-      logger.info('Gasto único y gasto asociado eliminados exitosamente:', { 
+      logger.info('Gasto único y gasto asociado eliminados exitosamente:', {
         gastoUnico_id: gastoUnico.id,
         gastos_eliminados: deletedGastos
       });
 
-      return sendSuccess(res, { 
+      return sendSuccess(res, {
         message: 'Gasto único eliminado correctamente',
         gastos_eliminados: deletedGastos
       });
@@ -193,7 +196,10 @@ export class GastoUnicoController extends BaseController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
@@ -227,7 +233,7 @@ export class GastoUnicoController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const gastosUnicos = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: gastosUnicos.count,
@@ -236,7 +242,7 @@ export class GastoUnicoController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < gastosUnicos.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, gastosUnicos.rows, pagination);
       } else {
         const gastosUnicos = await this.model.findAll(queryOptions);

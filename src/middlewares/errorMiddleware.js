@@ -1,17 +1,17 @@
-import logger from '../utils/logger.js'
+import logger from '../utils/logger.js';
 
-export function errorMiddleware(err, req, res, next) {
+export function errorMiddleware(err, req, res, _next) {
   //logger.error(`${err.message}`, { stack: err.stack });
   logger.error(`${err.message}`);
-    console.error('Error capturado:', err);
-  
-    const statusCode = err.status || 500;
-    const message = err.message || 'Error Interno del Servidor';
-    const detalles = err.details || [];
-  
-    res.status(statusCode).json({
-      status: 'error',
-      message,
-      detalles
-    });
-  }
+  logger.error('Error capturado:', err);
+
+  const statusCode = err.status || 500;
+  const message = err.message || 'Error Interno del Servidor';
+  const detalles = err.details || [];
+
+  res.status(statusCode).json({
+    status: 'error',
+    message,
+    detalles
+  });
+}

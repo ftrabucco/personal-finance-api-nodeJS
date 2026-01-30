@@ -137,23 +137,45 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
   /**
    * Generate recurring expense with common pattern
    * Subclasses should call this method and provide specific data
+   *
+   * IMPORTANT: This method is called AFTER findReadyForGeneration has already
+   * filtered sources, so we don't check shouldGenerate here. We only validate
+   * the source data structure.
+   *
    * @param {Object} source - The recurring expense source object
    * @param {Object} additionalData - Additional data specific to the strategy
    * @param {Object} transaction - Database transaction object
    * @returns {Promise<Object|null>} Generated expense or null
    */
   async generateRecurringExpense(source, additionalData, transaction) {
-    if (!this.validateSource(source) || !await this.shouldGenerate(source)) {
+    const today = moment().tz('America/Argentina/Buenos_Aires');
+    const fechaParaBD = today.format('YYYY-MM-DD');
+    return this.generateRecurringExpenseWithDate(source, additionalData, fechaParaBD, transaction);
+  }
+
+  /**
+   * Generate recurring expense with a specific date (for catch-up logic)
+   *
+   * @param {Object} source - The recurring expense source object
+   * @param {Object} additionalData - Additional data specific to the strategy
+   * @param {string} targetDate - Target date in YYYY-MM-DD format
+   * @param {Object} transaction - Database transaction object
+   * @returns {Promise<Object|null>} Generated expense or null
+   */
+  async generateRecurringExpenseWithDate(source, additionalData, targetDate, transaction) {
+    // Only validate source structure, skip shouldGenerate check
+    if (!this.validateSource(source)) {
       return null;
     }
 
     try {
-      const today = moment().tz('America/Argentina/Buenos_Aires');
-      const fechaParaBD = today.format('YYYY-MM-DD');
-
+      // 💱 Use pre-calculated multi-currency amounts (updated daily by ExchangeRateScheduler)
       const gastoData = this.createGastoData(source, {
-        fecha: fechaParaBD,
-        monto_ars: source.monto,
+        fecha: targetDate,
+        monto_ars: source.monto_ars || source.monto, // Backward compatibility
+        monto_usd: source.monto_usd || null,
+        moneda_origen: source.moneda_origen || 'ARS',
+        tipo_cambio_usado: source.tipo_cambio_referencia || null, // Para recurrentes usa tipo_cambio_referencia
         ...additionalData
       });
 
@@ -162,14 +184,17 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
         fields: Object.keys(gastoData)
       });
 
-      // Update the last generated date
-      await this.updateLastGeneratedDate(source, fechaParaBD, transaction);
+      // Update the last generated date with the target date
+      await this.updateLastGeneratedDate(source, targetDate, transaction);
 
-      logger.info(`${this.getType()} expense generated successfully`, {
+      logger.info(`${this.getType()} expense generated successfully (multi-currency)`, {
         gasto_id: gasto.id,
         source_id: source.id,
         type: this.getType(),
-        monto: source.monto
+        fecha: targetDate,
+        monto_ars: gasto.monto_ars,
+        monto_usd: gasto.monto_usd,
+        moneda_origen: source.moneda_origen
       });
 
       return gasto;

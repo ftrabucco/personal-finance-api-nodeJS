@@ -28,4 +28,4 @@ router.put('/:id', handleFormEditarDebitoAutomatico);
 // Eliminar débito automático
 router.delete('/:id', handleDeleteDebitoAutomatico);
 
-export default router; 
+export default router;
