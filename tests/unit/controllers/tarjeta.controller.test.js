@@ -216,13 +216,11 @@ describe('TarjetaController', () => {
       const normalizedData = { ...mockReq.body, permite_cuotas: true };
       const createdTarjeta = { id: 1, ...normalizedData, usuario_id: 1 };
 
-      mockTarjetaService.validateTarjetaData.mockReturnValue([]);
       mockTarjetaService.normalizeTarjetaData.mockReturnValue(normalizedData);
       mockTarjeta.create.mockResolvedValue(createdTarjeta);
 
       await tarjetaController.create(mockReq, mockRes);
 
-      expect(mockTarjetaService.validateTarjetaData).toHaveBeenCalledWith(mockReq.body);
       expect(mockTarjetaService.normalizeTarjetaData).toHaveBeenCalledWith(mockReq.body);
       expect(mockTarjeta.create).toHaveBeenCalledWith({
         ...normalizedData,
@@ -231,22 +229,8 @@ describe('TarjetaController', () => {
       expect(mockResponseHelper.sendSuccess).toHaveBeenCalledWith(mockRes, createdTarjeta, 201);
     });
 
-    test('should return validation errors', async () => {
-      const validationErrors = ['El nombre es requerido'];
-      mockTarjetaService.validateTarjetaData.mockReturnValue(validationErrors);
-
-      await tarjetaController.create(mockReq, mockRes);
-
-      expect(mockResponseHelper.sendValidationError).toHaveBeenCalledWith(
-        mockRes,
-        validationErrors
-      );
-      expect(mockTarjeta.create).not.toHaveBeenCalled();
-    });
-
     test('should handle database errors', async () => {
       const error = new Error('Database error');
-      mockTarjetaService.validateTarjetaData.mockReturnValue([]);
       mockTarjetaService.normalizeTarjetaData.mockReturnValue(mockReq.body);
       mockTarjeta.create.mockRejectedValue(error);
 
@@ -284,7 +268,6 @@ describe('TarjetaController', () => {
       const normalizedData = { ...mockReq.body };
 
       mockTarjetaService.findByIdAndUser.mockResolvedValue(existingTarjeta);
-      mockTarjetaService.validateTarjetaData.mockReturnValue([]);
       mockTarjetaService.normalizeTarjetaData.mockReturnValue(normalizedData);
 
       await tarjetaController.update(mockReq, mockRes);
@@ -306,21 +289,6 @@ describe('TarjetaController', () => {
       );
     });
 
-    test('should return validation errors', async () => {
-      const existingTarjeta = { id: 1, usuario_id: 1 };
-      const validationErrors = ['Error de validación'];
-
-      mockTarjetaService.findByIdAndUser.mockResolvedValue(existingTarjeta);
-      mockTarjetaService.validateTarjetaData.mockReturnValue(validationErrors);
-
-      await tarjetaController.update(mockReq, mockRes);
-
-      expect(mockResponseHelper.sendValidationError).toHaveBeenCalledWith(
-        mockRes,
-        validationErrors
-      );
-    });
-
     test('should remove usuario_id from normalized data', async () => {
       const existingTarjeta = {
         id: 1,
@@ -333,7 +301,6 @@ describe('TarjetaController', () => {
       };
 
       mockTarjetaService.findByIdAndUser.mockResolvedValue(existingTarjeta);
-      mockTarjetaService.validateTarjetaData.mockReturnValue([]);
       mockTarjetaService.normalizeTarjetaData.mockReturnValue(normalizedData);
 
       await tarjetaController.update(mockReq, mockRes);

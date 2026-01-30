@@ -47,10 +47,14 @@ export async function connectDatabase() {
     await sequelize.authenticate();
     logger.info('Conexión a PostgreSQL establecida correctamente');
 
-    // Sincronizar modelos (en desarrollo y producción, no en test)
-    if (process.env.NODE_ENV !== 'test') {
+    // Sincronizar modelos solo en desarrollo (alter:true puede destruir datos en producción)
+    if (process.env.NODE_ENV === 'development') {
       await sequelize.sync({ alter: true });
-      logger.info('Modelos sincronizados con PostgreSQL');
+      logger.info('Modelos sincronizados con PostgreSQL (development)');
+    } else if (process.env.NODE_ENV !== 'test') {
+      // En producción: solo sync sin alter (crea tablas faltantes, no modifica existentes)
+      await sequelize.sync();
+      logger.info('Modelos sincronizados con PostgreSQL (production - sin alter)');
     }
 
     return sequelize;
