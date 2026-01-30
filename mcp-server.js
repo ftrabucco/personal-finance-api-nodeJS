@@ -7,12 +7,11 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import cors from 'cors';
-import { 
+import {
   CallToolRequestSchema,
-  ListToolsRequestSchema,
+  ListToolsRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -26,12 +25,12 @@ class FinanzasApiMCPServer {
     this.server = new Server(
       {
         name: 'finanzas-api-mcp',
-        version: '1.0.0',
+        version: '1.0.0'
       },
       {
         capabilities: {
-          tools: {},
-        },
+          tools: {}
+        }
       }
     );
 
@@ -48,32 +47,32 @@ class FinanzasApiMCPServer {
             description: 'Retorna las reglas de negocio completas del sistema',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_api_endpoints',
             description: 'Retorna lista de endpoints disponibles para testing',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_gastos_api_docs',
             description: 'Retorna documentación detallada de /api/gastos endpoints con casos de uso, parámetros y escenarios de prueba',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_swagger_docs',
             description: 'Retorna documentación Swagger/OpenAPI para los endpoints de gastos y gastos únicos',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
           },
           {
             name: 'get_test_scenarios',
@@ -83,11 +82,11 @@ class FinanzasApiMCPServer {
               properties: {
                 category: {
                   type: 'string',
-                  description: 'Categoría de tests: gastos_unicos, compras, recurrentes, tarjetas, job',
-                  enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'all']
+                  description: 'Categoría de tests: gastos_unicos, compras, recurrentes, tarjetas, job, auth',
+                  enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'auth', 'all']
                 }
-              },
-            },
+              }
+            }
           },
           {
             name: 'get_validation_schemas',
@@ -97,19 +96,43 @@ class FinanzasApiMCPServer {
               properties: {
                 entity: {
                   type: 'string',
-                  description: 'Entidad específica: gasto_unico, compra, gasto_recurrente, debito_automatico',
-                  enum: ['gasto_unico', 'compra', 'gasto_recurrente', 'debito_automatico']
+                  description: 'Entidad específica: gasto_unico, compra, gasto_recurrente, debito_automatico, tarjeta',
+                  enum: ['gasto_unico', 'compra', 'gasto_recurrente', 'debito_automatico', 'tarjeta']
                 }
-              },
-            },
+              }
+            }
           },
           {
             name: 'get_database_schema',
             description: 'Retorna estructura de base de datos y relaciones',
             inputSchema: {
               type: 'object',
-              properties: {},
-            },
+              properties: {}
+            }
+          },
+          {
+            name: 'get_auth_endpoints',
+            description: 'Retorna documentación de endpoints de autenticación JWT',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'get_auth_schemas',
+            description: 'Retorna esquemas Swagger para autenticación y JWT',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
+          },
+          {
+            name: 'get_multicurrency_docs',
+            description: 'Retorna documentación completa del sistema multi-moneda USD/ARS: arquitectura, endpoints, reglas de negocio, campos, ejemplos y escenarios de prueba',
+            inputSchema: {
+              type: 'object',
+              properties: {}
+            }
           },
           {
             name: 'execute_api_call',
@@ -132,9 +155,9 @@ class FinanzasApiMCPServer {
                 }
               },
               required: ['method', 'endpoint']
-            },
+            }
           }
-        ],
+        ]
       };
     });
 
@@ -144,41 +167,50 @@ class FinanzasApiMCPServer {
 
       try {
         switch (name) {
-          case 'get_business_rules':
-            return await this.getBusinessRules();
-          
-          case 'get_api_endpoints':
-            return await this.getApiEndpoints();
-            
-          case 'get_gastos_api_docs':
-            return await this.getGastosApiDocs();
-            
-          case 'get_swagger_docs':
-            return await this.getSwaggerDocs();
-          
-          case 'get_test_scenarios':
-            return await this.getTestScenarios(args.category || 'all');
-          
-          case 'get_validation_schemas':
-            return await this.getValidationSchemas(args.entity);
-          
-          case 'get_database_schema':
-            return await this.getDatabaseSchema();
-          
-          case 'execute_api_call':
-            return await this.executeApiCall(args);
-          
-          default:
-            throw new Error(`Herramienta desconocida: ${name}`);
+        case 'get_business_rules':
+          return await this.getBusinessRules();
+
+        case 'get_api_endpoints':
+          return await this.getApiEndpoints();
+
+        case 'get_gastos_api_docs':
+          return await this.getGastosApiDocs();
+
+        case 'get_swagger_docs':
+          return await this.getSwaggerDocs();
+
+        case 'get_test_scenarios':
+          return await this.getTestScenarios(args.category || 'all');
+
+        case 'get_validation_schemas':
+          return await this.getValidationSchemas(args.entity);
+
+        case 'get_database_schema':
+          return await this.getDatabaseSchema();
+
+        case 'get_auth_endpoints':
+          return await this.getAuthEndpoints();
+
+        case 'get_auth_schemas':
+          return await this.getAuthSchemas();
+
+        case 'get_multicurrency_docs':
+          return await this.getMulticurrencyDocs();
+
+        case 'execute_api_call':
+          return await this.executeApiCall(args);
+
+        default:
+          throw new Error(`Herramienta desconocida: ${name}`);
         }
       } catch (error) {
         return {
           content: [
             {
               type: 'text',
-              text: `Error ejecutando ${name}: ${error.message}`,
-            },
-          ],
+              text: `Error ejecutando ${name}: ${error.message}`
+            }
+          ]
         };
       }
     });
@@ -193,20 +225,20 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# Business Rules (Strategy Pattern + BaseService Architecture)\n\n` +
-                  `> Last Updated: September 2025 - Post Major Migration\n` +
-                  `> Architecture: Clean Architecture with Strategy Pattern\n\n${content}`,
-          },
-        ],
+            text: '# Business Rules (Strategy Pattern + BaseService Architecture)\n\n' +
+                  '> Last Updated: September 2025 - Post Major Migration\n' +
+                  `> Architecture: Clean Architecture with Strategy Pattern\n\n${content}`
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error reading business rules: ${error.message}\nPath: docs/architecture/business-rules.md`,
-          },
-        ],
+            text: `Error reading business rules: ${error.message}\nPath: docs/architecture/business-rules.md`
+          }
+        ]
       };
     }
   }
@@ -220,20 +252,20 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# API Endpoints Documentation (Current)\n\n` +
-                  `> Strategy Pattern + BaseService Architecture\n` +
-                  `> All endpoints verified and functional\n\n${content}`,
-          },
-        ],
+            text: '# API Endpoints Documentation (Current)\n\n' +
+                  '> Strategy Pattern + BaseService Architecture\n' +
+                  `> All endpoints verified and functional\n\n${content}`
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error reading API documentation: ${error.message}\nPath: docs/api/endpoints.md`,
-          },
-        ],
+            text: `Error reading API documentation: ${error.message}\nPath: docs/api/endpoints.md`
+          }
+        ]
       };
     }
   }
@@ -247,20 +279,20 @@ class FinanzasApiMCPServer {
         content: [
           {
             type: 'text',
-            text: `# OpenAPI/Swagger Specification (Current)\n` +
-                  `# Architecture: Strategy Pattern + BaseService\n` +
-                  `# Last Updated: September 2025\n\n${content}`,
-          },
-        ],
+            text: '# OpenAPI/Swagger Specification (Current)\n' +
+                  '# Architecture: Strategy Pattern + BaseService\n' +
+                  `# Last Updated: September 2025\n\n${content}`
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error reading Swagger documentation: ${error.message}\nPath: docs/api/swagger.yaml`,
-          },
-        ],
+            text: `Error reading Swagger documentation: ${error.message}\nPath: docs/api/swagger.yaml`
+          }
+        ]
       };
     }
   }
@@ -325,6 +357,25 @@ class FinanzasApiMCPServer {
           '✅ PUT /api/debitos-automaticos/:id - Actualizar',
           '✅ DELETE /api/debitos-automaticos/:id - Eliminar'
         ]
+      },
+      tarjetas: {
+        base: '/api/tarjetas',
+        endpoints: [
+          '✅ GET /api/tarjetas - Obtener tarjetas con filtros opcionales y paginación inteligente',
+          '✅ GET /api/tarjetas/stats - Obtener estadísticas de tarjetas del usuario',
+          '✅ GET /api/tarjetas/:id - Obtener tarjeta por ID',
+          '✅ GET /api/tarjetas/:id/usage - Validar uso de tarjeta en gastos/compras',
+          '✅ POST /api/tarjetas - Crear nueva tarjeta',
+          '✅ PUT /api/tarjetas/:id - Actualizar tarjeta',
+          '✅ DELETE /api/tarjetas/:id - Eliminar tarjeta (solo si no está en uso)'
+        ],
+        business_logic: [
+          '🔧 Validación automática por tipo: crédito requiere fechas, débito no',
+          '🔧 Normalización automática de datos según tipo de tarjeta',
+          '🔧 Validación de uso antes de eliminar (gastos/compras asociados)',
+          '🔧 Estadísticas por usuario: total, crédito, débito, virtual',
+          '🔧 Filtros: tipo, banco, permite_cuotas con paginación inteligente'
+        ]
       }
     };
 
@@ -332,9 +383,9 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(endpoints, null, 2),
-        },
-      ],
+          text: JSON.stringify(endpoints, null, 2)
+        }
+      ]
     };
   }
 
@@ -381,8 +432,8 @@ class FinanzasApiMCPServer {
             response_structure: {
               success: true,
               data: 'array',
-              meta: { 
-                total: 'number', 
+              meta: {
+                total: 'number',
                 type: 'collection',
                 pagination: {
                   limit: 3,
@@ -450,20 +501,322 @@ class FinanzasApiMCPServer {
       ],
       tarjetas: [
         {
-          name: 'Tarjeta Crédito Requiere Fechas',
+          name: 'Tarjeta Crédito Válida',
+          description: 'Crear tarjeta de crédito con todas las validaciones',
+          endpoint: 'POST /api/tarjetas',
+          payload: {
+            nombre: 'Visa Crédito Test',
+            tipo: 'credito',
+            banco: 'Banco Nación',
+            dia_mes_cierre: 15,
+            dia_mes_vencimiento: 10,
+            ultimos_4_digitos: '1234'
+          },
+          expected: {
+            status: 201,
+            response_structure: {
+              success: true,
+              data: {
+                id: 'number',
+                nombre: 'Visa Crédito Test',
+                tipo: 'credito',
+                banco: 'Banco Nación',
+                dia_mes_cierre: 15,
+                dia_mes_vencimiento: 10,
+                permite_cuotas: true,
+                ultimos_4_digitos: '1234'
+              }
+            }
+          }
+        },
+        {
+          name: 'Tarjeta Débito Válida',
+          description: 'Crear tarjeta de débito sin fechas',
+          endpoint: 'POST /api/tarjetas',
+          payload: {
+            nombre: 'Mastercard Débito Test',
+            tipo: 'debito',
+            banco: 'Banco Santander',
+            ultimos_4_digitos: '5678'
+          },
+          expected: {
+            status: 201,
+            response_structure: {
+              success: true,
+              data: {
+                id: 'number',
+                nombre: 'Mastercard Débito Test',
+                tipo: 'debito',
+                banco: 'Banco Santander',
+                dia_mes_cierre: null,
+                dia_mes_vencimiento: null,
+                permite_cuotas: false,
+                ultimos_4_digitos: '5678'
+              }
+            }
+          }
+        },
+        {
+          name: 'Tarjeta Crédito Sin Fechas - Error',
           description: 'Tarjeta de crédito debe tener dias de cierre y vencimiento',
           endpoint: 'POST /api/tarjetas',
           payload: {
-            nombre: 'Test Crédito',
+            nombre: 'Test Crédito Inválido',
             tipo: 'credito',
-            banco: 'Test Bank',
-            dia_cierre: null,
-            dia_vencimiento: null,
-            permite_cuotas: true
+            banco: 'Test Bank'
           },
           expected: {
             status: 400,
-            error_contains: 'fechas'
+            response_structure: {
+              success: false,
+              message: 'Datos de tarjeta inválidos',
+              errors: [
+                'Las tarjetas de crédito requieren día de cierre',
+                'Las tarjetas de crédito requieren día de vencimiento'
+              ]
+            }
+          }
+        },
+        {
+          name: 'Tarjeta Débito Con Fechas - Error',
+          description: 'Tarjeta de débito no debe tener fechas de cierre/vencimiento',
+          endpoint: 'POST /api/tarjetas',
+          payload: {
+            nombre: 'Test Débito Inválido',
+            tipo: 'debito',
+            banco: 'Test Bank',
+            dia_mes_cierre: 15,
+            dia_mes_vencimiento: 10
+          },
+          expected: {
+            status: 400,
+            response_structure: {
+              success: false,
+              message: 'Datos de tarjeta inválidos',
+              errors: [
+                'Las tarjetas de débito no deben tener días de cierre o vencimiento'
+              ]
+            }
+          }
+        },
+        {
+          name: 'Filtros Tarjetas por Tipo',
+          description: 'Filtrar tarjetas por tipo con paginación inteligente',
+          endpoint: 'GET /api/tarjetas?tipo=credito',
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: 'array',
+              meta: {
+                total: 'number',
+                type: 'collection'
+              }
+            }
+          }
+        },
+        {
+          name: 'Estadísticas de Tarjetas',
+          description: 'Obtener estadísticas de tarjetas del usuario autenticado',
+          endpoint: 'GET /api/tarjetas/stats',
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: {
+                estadisticas: {
+                  total: 'number',
+                  credito: 'number',
+                  debito: 'number',
+                  virtual: 'number'
+                },
+                usuario_id: 'number'
+              }
+            }
+          }
+        },
+        {
+          name: 'Validar Uso de Tarjeta',
+          description: 'Verificar si tarjeta está en uso antes de eliminar',
+          endpoint: 'GET /api/tarjetas/:id/usage',
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: {
+                tarjeta: {
+                  id: 'number',
+                  nombre: 'string',
+                  tipo: 'string'
+                },
+                inUse: 'boolean',
+                usage: {
+                  gastos: 'number',
+                  compras: 'number',
+                  total: 'number'
+                }
+              }
+            }
+          }
+        },
+        {
+          name: 'Eliminar Tarjeta en Uso - Error',
+          description: 'No se debe poder eliminar tarjeta que está siendo utilizada',
+          endpoint: 'DELETE /api/tarjetas/:id',
+          expected: {
+            status: 400,
+            response_structure: {
+              success: false,
+              message: 'No se puede eliminar la tarjeta',
+              error: 'La tarjeta está siendo utilizada en X registro(s)'
+            }
+          }
+        },
+        {
+          name: 'Actualizar Tarjeta Válida',
+          description: 'Actualizar datos de tarjeta manteniendo validaciones',
+          endpoint: 'PUT /api/tarjetas/:id',
+          payload: {
+            nombre: 'Visa Actualizada',
+            banco: 'Banco Actualizado'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              data: {
+                id: 'number',
+                nombre: 'Visa Actualizada',
+                banco: 'Banco Actualizado'
+              }
+            }
+          }
+        }
+      ],
+      auth: [
+        {
+          name: 'Registro Usuario Válido',
+          description: 'Registrar usuario con datos válidos',
+          endpoint: 'POST /api/auth/register',
+          payload: {
+            nombre: 'Test User',
+            email: 'test@example.com',
+            password: 'Password123'
+          },
+          expected: {
+            status: 201,
+            response_structure: {
+              success: true,
+              message: 'Usuario registrado exitosamente',
+              data: { user: { id: 'number', nombre: 'string', email: 'string' } }
+            },
+            excludes: ['password']
+          }
+        },
+        {
+          name: 'Login Usuario Válido',
+          description: 'Login con credenciales correctas devuelve token JWT',
+          endpoint: 'POST /api/auth/login',
+          payload: {
+            email: 'test@example.com',
+            password: 'Password123'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              message: 'Login exitoso',
+              data: {
+                token: 'string (JWT format)',
+                user: { id: 'number', nombre: 'string', email: 'string' }
+              }
+            },
+            token_validation: 'JWT should be valid and decodable'
+          }
+        },
+        {
+          name: 'Registro Password Débil',
+          description: 'Password que no cumple política de seguridad debe fallar',
+          endpoint: 'POST /api/auth/register',
+          payload: {
+            nombre: 'Test User',
+            email: 'weak@example.com',
+            password: 'weak'
+          },
+          expected: {
+            status: 400,
+            response_structure: {
+              success: false,
+              message: 'Datos de registro inválidos',
+              errors: 'array containing password requirements'
+            }
+          }
+        },
+        {
+          name: 'Login Credenciales Incorrectas',
+          description: 'Login con password incorrecto debe fallar',
+          endpoint: 'POST /api/auth/login',
+          payload: {
+            email: 'test@example.com',
+            password: 'wrongpassword'
+          },
+          expected: {
+            status: 401,
+            response_structure: {
+              success: false,
+              message: 'Email o contraseña incorrectos',
+              error: 'INVALID_CREDENTIALS'
+            }
+          }
+        },
+        {
+          name: 'Perfil Sin Token',
+          description: 'Acceso a perfil sin token debe fallar',
+          endpoint: 'GET /api/auth/profile',
+          headers: {},
+          expected: {
+            status: 401,
+            response_structure: {
+              success: false,
+              message: 'Token de acceso requerido',
+              error: 'MISSING_TOKEN'
+            }
+          }
+        },
+        {
+          name: 'Perfil Con Token Válido',
+          description: 'Acceso a perfil con token válido debe retornar user data',
+          endpoint: 'GET /api/auth/profile',
+          headers: {
+            'Authorization': 'Bearer <JWT_TOKEN_FROM_LOGIN>'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              message: 'Perfil obtenido exitosamente',
+              data: { user: { id: 'number', nombre: 'string', email: 'string' } }
+            }
+          },
+          note: 'Token debe obtenerse desde login exitoso previo'
+        },
+        {
+          name: 'Cambio Password Válido',
+          description: 'Cambio de contraseña con datos válidos',
+          endpoint: 'POST /api/auth/change-password',
+          headers: {
+            'Authorization': 'Bearer <JWT_TOKEN_FROM_LOGIN>'
+          },
+          payload: {
+            currentPassword: 'Password123',
+            newPassword: 'NewPassword456'
+          },
+          expected: {
+            status: 200,
+            response_structure: {
+              success: true,
+              message: 'Contraseña actualizada exitosamente'
+            }
           }
         }
       ]
@@ -475,62 +828,79 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
   async getValidationSchemas(entity) {
     try {
       let schemaPath;
-      
+
       switch (entity) {
-        case 'compra':
-          schemaPath = 'src/validations/compra.validation.js';
-          break;
-        case 'gasto_recurrente':
-          schemaPath = 'src/validations/gastoRecurrente.validation.js';
-          break;
-        case 'debito_automatico':
-          schemaPath = 'src/validations/debitoAutomatico.validation.js';
-          break;
-        default:
-          // Retornar todos los esquemas
-          const allSchemas = await Promise.all([
-            fs.readFile(path.join(__dirname, 'src/validations/compra.validation.js'), 'utf-8'),
-            fs.readFile(path.join(__dirname, 'src/validations/gastoRecurrente.validation.js'), 'utf-8'),
-            fs.readFile(path.join(__dirname, 'src/validations/debitoAutomatico.validation.js'), 'utf-8')
-          ]);
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `// Compra Validation\n${allSchemas[0]}\n\n// Gasto Recurrente Validation\n${allSchemas[1]}\n\n// Débito Automático Validation\n${allSchemas[2]}`,
-              },
-            ],
-          };
+      case 'compra':
+        schemaPath = 'src/validations/compra.validation.js';
+        break;
+      case 'gasto_recurrente':
+        schemaPath = 'src/validations/gastoRecurrente.validation.js';
+        break;
+      case 'debito_automatico':
+        schemaPath = 'src/validations/debitoAutomatico.validation.js';
+        break;
+      case 'tarjeta': {
+        // Tarjetas usan validation.middleware.js que contiene todos los esquemas de validación
+        const validationPath = path.join(__dirname, 'src/middlewares/validation.middleware.js');
+        const validationContent = await fs.readFile(validationPath, 'utf-8');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '# Esquemas de Validación de Tarjetas (Joi)\n' +
+                      '# Validación condicional por tipo: crédito requiere fechas, débito no\n' +
+                      '# Normalización automática de datos según tipo\n\n' +
+                      validationContent.split('// Tarjeta validation')[1]?.split('// Export')[0] || 'Esquemas de tarjeta no encontrados'
+            }
+          ]
+        };
+      }
+      default: {
+        // Retornar todos los esquemas
+        const allSchemas = await Promise.all([
+          fs.readFile(path.join(__dirname, 'src/validations/compra.validation.js'), 'utf-8'),
+          fs.readFile(path.join(__dirname, 'src/validations/gastoRecurrente.validation.js'), 'utf-8'),
+          fs.readFile(path.join(__dirname, 'src/validations/debitoAutomatico.validation.js'), 'utf-8')
+        ]);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `// Compra Validation\n${allSchemas[0]}\n\n// Gasto Recurrente Validation\n${allSchemas[1]}\n\n// Débito Automático Validation\n${allSchemas[2]}`
+            }
+          ]
+        };
+      }
       }
 
       const content = await fs.readFile(path.join(__dirname, schemaPath), 'utf-8');
-      
+
       return {
         content: [
           {
             type: 'text',
-            text: content,
-          },
-        ],
+            text: content
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error leyendo esquemas de validación: ${error.message}`,
-          },
-        ],
+            text: `Error leyendo esquemas de validación: ${error.message}`
+          }
+        ]
       };
     }
   }
@@ -587,11 +957,21 @@ class FinanzasApiMCPServer {
           ]
         },
         tarjetas: {
-          description: 'Tarjetas con billing cycle logic for InstallmentStrategy',
+          description: 'Tarjetas con billing cycle logic for InstallmentStrategy + User isolation',
           fields: [
-            'id (PK)', 'nombre', 'tipo', 'banco',
-            'dia_cierre (billing close)', 'dia_vencimiento (due date)',
-            'permite_cuotas'
+            'id (PK)', 'nombre', 'tipo (debito|credito|virtual)', 'banco',
+            'ultimos_4_digitos (últimos 4 dígitos para identificación - opcional)',
+            'dia_mes_cierre (billing close - required for credito)',
+            'dia_mes_vencimiento (due date - required for credito)',
+            'permite_cuotas (auto-normalized by tipo)',
+            'usuario_id (FK - user isolation)'
+          ],
+          business_rules: [
+            'CREDITO: requiere dia_mes_cierre + dia_mes_vencimiento, permite_cuotas=true',
+            'DEBITO: no debe tener fechas, permite_cuotas=false',
+            'VIRTUAL: permite_cuotas configurable, fechas opcionales',
+            'User isolation: usuarios solo ven/modifican sus propias tarjetas',
+            'Usage validation: no se puede eliminar si está en uso en gastos/compras'
           ]
         }
       },
@@ -616,6 +996,12 @@ class FinanzasApiMCPServer {
           'GastoGeneratorService': 'Orchestrates all strategies',
           'Scheduler': 'Node-cron daily execution (5:00 AM Argentina)',
           'Transaction Safety': 'All operations use database transactions'
+        },
+        authentication: {
+          'AuthService': 'JWT-based authentication extending BaseService',
+          'AuthMiddleware': 'Token validation and user extraction',
+          'PasswordHashing': 'bcrypt with 10 salt rounds',
+          'UserModel': 'Usuario table with unique email constraint'
         }
       }
     };
@@ -624,9 +1010,799 @@ class FinanzasApiMCPServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(schema, null, 2),
+          text: JSON.stringify(schema, null, 2)
+        }
+      ]
+    };
+  }
+
+  async getAuthEndpoints() {
+    const endpoints = {
+      authentication: {
+        base_url: process.env.API_BASE_URL || 'http://localhost:3030',
+        endpoints: {
+          'POST /api/auth/register': {
+            description: 'Registro de nuevo usuario con validación JWT',
+            request_body: {
+              nombre: 'string (2-100 chars)',
+              email: 'string (email format)',
+              password: 'string (min 6 chars, 1 uppercase, 1 lowercase, 1 digit)'
+            },
+            responses: {
+              201: 'Usuario creado exitosamente',
+              400: 'Datos inválidos o email ya existe',
+              500: 'Error interno del servidor'
+            },
+            test_scenarios: {
+              valid_user: {
+                nombre: 'Test User',
+                email: 'test@example.com',
+                password: 'Password123'
+              },
+              duplicate_email: 'Should return 400',
+              invalid_password: 'Should return 400'
+            }
+          },
+          'POST /api/auth/login': {
+            description: 'Autenticación de usuario con JWT',
+            request_body: {
+              email: 'string (email format)',
+              password: 'string'
+            },
+            responses: {
+              200: 'Login exitoso con JWT token',
+              401: 'Credenciales inválidas',
+              400: 'Datos faltantes o inválidos'
+            },
+            test_scenarios: {
+              valid_credentials: {
+                email: 'test@example.com',
+                password: 'Password123'
+              },
+              invalid_credentials: 'Should return 401',
+              missing_fields: 'Should return 400'
+            }
+          },
+          'GET /api/auth/profile': {
+            description: 'Obtener perfil del usuario autenticado',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            responses: {
+              200: 'Perfil de usuario',
+              401: 'Token inválido o faltante',
+              404: 'Usuario no encontrado'
+            }
+          },
+          'PUT /api/auth/profile': {
+            description: 'Actualizar perfil del usuario autenticado',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            request_body: {
+              nombre: 'string (optional)',
+              email: 'string (optional, email format)'
+            },
+            responses: {
+              200: 'Perfil actualizado',
+              400: 'Datos inválidos',
+              401: 'Token inválido'
+            }
+          },
+          'POST /api/auth/change-password': {
+            description: 'Cambiar contraseña del usuario autenticado',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            request_body: {
+              currentPassword: 'string',
+              newPassword: 'string (min 6 chars, 1 uppercase, 1 lowercase, 1 digit)'
+            },
+            responses: {
+              200: 'Contraseña cambiada exitosamente',
+              400: 'Datos inválidos o contraseña actual incorrecta',
+              401: 'Token inválido'
+            }
+          },
+          'POST /api/auth/logout': {
+            description: 'Cerrar sesión (invalidar token)',
+            headers: {
+              Authorization: 'Bearer <JWT_TOKEN>'
+            },
+            responses: {
+              200: 'Logout exitoso',
+              401: 'Token inválido'
+            }
+          }
         },
-      ],
+        middleware: {
+          authenticateToken: 'Middleware requerido para rutas protegidas',
+          optionalAuth: 'Middleware opcional para autenticación',
+          requireRole: 'Middleware para control de roles (extensible)',
+          logAuthenticatedRequest: 'Middleware de auditoría'
+        },
+        jwt_configuration: {
+          algorithm: 'HS256',
+          default_expiry: '7d',
+          secret: 'process.env.JWT_SECRET || default',
+          bcrypt_rounds: 10
+        }
+      }
+    };
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(endpoints, null, 2)
+        }
+      ]
+    };
+  }
+
+  async getAuthSchemas() {
+    try {
+      const authSchemasPath = path.join(__dirname, 'docs', 'api', 'auth-schemas.yaml');
+      const content = await fs.readFile(authSchemasPath, 'utf-8');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '# Authentication Schemas (Swagger/OpenAPI)\n' +
+                  '# JWT-based authentication system with bcrypt password hashing\n' +
+                  '# Extends BaseService pattern for consistent CRUD operations\n\n' +
+                  content
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error cargando esquemas de autenticación: ${error.message}`
+          }
+        ]
+      };
+    }
+  }
+
+  async getMulticurrencyDocs() {
+    const docs = `# 💱 Sistema Multi-Moneda USD/ARS - Documentación Completa
+
+## Arquitectura General
+
+El sistema multi-moneda permite manejar gastos en pesos argentinos (ARS) y dólares estadounidenses (USD) con conversión automática y actualización diaria de tipos de cambio.
+
+### Características Principales:
+- ✅ Conversión automática ARS ↔ USD al crear gastos
+- ✅ Almacenamiento dual de montos (monto_ars + monto_usd)
+- ✅ Snapshot del tipo de cambio usado en cada transacción
+- ✅ Actualización diaria automática de tipos de cambio (00:00 AM)
+- ✅ Proyecciones realistas con TC actualizado
+- ✅ Integración con APIs externas (DolarAPI + BCRA)
+- ✅ Soporte para configuración manual de TC
+- ✅ Backward compatibility con datos legacy
+
+---
+
+## Modelos con Soporte Multi-Moneda
+
+### 1. TipoCambio (Nuevo)
+**Tabla:** \`finanzas.tipos_cambio\`
+**Propósito:** Almacena histórico de tipos de cambio (un registro por día)
+
+**Campos:**
+\`\`\`javascript
+{
+  fecha: DATE (PK),                    // Fecha del TC
+  valor_compra_usd_ars: DECIMAL(10,2), // Cotización de compra
+  valor_venta_usd_ars: DECIMAL(10,2),  // Cotización de venta (usado para conversiones)
+  fuente: ENUM,                         // 'manual', 'api_bcra', 'api_dolar_api'
+  activo: BOOLEAN,                      // TC activo/inactivo
+  createdAt: TIMESTAMP,
+  updatedAt: TIMESTAMP
+}
+\`\`\`
+
+### 2. GastoUnico
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),   // Moneda en que se ingresó
+  monto_ars: DECIMAL(10,2),            // Monto en pesos
+  monto_usd: DECIMAL(10,2),            // Monto en dólares
+  tipo_cambio_usado: DECIMAL(10,2)    // Snapshot del TC usado
+}
+\`\`\`
+
+### 3. Compra
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),
+  monto_total_ars: DECIMAL(10,2),      // Monto total en pesos
+  monto_total_usd: DECIMAL(10,2),      // Monto total en dólares
+  tipo_cambio_usado: DECIMAL(10,2)
+}
+\`\`\`
+
+### 4. GastoRecurrente
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),
+  monto_ars: DECIMAL(10,2),
+  monto_usd: DECIMAL(10,2),
+  tipo_cambio_referencia: DECIMAL(10,2)  // TC de referencia (actualizado diariamente)
+}
+\`\`\`
+
+### 5. DebitoAutomatico
+**Nuevos campos:**
+\`\`\`javascript
+{
+  moneda_origen: ENUM('ARS', 'USD'),
+  monto_ars: DECIMAL(10,2),
+  monto_usd: DECIMAL(10,2),
+  tipo_cambio_referencia: DECIMAL(10,2)
+}
+\`\`\`
+
+---
+
+## API Endpoints - Tipo de Cambio
+
+### GET /api/tipo-cambio/actual
+**Descripción:** Obtiene el tipo de cambio actual (activo)
+**Auth:** Required (JWT)
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "fecha": "2025-10-15",
+    "valor_compra_usd_ars": 1195.50,
+    "valor_venta_usd_ars": 1205.50,
+    "fuente": "api_dolar_api",
+    "activo": true,
+    "ultima_actualizacion": "2025-10-15T03:00:00Z"
+  }
+}
+\`\`\`
+
+### GET /api/tipo-cambio/historico
+**Descripción:** Obtiene histórico de tipos de cambio con filtros
+**Auth:** Required (JWT)
+**Query Params:**
+- \`fecha_desde\` (YYYY-MM-DD) - Opcional
+- \`fecha_hasta\` (YYYY-MM-DD) - Opcional
+- \`fuente\` (manual|api_bcra|api_dolar_api) - Opcional
+- \`limit\` (number, default: 30) - Opcional
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "total": 15,
+    "filtros": {
+      "fecha_desde": "2025-10-01",
+      "fecha_hasta": "2025-10-15",
+      "limit": 30
+    },
+    "datos": [
+      {
+        "fecha": "2025-10-15",
+        "valor_compra_usd_ars": 1195.50,
+        "valor_venta_usd_ars": 1205.50,
+        "fuente": "api_dolar_api",
+        "activo": true
+      }
+    ]
+  }
+}
+\`\`\`
+
+### POST /api/tipo-cambio/manual
+**Descripción:** Configura un tipo de cambio manualmente
+**Auth:** Required (JWT)
+**Body:**
+\`\`\`json
+{
+  "fecha": "2025-10-15",  // Opcional (default: hoy)
+  "valor_compra_usd_ars": 1195.50,  // Opcional
+  "valor_venta_usd_ars": 1205.50    // Required
+}
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "mensaje": "Tipo de cambio configurado exitosamente",
+    "tipo_cambio": {
+      "fecha": "2025-10-15",
+      "valor_compra_usd_ars": 1195.50,
+      "valor_venta_usd_ars": 1205.50,
+      "fuente": "manual",
+      "activo": true
+    }
+  }
+}
+\`\`\`
+
+### POST /api/tipo-cambio/actualizar
+**Descripción:** Actualiza el TC desde API externa
+**Auth:** Required (JWT)
+**Body:**
+\`\`\`json
+{
+  "fuente": "auto"  // 'auto', 'bcra', 'dolarapi'
+}
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "mensaje": "Tipo de cambio actualizado exitosamente",
+    "tipo_cambio": {
+      "fecha": "2025-10-15",
+      "valor_compra_usd_ars": 1195.50,
+      "valor_venta_usd_ars": 1205.50,
+      "fuente": "api_dolar_api",
+      "activo": true
+    }
+  }
+}
+\`\`\`
+
+### POST /api/tipo-cambio/convertir
+**Descripción:** Convierte un monto entre monedas
+**Auth:** Required (JWT)
+**Body:**
+\`\`\`json
+{
+  "monto": 100,
+  "moneda_origen": "USD"  // 'ARS' o 'USD'
+}
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "monto_original": 100,
+    "moneda_origen": "USD",
+    "conversion": {
+      "monto_ars": 120550.00,
+      "monto_usd": 100.00,
+      "tipo_cambio_usado": 1205.50,
+      "fecha_tipo_cambio": "2025-10-15"
+    }
+  }
+}
+\`\`\`
+
+---
+
+## Uso en Endpoints Existentes
+
+### POST /api/gastos-unicos
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Compra en Amazon",
+  "monto": 100,
+  "moneda_origen": "USD",  // 💱 Nuevo (default: 'ARS')
+  "fecha": "2025-10-15",
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 1
+}
+\`\`\`
+
+**Conversión automática:**
+El sistema automáticamente calcula:
+- \`monto_ars\` = 100 * 1205.50 = 120,550
+- \`monto_usd\` = 100
+- \`tipo_cambio_usado\` = 1205.50
+
+### POST /api/compras
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Compra en cuotas",
+  "monto_total": 50000,
+  "moneda_origen": "ARS",  // 💱 Nuevo
+  "cantidad_cuotas": 12,
+  "fecha_compra": "2025-10-15",
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 3,
+  "tarjeta_id": 1
+}
+\`\`\`
+
+### POST /api/gastos-recurrentes
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Alquiler mensual",
+  "monto": 920000,
+  "moneda_origen": "ARS",  // 💱 Nuevo
+  "dia_de_pago": 5,
+  "frecuencia_gasto_id": 4,  // Mensual
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 4
+}
+\`\`\`
+
+### POST /api/debitos-automaticos
+**Nuevos campos opcionales:**
+\`\`\`json
+{
+  "descripcion": "Netflix",
+  "monto": 15,
+  "moneda_origen": "USD",  // 💱 Nuevo
+  "dia_de_pago": 10,
+  "frecuencia_gasto_id": 4,
+  "categoria_gasto_id": 8,
+  "importancia_gasto_id": 2,
+  "tipo_pago_id": 3,
+  "tarjeta_id": 1
+}
+\`\`\`
+
+---
+
+## Reglas de Negocio Multi-Moneda
+
+### 1. Conversión al Crear
+- Si \`moneda_origen = 'USD'\` → calcula \`monto_ars\` usando TC actual
+- Si \`moneda_origen = 'ARS'\` → calcula \`monto_usd\` usando TC actual
+- Siempre guarda \`tipo_cambio_usado\` como snapshot
+
+### 2. Actualización Diaria (Scheduler)
+**Ejecución:** Todos los días a las 00:00 AM
+**Acciones:**
+1. Actualiza TC desde DolarAPI (fallback a BCRA)
+2. Re-calcula \`monto_ars\` y \`monto_usd\` de:
+   - Gastos Recurrentes activos
+   - Débitos Automáticos activos
+   - Cuotas pendientes de Compras
+
+**Por qué:** Asegura proyecciones realistas (ej: alquiler en ARS cambia su valor en USD mes a mes)
+
+### 3. Gastos Únicos
+- **NO se actualizan** después de crearse (snapshot histórico)
+- Conversión una vez al momento de creación
+
+### 4. Backward Compatibility
+- Datos legacy sin \`moneda_origen\` → default 'ARS'
+- Datos legacy sin \`monto_ars\`/\`monto_usd\` → usa \`monto\` como ARS
+
+---
+
+## Escenarios de Prueba E2E
+
+### Escenario 1: Crear Gasto Único en USD
+\`\`\`javascript
+// POST /api/gastos-unicos
+{
+  "descripcion": "Compra Amazon",
+  "monto": 50,
+  "moneda_origen": "USD",
+  "fecha": "2025-10-15",
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 3,
+  "tarjeta_id": 1
+}
+
+// Expected Response:
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "descripcion": "Compra Amazon",
+    "monto": 50,
+    "moneda_origen": "USD",
+    "monto_ars": 60275.00,  // 50 * 1205.50
+    "monto_usd": 50.00,
+    "tipo_cambio_usado": 1205.50,
+    // ... otros campos
+  }
+}
+
+// Validaciones:
+assert response.data.moneda_origen == "USD"
+assert response.data.monto_usd == 50
+assert response.data.monto_ars == 50 * TC_actual
+assert response.data.tipo_cambio_usado == TC_actual
+\`\`\`
+
+### Escenario 2: Crear Alquiler Mensual en ARS
+\`\`\`javascript
+// POST /api/gastos-recurrentes
+{
+  "descripcion": "Alquiler",
+  "monto": 920000,
+  "moneda_origen": "ARS",
+  "dia_de_pago": 5,
+  "frecuencia_gasto_id": 4,
+  "categoria_gasto_id": 1,
+  "importancia_gasto_id": 1,
+  "tipo_pago_id": 4
+}
+
+// Expected Response:
+{
+  "data": {
+    "moneda_origen": "ARS",
+    "monto_ars": 920000.00,
+    "monto_usd": 763.07,  // 920000 / 1205.50
+    "tipo_cambio_referencia": 1205.50
+  }
+}
+
+// Validaciones:
+assert response.data.monto_ars == 920000
+assert response.data.monto_usd == 920000 / TC_actual
+assert response.data.tipo_cambio_referencia == TC_actual
+\`\`\`
+
+### Escenario 3: Actualización Diaria
+\`\`\`javascript
+// 1. Crear alquiler (TC: 1200)
+POST /api/gastos-recurrentes → monto_usd = 766.67
+
+// 2. Simular cambio de TC al día siguiente (TC: 1300)
+POST /api/tipo-cambio/manual
+{
+  "valor_venta_usd_ars": 1300.00
+}
+
+// 3. Ejecutar scheduler (automático 00:00 o manual)
+// El scheduler actualiza:
+// monto_usd = 920000 / 1300 = 707.69
+
+// 4. Verificar actualización
+GET /api/gastos-recurrentes/:id
+
+// Validaciones:
+assert response.data.monto_ars == 920000  // Sin cambios
+assert response.data.monto_usd == 707.69  // Actualizado
+assert response.data.tipo_cambio_referencia == 1300.00
+\`\`\`
+
+### Escenario 4: Configurar TC Manualmente
+\`\`\`javascript
+// POST /api/tipo-cambio/manual
+{
+  "valor_venta_usd_ars": 1250.00
+}
+
+// Expected Response:
+{
+  "success": true,
+  "data": {
+    "mensaje": "Tipo de cambio configurado exitosamente",
+    "tipo_cambio": {
+      "fecha": "2025-10-15",
+      "valor_compra_usd_ars": 1250.00,
+      "valor_venta_usd_ars": 1250.00,
+      "fuente": "manual",
+      "activo": true
+    }
+  }
+}
+
+// Validaciones:
+assert response.data.tipo_cambio.fuente == "manual"
+assert response.data.tipo_cambio.valor_venta_usd_ars == 1250.00
+\`\`\`
+
+### Escenario 5: Obtener Histórico de TC
+\`\`\`javascript
+// GET /api/tipo-cambio/historico?fecha_desde=2025-10-01&limit=10
+
+// Expected Response:
+{
+  "success": true,
+  "data": {
+    "total": 10,
+    "filtros": {
+      "fecha_desde": "2025-10-01",
+      "limit": 10
+    },
+    "datos": [
+      {
+        "fecha": "2025-10-15",
+        "valor_compra_usd_ars": 1195.50,
+        "valor_venta_usd_ars": 1205.50,
+        "fuente": "api_dolar_api",
+        "activo": true
+      },
+      // ... más registros
+    ]
+  }
+}
+
+// Validaciones:
+assert response.data.total <= 10
+assert response.data.datos.length <= 10
+assert all(item.fecha >= "2025-10-01" for item in response.data.datos)
+\`\`\`
+
+---
+
+## Validaciones Joi
+
+### GastoUnico
+\`\`\`javascript
+{
+  moneda_origen: Joi.string().valid('ARS', 'USD').optional(),
+  monto_ars: Joi.number().positive().optional(),
+  monto_usd: Joi.number().positive().optional(),
+  tipo_cambio_usado: Joi.number().positive().optional()
+}
+\`\`\`
+
+### Compra
+\`\`\`javascript
+{
+  moneda_origen: Joi.string().valid('ARS', 'USD').optional(),
+  monto_total_ars: Joi.number().positive().precision(2).optional(),
+  monto_total_usd: Joi.number().positive().precision(2).optional(),
+  tipo_cambio_usado: Joi.number().positive().optional()
+}
+\`\`\`
+
+### GastoRecurrente / DebitoAutomatico
+\`\`\`javascript
+{
+  moneda_origen: Joi.string().valid('ARS', 'USD').optional(),
+  monto_ars: Joi.number().positive().optional(),
+  monto_usd: Joi.number().positive().optional(),
+  tipo_cambio_referencia: Joi.number().positive().optional()
+}
+\`\`\`
+
+---
+
+## APIs Externas Integradas
+
+### DolarAPI (Principal)
+**URL:** https://dolarapi.com/v1/dolares/oficial
+**Rate Limit:** Sin límite (gratis)
+**Response:**
+\`\`\`json
+{
+  "compra": 1195.50,
+  "venta": 1205.50,
+  "fecha": "2025-10-15"
+}
+\`\`\`
+
+### BCRA API (Fallback)
+**URL:** https://api.bcra.gob.ar/estadisticas/v1/
+**Rate Limit:** Limitado
+**Uso:** Solo cuando DolarAPI falla
+
+---
+
+## Cache y Performance
+
+### Cache de TC
+- **TTL:** 1 hora
+- **Propósito:** Evitar hits innecesarios a BD
+- **Invalidación:** Al actualizar TC
+
+### Índices en BD
+\`\`\`sql
+CREATE INDEX idx_tipos_cambio_fecha ON finanzas.tipos_cambio(fecha DESC);
+CREATE INDEX idx_tipos_cambio_activo ON finanzas.tipos_cambio(activo);
+\`\`\`
+
+---
+
+## Migraciones SQL
+
+### 005: Crear tabla tipos_cambio
+\`\`\`sql
+CREATE TABLE finanzas.tipos_cambio (
+  fecha DATE PRIMARY KEY,
+  valor_compra_usd_ars DECIMAL(10,2) NOT NULL,
+  valor_venta_usd_ars DECIMAL(10,2) NOT NULL,
+  fuente VARCHAR(20) NOT NULL,
+  activo BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+\`\`\`
+
+### 006-009: Agregar campos multi-moneda
+- 006: gastos_unico
+- 007: compras
+- 008: gastos_recurrentes
+- 009: debitos_automaticos
+
+Cada migración:
+1. Agrega nuevas columnas
+2. Migra datos legacy (monto → monto_ars)
+3. Mantiene compatibilidad
+
+---
+
+## Testing Checklist
+
+### Tests de Integración
+- [ ] Crear gasto único en USD con conversión automática
+- [ ] Crear gasto único en ARS con conversión automática
+- [ ] Crear compra en cuotas en USD
+- [ ] Crear gasto recurrente en ARS
+- [ ] Crear débito automático en USD
+- [ ] Configurar TC manualmente
+- [ ] Actualizar TC desde API
+- [ ] Obtener TC actual
+- [ ] Obtener histórico de TC con filtros
+- [ ] Convertir monto entre monedas
+- [ ] Verificar actualización diaria de gastos recurrentes
+- [ ] Verificar actualización diaria de débitos automáticos
+- [ ] Verificar actualización diaria de cuotas pendientes
+- [ ] Backward compatibility con datos legacy
+
+### Tests de Validación
+- [ ] Rechazar moneda_origen inválida
+- [ ] Rechazar montos negativos
+- [ ] Rechazar TC con fecha futura
+- [ ] Validar formato de fechas
+- [ ] Validar campos opcionales
+
+### Tests de Edge Cases
+- [ ] TC no configurado (primera vez)
+- [ ] API externa caída (fallback)
+- [ ] Conversión con TC = 0
+- [ ] Gastos con moneda_origen = null (legacy)
+- [ ] Actualización diaria sin cambios en TC
+
+---
+
+## Referencias Rápidas
+
+### Archivos Clave
+- Modelo: \`src/models/TipoCambio.model.js\`
+- Servicio: \`src/services/exchangeRate.service.js\`
+- Scheduler: \`src/schedulers/exchangeRateScheduler.js\`
+- Controller: \`src/controllers/api/tipoCambio.controller.js\`
+- Migraciones: \`migrations/005-009_*.sql\`
+
+### Comandos Útiles
+\`\`\`bash
+# Ejecutar migraciones
+npm run migrate
+
+# Ejecutar scheduler manualmente
+npm run scheduler:tc
+
+# Ver logs del scheduler
+tail -f logs/scheduler.log
+\`\`\`
+`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: docs
+        }
+      ]
     };
   }
 
@@ -634,12 +1810,12 @@ class FinanzasApiMCPServer {
     try {
       const baseUrl = process.env.API_BASE_URL || 'http://localhost:3030';
       const url = `${baseUrl}${endpoint}`;
-      
+
       const options = {
         method,
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json'
+        }
       };
 
       if (body && (method === 'POST' || method === 'PUT')) {
@@ -657,18 +1833,18 @@ class FinanzasApiMCPServer {
               status: response.status,
               headers: Object.fromEntries(response.headers.entries()),
               data: data
-            }, null, 2),
-          },
-        ],
+            }, null, 2)
+          }
+        ]
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error ejecutando API call: ${error.message}`,
-          },
-        ],
+            text: `Error ejecutando API call: ${error.message}`
+          }
+        ]
       };
     }
   }
@@ -677,13 +1853,13 @@ class FinanzasApiMCPServer {
     // Determinar el transport según argumentos de línea de comandos
     const useHttp = process.argv.includes('--http');
     const port = process.env.MCP_PORT || 3031;
-    
+
     if (useHttp) {
       // HTTP Transport para RestAssured
       const app = express();
       app.use(cors());
       app.use(express.json());
-      
+
       // Endpoint para obtener herramientas disponibles
       app.get('/mcp/tools', async (req, res) => {
         try {
@@ -716,10 +1892,20 @@ class FinanzasApiMCPServer {
                 properties: {
                   category: {
                     type: 'string',
-                    enum: ['gastos_unicos', 'compras', 'recurrentes', 'tarjetas', 'job', 'all']
+                    enum: ['gastos_unicos', 'compras', 'recurrentes', 'debitos_automaticos', 'tarjetas', 'job', 'auth', 'all']
                   }
                 }
               }
+            },
+            {
+              name: 'get_auth_endpoints',
+              description: 'Retorna documentación de endpoints de autenticación JWT',
+              inputSchema: { type: 'object', properties: {} }
+            },
+            {
+              name: 'get_auth_schemas',
+              description: 'Retorna esquemas Swagger para autenticación y JWT',
+              inputSchema: { type: 'object', properties: {} }
             },
             {
               name: 'execute_api_call',
@@ -740,53 +1926,59 @@ class FinanzasApiMCPServer {
           res.status(500).json({ error: error.message });
         }
       });
-      
+
       // Endpoint para ejecutar herramientas
       app.post('/mcp/tools/:toolName', async (req, res) => {
         try {
           const { toolName } = req.params;
           const args = req.body || {};
-          
+
           let result;
           switch (toolName) {
-            case 'get_business_rules':
-              result = await this.getBusinessRules();
-              break;
-            case 'get_api_endpoints':
-              result = await this.getApiEndpoints();
-              break;
-            case 'get_gastos_api_docs':
-              result = await this.getGastosApiDocs();
-              break;
-            case 'get_swagger_docs':
-              result = await this.getSwaggerDocs();
-              break;
-            case 'get_test_scenarios':
-              result = await this.getTestScenarios(args.category || 'all');
-              break;
-            case 'execute_api_call':
-              result = await this.executeApiCall(args);
-              break;
-            default:
-              throw new Error(`Herramienta desconocida: ${toolName}`);
+          case 'get_business_rules':
+            result = await this.getBusinessRules();
+            break;
+          case 'get_api_endpoints':
+            result = await this.getApiEndpoints();
+            break;
+          case 'get_gastos_api_docs':
+            result = await this.getGastosApiDocs();
+            break;
+          case 'get_swagger_docs':
+            result = await this.getSwaggerDocs();
+            break;
+          case 'get_test_scenarios':
+            result = await this.getTestScenarios(args.category || 'all');
+            break;
+          case 'get_auth_endpoints':
+            result = await this.getAuthEndpoints();
+            break;
+          case 'get_auth_schemas':
+            result = await this.getAuthSchemas();
+            break;
+          case 'execute_api_call':
+            result = await this.executeApiCall(args);
+            break;
+          default:
+            throw new Error(`Herramienta desconocida: ${toolName}`);
           }
-          
+
           res.json(result);
         } catch (error) {
           res.status(500).json({ error: error.message });
         }
       });
-      
+
       // Endpoint de salud
       app.get('/mcp/health', (req, res) => {
-        res.json({ 
-          status: 'ok', 
+        res.json({
+          status: 'ok',
           server: 'finanzas-api-mcp',
           version: '1.0.0',
           timestamp: new Date().toISOString()
         });
       });
-      
+
       // Endpoint para obtener documentación OpenAPI/Swagger
       app.get('/mcp/api-docs', async (req, res) => {
         try {
@@ -797,10 +1989,10 @@ class FinanzasApiMCPServer {
           res.status(500).json({ error: error.message });
         }
       });
-      
+
       app.listen(port, () => {
         console.error(`Finanzas API MCP Server (HTTP) iniciado en puerto ${port}`);
-        console.error(`Endpoints disponibles:`);
+        console.error('Endpoints disponibles:');
         console.error(`  GET  http://localhost:${port}/mcp/health`);
         console.error(`  GET  http://localhost:${port}/mcp/tools`);
         console.error(`  POST http://localhost:${port}/mcp/tools/{toolName}`);

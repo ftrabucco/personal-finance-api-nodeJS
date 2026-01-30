@@ -24,7 +24,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-      PGADMIN_CONFIG_LOGIN_BANNER: 'Personal Finance API - Development'
+      PGADMIN_CONFIG_LOGIN_BANNER: '"Personal Finance API - Development"'
     ports:
       - "8080:80"
     volumes:

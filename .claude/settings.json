@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/fran/GitHub/personal-finance-frontend/src/lib/hooks"
+    ]
+  }
+}

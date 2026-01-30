@@ -5,26 +5,26 @@ export function defineCompra(sequelize) {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true,
+      autoIncrement: true
     },
-    descripcion: { 
-      type: DataTypes.STRING(255), 
+    descripcion: {
+      type: DataTypes.STRING(255),
       allowNull: false,
       validate: {
         notEmpty: true,
         len: [3, 255]
       }
     },
-    monto_total: { 
-      type: DataTypes.DECIMAL(10, 2), 
+    monto_total: {
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
         min: 0.01,
         isDecimal: true
       }
     },
-    cantidad_cuotas: { 
-      type: DataTypes.INTEGER, 
+    cantidad_cuotas: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 1,
       validate: {
@@ -32,8 +32,8 @@ export function defineCompra(sequelize) {
         max: 60
       }
     },
-    fecha_compra: { 
-      type: DataTypes.DATEONLY, 
+    fecha_compra: {
+      type: DataTypes.DATEONLY,
       allowNull: false,
       validate: {
         isDate: true,
@@ -44,24 +44,24 @@ export function defineCompra(sequelize) {
         }
       }
     },
-    categoria_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    categoria_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'categorias_gasto',
         key: 'id'
       }
     },
-    importancia_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    importancia_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'importancias_gasto',
         key: 'id'
       }
     },
-    tipo_pago_id: { 
-      type: DataTypes.INTEGER, 
+    tipo_pago_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'tipos_pago',
@@ -69,21 +69,57 @@ export function defineCompra(sequelize) {
       }
     },
     tarjeta_id: {
-      type: DataTypes.INTEGER, 
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: 'tarjetas',
         key: 'id'
       }
     },
+    usuario_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'usuarios',
+        key: 'id'
+      },
+      comment: 'Usuario propietario de la compra'
+    },
     pendiente_cuotas: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
       comment: 'Indica si aún quedan cuotas por generar'
+    },
+    fecha_ultima_cuota_generada: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Última fecha en que se generó una cuota desde esta compra'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se ingresó la compra originalmente'
+    },
+    monto_total_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      comment: 'Monto total en pesos argentinos (calculado automáticamente)'
+    },
+    monto_total_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto total en dólares estadounidenses'
+    },
+    tipo_cambio_usado: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio usado para la conversión (snapshot)'
     }
   }, {
     tableName: 'compras',
-    timestamps: false,
+    timestamps: false
   });
 }

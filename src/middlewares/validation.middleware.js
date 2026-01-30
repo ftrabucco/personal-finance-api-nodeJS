@@ -10,7 +10,7 @@ const baseGastoSchema = {
       'number.positive': 'El monto debe ser positivo',
       'any.required': 'El monto es requerido'
     }),
-  
+
   descripcion: Joi.string().trim().min(3).max(255).required()
     .messages({
       'string.min': 'La descripción debe tener al menos 3 caracteres',
@@ -76,7 +76,12 @@ const compraSchema = Joi.object({
       'number.integer': 'La cantidad de cuotas debe ser un número entero',
       'number.min': 'La cantidad de cuotas debe ser al menos 1',
       'number.max': 'La cantidad de cuotas no puede exceder 60'
-    })
+    }),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_total_ars: Joi.forbidden(),
+  monto_total_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
 }).unknown(false);
 
 const gastoRecurrenteSchema = Joi.object({
@@ -113,7 +118,12 @@ const gastoRecurrenteSchema = Joi.object({
       'date.base': 'La fecha de inicio debe ser una fecha válida',
       'date.format': 'La fecha de inicio debe estar en formato ISO'
     }),
-  activo: Joi.boolean().default(true)
+  activo: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
 }).unknown(false);
 
 const debitoAutomaticoSchema = Joi.object({
@@ -138,7 +148,12 @@ const debitoAutomaticoSchema = Joi.object({
       'number.positive': 'La frecuencia debe ser un ID válido',
       'any.required': 'La frecuencia es requerida'
     }),
-  activo: Joi.boolean().default(true)
+  activo: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
 }).unknown(false);
 
 const gastoUnicoSchema = Joi.object({
@@ -154,7 +169,12 @@ const gastoUnicoSchema = Joi.object({
       'date.format': 'La fecha debe estar en formato ISO',
       'date.max': 'La fecha no puede ser futura',
       'any.required': 'La fecha es requerida'
-    })
+    }),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
 }).unknown(false);
 
 const gastoUnicoFiltersSchema = Joi.object({
@@ -334,11 +354,11 @@ const idParamSchema = Joi.object({
 // Middleware genérico para validación
 const createValidationMiddleware = (schema, location = 'body') => {
   return (req, res, next) => {
-    const dataToValidate = location === 'body' ? req.body : 
-                          location === 'query' ? req.query : 
-                          location === 'params' ? req.params : {};
-    
-    const { error, value } = schema.validate(dataToValidate, { 
+    const dataToValidate = location === 'body' ? req.body :
+      location === 'query' ? req.query :
+        location === 'params' ? req.params : {};
+
+    const { error, value } = schema.validate(dataToValidate, {
       abortEarly: false,
       stripUnknown: true,
       convert: true
@@ -351,10 +371,10 @@ const createValidationMiddleware = (schema, location = 'body') => {
         value: detail.context?.value
       }));
 
-      logger.warn('Errores de validación:', { 
-        path: req.path, 
+      logger.warn('Errores de validación:', {
+        path: req.path,
         method: req.method,
-        errors: validationErrors 
+        errors: validationErrors
       });
 
       return sendValidationError(res, validationErrors);
@@ -391,3 +411,120 @@ export const validateCompraFilters = createValidationMiddleware(compraFiltersSch
 export const validateGastoRecurrenteFilters = createValidationMiddleware(gastoRecurrenteFiltersSchema, 'query');
 export const validateDebitoAutomaticoFilters = createValidationMiddleware(debitoAutomaticoFiltersSchema, 'query');
 export const validateIdParam = createValidationMiddleware(idParamSchema, 'params');
+
+// =============================================================================
+// TARJETAS VALIDATIONS
+// =============================================================================
+
+const tarjetaSchema = Joi.object({
+  nombre: Joi.string().trim().min(2).max(100).required()
+    .messages({
+      'string.min': 'El nombre debe tener al menos 2 caracteres',
+      'string.max': 'El nombre no puede exceder 100 caracteres',
+      'any.required': 'El nombre de la tarjeta es requerido'
+    }),
+
+  tipo: Joi.string().valid('debito', 'credito', 'virtual').required()
+    .messages({
+      'any.only': 'El tipo debe ser: debito, credito o virtual',
+      'any.required': 'El tipo de tarjeta es requerido'
+    }),
+
+  banco: Joi.string().trim().min(2).max(100).required()
+    .messages({
+      'string.min': 'El banco debe tener al menos 2 caracteres',
+      'string.max': 'El banco no puede exceder 100 caracteres',
+      'any.required': 'El banco es requerido'
+    }),
+
+  ultimos_4_digitos: Joi.string().length(4).pattern(/^\d{4}$/).optional().allow(null, '')
+    .messages({
+      'string.length': 'Debe ingresar exactamente 4 dígitos',
+      'string.pattern.base': 'Solo se permiten números'
+    }),
+
+  dia_mes_cierre: Joi.when('tipo', {
+    is: 'credito',
+    then: Joi.number().integer().min(1).max(31).required()
+      .messages({
+        'number.base': 'El día de cierre debe ser un número',
+        'number.integer': 'El día de cierre debe ser un número entero',
+        'number.min': 'El día de cierre debe ser entre 1 y 31',
+        'number.max': 'El día de cierre debe ser entre 1 y 31',
+        'any.required': 'Las tarjetas de crédito requieren día de cierre'
+      }),
+    otherwise: Joi.any().valid(null).optional()
+      .messages({
+        'any.only': 'Las tarjetas de débito no deben tener día de cierre'
+      })
+  }),
+
+  dia_mes_vencimiento: Joi.when('tipo', {
+    is: 'credito',
+    then: Joi.number().integer().min(1).max(31).required()
+      .messages({
+        'number.base': 'El día de vencimiento debe ser un número',
+        'number.integer': 'El día de vencimiento debe ser un número entero',
+        'number.min': 'El día de vencimiento debe ser entre 1 y 31',
+        'number.max': 'El día de vencimiento debe ser entre 1 y 31',
+        'any.required': 'Las tarjetas de crédito requieren día de vencimiento'
+      }),
+    otherwise: Joi.any().valid(null).optional()
+      .messages({
+        'any.only': 'Las tarjetas de débito no deben tener día de vencimiento'
+      })
+  }),
+
+  permite_cuotas: Joi.boolean().optional()
+    .messages({
+      'boolean.base': 'El campo permite_cuotas debe ser verdadero o falso'
+    })
+});
+
+const tarjetaFiltersSchema = Joi.object({
+  tipo: Joi.string().valid('debito', 'credito', 'virtual').optional()
+    .messages({
+      'any.only': 'El tipo debe ser: debito, credito o virtual'
+    }),
+
+  banco: Joi.string().trim().min(1).max(100).optional()
+    .messages({
+      'string.min': 'El banco debe tener al menos 1 caracter para la búsqueda',
+      'string.max': 'El banco no puede exceder 100 caracteres'
+    }),
+
+  permite_cuotas: Joi.string().valid('true', 'false').optional()
+    .messages({
+      'any.only': 'El campo permite_cuotas debe ser "true" o "false"'
+    }),
+
+  limit: Joi.number().integer().min(1).max(100).optional()
+    .messages({
+      'number.base': 'El límite debe ser un número',
+      'number.integer': 'El límite debe ser un número entero',
+      'number.min': 'El límite debe ser al menos 1',
+      'number.max': 'El límite no puede ser mayor a 100'
+    }),
+
+  offset: Joi.number().integer().min(0).optional()
+    .messages({
+      'number.base': 'El offset debe ser un número',
+      'number.integer': 'El offset debe ser un número entero',
+      'number.min': 'El offset debe ser 0 o mayor'
+    }),
+
+  orderBy: Joi.string().valid('nombre', 'tipo', 'banco', 'id').optional()
+    .messages({
+      'any.only': 'El ordenamiento debe ser por: nombre, tipo, banco o id'
+    }),
+
+  orderDirection: Joi.string().valid('ASC', 'DESC').optional()
+    .messages({
+      'any.only': 'La dirección debe ser ASC o DESC'
+    })
+});
+
+// Exportar validaciones de tarjeta
+export const validateCreateTarjeta = createValidationMiddleware(tarjetaSchema, 'body');
+export const validateUpdateTarjeta = createValidationMiddleware(tarjetaSchema, 'body');
+export const validateTarjetaFilters = createValidationMiddleware(tarjetaFiltersSchema, 'query');

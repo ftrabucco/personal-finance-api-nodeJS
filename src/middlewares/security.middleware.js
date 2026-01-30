@@ -14,64 +14,68 @@ export const corsMiddleware = cors({
 // Configurar Helmet para security headers
 export const helmetMiddleware = helmet(config.security.helmet);
 
-// Configurar Rate Limiting
-export const rateLimitMiddleware = rateLimit({
-  windowMs: config.security.rateLimit.windowMs,
-  max: config.security.rateLimit.max,
-  message: {
-    error: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.',
-    retryAfter: Math.ceil(config.security.rateLimit.windowMs / 1000)
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    logger.warn('Rate limit excedido', {
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      path: req.path
-    });
-    
-    res.status(429).json({
-      success: false,
+// Configurar Rate Limiting (deshabilitado en tests)
+export const rateLimitMiddleware = process.env.NODE_ENV === 'test'
+  ? (req, res, next) => next()
+  : rateLimit({
+    windowMs: config.security.rateLimit.windowMs,
+    max: config.security.rateLimit.max,
+    message: {
       error: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.',
       retryAfter: Math.ceil(config.security.rateLimit.windowMs / 1000)
-    });
-  }
-});
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logger.warn('Rate limit excedido', {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        path: req.path
+      });
 
-// Rate limiting más estricto para endpoints de autenticación
-export const authRateLimitMiddleware = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // 5 intentos por ventana
-  message: {
-    error: 'Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.'
-  },
-  skipSuccessfulRequests: true,
-  handler: (req, res) => {
-    logger.warn('Rate limit de autenticación excedido', {
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      path: req.path
-    });
-    
-    res.status(429).json({
-      success: false,
+      res.status(429).json({
+        success: false,
+        error: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.',
+        retryAfter: Math.ceil(config.security.rateLimit.windowMs / 1000)
+      });
+    }
+  });
+
+// Rate limiting más estricto para endpoints de autenticación (deshabilitado en tests y desarrollo)
+export const authRateLimitMiddleware = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
+  ? (req, res, next) => next()
+  : rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 5, // 5 intentos por ventana
+    message: {
       error: 'Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.'
-    });
-  }
-});
+    },
+    skipSuccessfulRequests: true,
+    handler: (req, res) => {
+      logger.warn('Rate limit de autenticación excedido', {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        path: req.path
+      });
+
+      res.status(429).json({
+        success: false,
+        error: 'Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.'
+      });
+    }
+  });
 
 // Middleware para sanitizar inputs
 export const sanitizeMiddleware = (req, res, next) => {
   // Remover campos potencialmente peligrosos
   const dangerousFields = ['__proto__', 'constructor', 'prototype'];
-  
+
   const sanitizeObject = (obj) => {
     if (obj && typeof obj === 'object') {
       dangerousFields.forEach(field => {
         delete obj[field];
       });
-      
+
       Object.keys(obj).forEach(key => {
         if (typeof obj[key] === 'object') {
           sanitizeObject(obj[key]);
@@ -82,11 +86,11 @@ export const sanitizeMiddleware = (req, res, next) => {
       });
     }
   };
-  
+
   sanitizeObject(req.body);
   sanitizeObject(req.query);
   sanitizeObject(req.params);
-  
+
   next();
 };
 
@@ -100,18 +104,18 @@ export const securityLoggerMiddleware = (req, res, next) => {
     /javascript:/i, // XSS
     /data:text\/html/i // Data URI XSS
   ];
-  
+
   const fullUrl = req.originalUrl || req.url;
   const userAgent = req.get('User-Agent') || '';
   const referer = req.get('Referer') || '';
-  
-  const isSuspicious = suspiciousPatterns.some(pattern => 
-    pattern.test(fullUrl) || 
-    pattern.test(userAgent) || 
+
+  const isSuspicious = suspiciousPatterns.some(pattern =>
+    pattern.test(fullUrl) ||
+    pattern.test(userAgent) ||
     pattern.test(referer) ||
     pattern.test(JSON.stringify(req.body))
   );
-  
+
   if (isSuspicious) {
     logger.warn('Petición sospechosa detectada', {
       ip: req.ip,
@@ -122,7 +126,7 @@ export const securityLoggerMiddleware = (req, res, next) => {
       body: req.body
     });
   }
-  
+
   next();
 };
 
@@ -130,22 +134,22 @@ export const securityLoggerMiddleware = (req, res, next) => {
 export const validateContentTypeMiddleware = (req, res, next) => {
   if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
     const contentType = req.get('Content-Type');
-    
+
     if (!contentType) {
       return res.status(400).json({
         success: false,
         error: 'Content-Type header requerido'
       });
     }
-    
+
     const allowedTypes = [
       'application/json',
       'application/x-www-form-urlencoded',
       'multipart/form-data'
     ];
-    
+
     const isValidType = allowedTypes.some(type => contentType.includes(type));
-    
+
     if (!isValidType) {
       return res.status(415).json({
         success: false,
@@ -153,7 +157,7 @@ export const validateContentTypeMiddleware = (req, res, next) => {
       });
     }
   }
-  
+
   next();
 };
 

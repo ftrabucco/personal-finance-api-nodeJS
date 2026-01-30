@@ -1,6 +1,6 @@
 import { BaseController } from './base.controller.js';
-import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto, Gasto } from '../../models/index.js';
-import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
+import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
+import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
@@ -49,16 +49,51 @@ export class DebitoAutomaticoController extends BaseController {
         return sendError(res, 400, 'Campos inválidos', validationResult.message);
       }
 
-      // 1. Crear el débito automático
-      const debitoAutomatico = await this.model.create({
+      // 💱 Calculate multi-currency fields
+      const monto = req.body.monto;
+      const monedaOrigen = req.body.moneda_origen || 'ARS';
+
+      let debitoData = {
         ...req.body,
-        activo: true, // Por defecto activo
-        ultima_fecha_generado: null // Inicialmente no se ha generado ningún gasto
-      }, { 
+        usuario_id: req.user.id,
+        activo: true,
+        ultima_fecha_generado: null,
+        moneda_origen: monedaOrigen
+      };
+
+      // Calculate monto_ars, monto_usd, tipo_cambio_referencia
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        debitoData = {
+          ...debitoData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado  // Note: 'referencia' for debitos
+        };
+
+        logger.debug('Multi-currency conversion applied to DebitoAutomatico', {
+          moneda_origen: monedaOrigen,
+          monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        logger.warn('Exchange rate conversion failed for DebitoAutomatico', {
+          error: exchangeError.message
+        });
+        debitoData.monto_ars = monto;
+        debitoData.monto_usd = null;
+      }
+
+      // 1. Crear el débito automático
+      const debitoAutomatico = await this.model.create(debitoData, {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });
-      
+
       // 2. Recargar con includes para tener frecuencia disponible
       const debitoAutomaticoCompleto = await this.model.findByPk(debitoAutomatico.id, {
         include: this.getIncludes(),
@@ -68,9 +103,9 @@ export class DebitoAutomaticoController extends BaseController {
       // 3. La generación de gastos se hará vía job diario (business rule)
       // No generar gasto inmediatamente para éviter problemas de transacciones
       const gasto = null;
-      
+
       await transaction.commit();
-      logger.info('Débito automático creado exitosamente:', { 
+      logger.info('Débito automático creado exitosamente:', {
         debitoAutomatico_id: debitoAutomatico.id,
         gasto_id: gasto?.id,
         primera_generacion: !!gasto
@@ -88,7 +123,12 @@ export class DebitoAutomaticoController extends BaseController {
   async update(req, res) {
     const transaction = await sequelize.transaction();
     try {
-      const debitoAutomatico = await this.model.findByPk(req.params.id);
+      const debitoAutomatico = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!debitoAutomatico) {
         await transaction.rollback();
         return sendError(res, 404, 'Débito automático no encontrado');
@@ -113,12 +153,37 @@ export class DebitoAutomaticoController extends BaseController {
       // Limpiar datos del formulario (similar a GastoRecurrente)
       const cleanData = this.cleanFormData(req.body);
 
+      // 💱 Recalculate multi-currency if monto or moneda_origen changed
+      if (cleanData.monto !== undefined || cleanData.moneda_origen !== undefined) {
+        const monto = cleanData.monto || debitoAutomatico.monto;
+        const monedaOrigen = cleanData.moneda_origen || debitoAutomatico.moneda_origen || 'ARS';
+
+        try {
+          const { monto_ars, monto_usd, tipo_cambio_usado } =
+            await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+          cleanData.monto_ars = monto_ars;
+          cleanData.monto_usd = monto_usd;
+          cleanData.tipo_cambio_referencia = tipo_cambio_usado;
+
+          logger.debug('Multi-currency recalculated for DebitoAutomatico update', {
+            id: debitoAutomatico.id, moneda_origen: monedaOrigen, monto, monto_ars, monto_usd
+          });
+        } catch (exchangeError) {
+          logger.warn('Exchange rate conversion failed during DebitoAutomatico update', {
+            error: exchangeError.message
+          });
+          cleanData.monto_ars = monto;
+          cleanData.monto_usd = null;
+        }
+      }
+
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== debitoAutomatico.activo) {
-        logger.info('Cambiando estado de débito automático:', { 
-          id: debitoAutomatico.id, 
+        logger.info('Cambiando estado de débito automático:', {
+          id: debitoAutomatico.id,
           estado_anterior: debitoAutomatico.activo,
-          nuevo_estado: cleanData.activo 
+          nuevo_estado: cleanData.activo
         });
       }
 
@@ -144,7 +209,12 @@ export class DebitoAutomaticoController extends BaseController {
   // Método delete mejorado: preserva gastos ya generados (business rule)
   async delete(req, res) {
     try {
-      const debitoAutomatico = await this.model.findByPk(req.params.id);
+      const debitoAutomatico = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!debitoAutomatico) {
         return sendError(res, 404, 'Débito automático no encontrado');
       }
@@ -152,11 +222,11 @@ export class DebitoAutomaticoController extends BaseController {
       // ✅ BUSINESS RULE: Solo eliminar DebitoAutomatico, NO los Gastos generados
       await debitoAutomatico.destroy();
 
-      logger.info('Débito automático eliminado exitosamente:', { 
+      logger.info('Débito automático eliminado exitosamente:', {
         debitoAutomatico_id: req.params.id
       });
 
-      return sendSuccess(res, { 
+      return sendSuccess(res, {
         message: 'Débito automático eliminado correctamente',
         nota: 'Los gastos ya generados se mantienen como histórico'
       });
@@ -169,7 +239,7 @@ export class DebitoAutomaticoController extends BaseController {
   // Helper para limpiar datos del formulario
   cleanFormData(body) {
     const cleaned = { ...body };
-    
+
     // Convertir strings vacíos a null para campos opcionales
     if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
       cleaned.tarjeta_id = null;
@@ -177,7 +247,7 @@ export class DebitoAutomaticoController extends BaseController {
     if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
       cleaned.mes_de_pago = null;
     }
-    
+
     // Asegurar tipos numéricos correctos
     if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
     if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
@@ -187,11 +257,11 @@ export class DebitoAutomaticoController extends BaseController {
     if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
     if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
     if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-    
+
     // Manejar checkbox de activo
     if (cleaned.activo === 'on') cleaned.activo = true;
     if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
-    
+
     return cleaned;
   }
 
@@ -245,7 +315,10 @@ export class DebitoAutomaticoController extends BaseController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
@@ -276,7 +349,7 @@ export class DebitoAutomaticoController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const debitosAutomaticos = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: debitosAutomaticos.count,
@@ -285,7 +358,7 @@ export class DebitoAutomaticoController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < debitosAutomaticos.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, debitosAutomaticos.rows, pagination);
       } else {
         const debitosAutomaticos = await this.model.findAll(queryOptions);

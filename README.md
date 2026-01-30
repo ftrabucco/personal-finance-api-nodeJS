@@ -6,10 +6,12 @@ A complete REST API for personal finance management, built with Node.js, Express
 
 - **Complete expense management** (one-time, recurring, installment purchases)
 - **Automatic debits** (subscriptions, services)
+- **Multi-currency support** (USD/ARS) with automatic conversion and historical snapshots
 - **Category system** (rent, groceries, transportation, etc.)
 - **Importance control** (essential, nice to have, dispensable)
 - **Multiple payment methods** (cash, debit, credit, transfer)
 - **Credit card management** with closing and due dates
+- **Daily exchange rate updates** from external APIs (DolarAPI Blue + BCRA)
 - **Web interface** with Handlebars for visualization
 - **PostgreSQL database** with Docker for development
 
@@ -143,8 +145,17 @@ npm run docker:restart  # Restart services
 npm run seed-db         # Insert initial data
 npm run reset-db        # Reset DB (deletes data)
 
-# Others
-npm run db:migrate      # Run migrations
+# Migrations
+npm run db:migrate                  # Run migrations
+npm run db:migrate:multi-currency   # Run multi-currency migrations
+
+# Security
+npm run generate-secrets            # Generate secure JWT/Session secrets
+
+# Testing
+npm test                           # Run all tests
+npm run test:watch                 # Run tests in watch mode
+npm run test:coverage              # Run tests with coverage
 ```
 
 ## 🏗️ Project Structure
@@ -206,33 +217,125 @@ src/
 - `PUT /api/gastos-unicos/:id` - Update one-time expense
 - `DELETE /api/gastos-unicos/:id` - Delete one-time expense
 
+### Exchange Rates (Tipo de Cambio) 💱
+- `GET /api/tipo-cambio` - Get exchange rate history with filters
+- `GET /api/tipo-cambio/actual` - Get current exchange rate (latest)
+- `GET /api/tipo-cambio/fecha/:fecha` - Get exchange rate by date (with fallback)
+- `GET /api/tipo-cambio/:id` - Get exchange rate by ID
+- `POST /api/tipo-cambio` - Create exchange rate manually
+- `POST /api/tipo-cambio/actualizar` - Force update from external APIs
+- `DELETE /api/tipo-cambio/:id` - Delete exchange rate
+
+## 💱 Multi-Currency System
+
+### Features
+- **Dual Currency Storage**: All expenses store both ARS and USD amounts
+- **Automatic Conversion**: Backend calculates conversions automatically
+- **Historical Snapshots**: Exchange rate used is stored with each transaction
+- **Daily Updates**: Scheduler fetches latest rates at 00:00 from:
+  - DolarAPI.com (primary source - Dólar oficial)
+  - BCRA (fallback source)
+- **Flexible Input**: Users can create expenses in either ARS or USD
+- **Integrity**: Historical exchange rates remain unchanged (snapshot approach)
+
+### Usage Example
+```bash
+# Create expense in USD (backend converts to ARS automatically)
+POST /api/gastos-unicos
+{
+  "descripcion": "Netflix Subscription",
+  "monto": 15.00,
+  "moneda_origen": "USD",
+  "fecha": "2024-01-15",
+  "categoria_gasto_id": 5,
+  "importancia_gasto_id": 2,
+  "tipo_pago_id": 3
+}
+
+# Response includes both currencies and exchange rate snapshot
+{
+  "id": 123,
+  "monto": 15.00,
+  "moneda_origen": "USD",
+  "monto_ars": 15075.00,      # Calculated: 15 * 1005
+  "monto_usd": 15.00,
+  "tipo_cambio_usado": 1005.00,  # Snapshot for historical integrity
+  ...
+}
+```
+
+### Documentation
+For complete multi-currency documentation:
+- **[Multi-Currency API Guide](./docs/api/multicurrency-api.md)** - Complete API reference
+- **[Business Rules](./docs/architecture/business-rules.md#4-sistema-multi-moneda-usdars)** - Architecture and business logic
+
 ## 🧪 Testing
 
 ```bash
-# To be implemented
+# Run all tests
 npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+
+# Current status: 124/129 tests passing (96%)
 ```
 
 ## 🚀 Deployment
 
-### Environment variables for production
+**📖 Guías de deployment disponibles:**
+
+- **[DEPLOYMENT_RENDER.md](./DEPLOYMENT_RENDER.md)** - ⭐ **RECOMENDADO** - Deployment en Render con Node.js nativo
+- **[DEPLOYMENT_RENDER_DOCKER.md](./DEPLOYMENT_RENDER_DOCKER.md)** - Deployment en Render con Docker (avanzado)
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Guía general para cualquier plataforma
+
+### Quick Start - Render (Recomendado)
+
+#### 1. Generar secretos seguros
+
 ```bash
-NODE_ENV=production
-DB_HOST=your-production-host
-DB_PORT=5432
-DB_NAME=finanzas_prod
-DB_USER=prod_user
-DB_PASSWORD=secure_password
+npm run generate-secrets
 ```
 
-### With Docker
-```bash
-# Build image
-docker build -t finanzas-api .
+#### 2. Crear PostgreSQL Database en Render
 
-# Run
-docker run -p 3030:3030 --env-file .env finanzas-api
+- New + → PostgreSQL → Name: `finanzas-db`
+
+#### 3. Crear Web Service en Render
+
+- New + → Web Service → Conecta repo
+- Build: `npm ci --only=production`
+- Start: `npm start`
+
+#### 4. Configurar Environment Variables
+
+En Render Dashboard, agrega:
+- `DATABASE_URL` (Internal DB URL)
+- `JWT_SECRET` y `SESSION_SECRET` (del paso 1)
+- `CORS_ORIGIN=https://tu-frontend.com`
+- `NODE_ENV=production`
+
+#### 5. Setup BD (una sola vez desde tu máquina)
+
+```bash
+# Ejecutar migraciones
+npm run db:migrate:multi-currency
+
+# Seed data
+npm run seed-db
+
+# Tipo de cambio inicial
+curl -X POST https://tu-api.onrender.com/api/tipo-cambio/actualizar
 ```
+
+**✅ Listo!** API live en `https://tu-servicio.onrender.com`
+
+---
+
+**📖 Guía completa**: [DEPLOYMENT_RENDER.md](./DEPLOYMENT_RENDER.md)
 
 ## 🤝 Contributing
 

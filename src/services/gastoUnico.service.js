@@ -1,6 +1,7 @@
 import { BaseService } from './base.service.js';
 import { GastoUnico, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../models/index.js';
 import { ImmediateExpenseStrategy } from '../strategies/expenseGeneration/immediateStrategy.js';
+import ExchangeRateService from './exchangeRate.service.js';
 import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
 
@@ -35,6 +36,23 @@ export class GastoUnicoService extends BaseService {
   }
 
   /**
+   * Find all one-time expenses for a specific user
+   * @param {number} userId - ID of the user
+   * @param {Object} options - Additional query options
+   */
+  async findAllByUser(userId, options = {}) {
+    const userFilterOptions = {
+      where: {
+        usuario_id: userId,
+        ...(options.where || {})
+      },
+      ...options
+    };
+
+    return this.findAll(userFilterOptions);
+  }
+
+  /**
    * Find one-time expense by ID with related data
    * Overrides base method to include specific associations
    */
@@ -53,8 +71,40 @@ export class GastoUnicoService extends BaseService {
   }
 
   /**
+   * Find one-time expense by ID for a specific user
+   * @param {number} id - ID of the expense
+   * @param {number} userId - ID of the user
+   * @param {Object} options - Additional query options
+   */
+  async findByIdAndUser(id, userId, options = {}) {
+    const userFilterOptions = {
+      where: {
+        usuario_id: userId,
+        ...(options.where || {})
+      },
+      ...options
+    };
+
+    return this.findById(id, userFilterOptions);
+  }
+
+  /**
+   * Create one-time expense with automatic real expense generation for a specific user
+   * @param {Object} data - One-time expense data
+   * @param {number} userId - ID of the user
+   * @param {Object} externalTransaction - Optional external transaction
+   */
+  async createForUser(data, userId, externalTransaction = null) {
+    return this.createWithGastoReal({
+      ...data,
+      usuario_id: userId
+    }, externalTransaction);
+  }
+
+  /**
    * Create one-time expense with automatic real expense generation
    * Uses ImmediateExpenseStrategy for transactional creation
+   * 💱 Handles multi-currency conversion automatically
    * @param {Object} data - One-time expense data
    * @param {Object} externalTransaction - Optional external transaction
    * @returns {Object} - The created one-time expense
@@ -64,11 +114,54 @@ export class GastoUnicoService extends BaseService {
     const transaction = externalTransaction || await sequelize.transaction();
 
     try {
-      // 1. Create one-time expense (not processed yet)
-      const gastoUnico = await super.create({
+      // 💱 Calculate both currencies based on moneda_origen
+      const monedaOrigen = data.moneda_origen || 'ARS';
+      const monto = data.monto;
+
+      let gastoUnicoData = {
         ...data,
+        moneda_origen: monedaOrigen,
         procesado: false
-      }, { transaction });
+      };
+
+      // Only calculate if not already provided
+      if (!data.monto_ars || !data.monto_usd) {
+        try {
+          const { monto_ars, monto_usd, tipo_cambio_usado } =
+            await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+          gastoUnicoData = {
+            ...gastoUnicoData,
+            monto_ars,
+            monto_usd,
+            tipo_cambio_usado
+          };
+
+          logger.debug('Multi-currency conversion applied to GastoUnico', {
+            moneda_origen: monedaOrigen,
+            monto_original: monto,
+            monto_ars,
+            monto_usd,
+            tipo_cambio_usado
+          });
+        } catch (exchangeError) {
+          // If exchange rate service fails, use backward compatibility
+          logger.warn('Exchange rate conversion failed, using backward compatibility', {
+            error: exchangeError.message
+          });
+
+          if (monedaOrigen === 'ARS') {
+            gastoUnicoData.monto_ars = monto;
+            gastoUnicoData.monto_usd = null;
+          } else {
+            gastoUnicoData.monto_ars = monto; // Fallback
+            gastoUnicoData.monto_usd = null;
+          }
+        }
+      }
+
+      // 1. Create one-time expense (not processed yet)
+      const gastoUnico = await super.create(gastoUnicoData, { transaction });
 
       // 2. Generate real expense using immediate strategy
       const gasto = await this.immediateStrategy.generate(gastoUnico, transaction);
@@ -84,10 +177,12 @@ export class GastoUnicoService extends BaseService {
         await transaction.commit();
       }
 
-      logger.info('One-time expense and real expense created successfully', {
+      logger.info('One-time expense and real expense created successfully (multi-currency)', {
         gastoUnico_id: gastoUnico.id,
         gasto_id: gasto.id,
-        monto: data.monto,
+        monto_ars: gastoUnico.monto_ars,
+        monto_usd: gastoUnico.monto_usd,
+        moneda_origen: gastoUnico.moneda_origen,
         descripcion: data.descripcion
       });
 
@@ -219,10 +314,28 @@ export class GastoUnicoService extends BaseService {
   }
 
   /**
+   * Find unprocessed one-time expenses for a specific user
+   */
+  async findUnprocessedByUser(userId) {
+    return this.findAllByUser(userId, {
+      where: { procesado: false }
+    });
+  }
+
+  /**
    * Find processed one-time expenses
    */
   async findProcessed() {
     return this.findAll({
+      where: { procesado: true }
+    });
+  }
+
+  /**
+   * Find processed one-time expenses for a specific user
+   */
+  async findProcessedByUser(userId) {
+    return this.findAllByUser(userId, {
       where: { procesado: true }
     });
   }
@@ -346,13 +459,23 @@ export class GastoUnicoService extends BaseService {
   /**
    * Map one-time expense fields to real expense update data
    * Only includes changed fields that affect the real expense
+   * 💱 Handles multi-currency fields
    */
   mapGastoUnicoToGastoUpdate(gastoUnico, oldValues) {
     const updateData = {};
 
     // Map relevant field changes
     if (gastoUnico.monto !== oldValues.monto) {
-      updateData.monto_ars = gastoUnico.monto;
+      updateData.monto_ars = gastoUnico.monto_ars || gastoUnico.monto;
+    }
+
+    // 💱 Update multi-currency amounts if changed
+    if (gastoUnico.monto_ars !== oldValues.monto_ars) {
+      updateData.monto_ars = gastoUnico.monto_ars;
+    }
+
+    if (gastoUnico.monto_usd !== oldValues.monto_usd) {
+      updateData.monto_usd = gastoUnico.monto_usd;
     }
 
     if (gastoUnico.descripcion !== oldValues.descripcion) {
@@ -400,16 +523,19 @@ export class GastoUnicoService extends BaseService {
 
   /**
    * Sanitize update data to prevent issues with circular references
+   * 💱 Includes multi-currency fields
    */
   sanitizeUpdateData(data) {
     const allowedFields = [
       'descripcion', 'monto', 'fecha', 'categoria_gasto_id',
-      'importancia_gasto_id', 'tipo_pago_id', 'tarjeta_id', 'procesado'
+      'importancia_gasto_id', 'tipo_pago_id', 'tarjeta_id', 'procesado',
+      // 💱 Multi-currency fields
+      'moneda_origen', 'monto_ars', 'monto_usd', 'tipo_cambio_usado'
     ];
 
     const sanitized = {};
     allowedFields.forEach(field => {
-      if (data.hasOwnProperty(field)) {
+      if (Object.prototype.hasOwnProperty.call(data, field)) {
         sanitized[field] = data[field];
       }
     });

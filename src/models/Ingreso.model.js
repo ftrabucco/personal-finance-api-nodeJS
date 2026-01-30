@@ -2,28 +2,28 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
 const Ingreso = sequelize.define('Ingreso', {
-  id: { 
+  id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  fecha: { 
+  fecha: {
     type: DataTypes.DATEONLY,
     allowNull: false
   },
-  monto: { 
+  monto: {
     type: DataTypes.DECIMAL(10,2),
     allowNull: false
   },
-  divisa: { 
+  divisa: {
     type: DataTypes.STRING(10),
     allowNull: false
   },
-  fuente_ingreso: { 
+  fuente_ingreso: {
     type: DataTypes.STRING(100),
     allowNull: false
   },
-  descripcion: { 
+  descripcion: {
     type: DataTypes.TEXT
   }
 }, {

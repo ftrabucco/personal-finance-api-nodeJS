@@ -5,69 +5,105 @@ export function defineDebitoAutomatico(sequelize) {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true,
+      autoIncrement: true
     },
     descripcion: { type: DataTypes.STRING, allowNull: false },
     monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     dia_de_pago: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1, max: 31 } }, // Día del mes que se debita
-    mes_de_pago: { 
-      type: DataTypes.INTEGER, 
+    mes_de_pago: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       validate: { min: 1, max: 12 },
-      comment: 'Mes de pago para débitos anuales (1-12). Null para otras frecuencias'
+      comment: 'Mes específico para frecuencia anual (1-12)'
     },
-    categoria_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    fecha_fin: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Fecha hasta la cual el débito automático estará activo'
+    },
+    categoria_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'categorias_gasto',
         key: 'id'
       }
     },
-    importancia_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    importancia_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'importancias_gasto',
         key: 'id'
       }
     },
-    frecuencia_gasto_id: { 
-      type: DataTypes.INTEGER, 
+    frecuencia_gasto_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'frecuencias_gasto',
         key: 'id'
       }
     },
-    tipo_pago_id: { 
-      type: DataTypes.INTEGER, 
+    tipo_pago_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: 'tipos_pago',
         key: 'id'
       }
     },
-    tarjeta_id: { 
-      type: DataTypes.INTEGER, 
+    tarjeta_id: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: 'tarjetas',
         key: 'id'
       }
     },
-    activo: { 
-      type: DataTypes.BOOLEAN, 
-      allowNull: false, 
-      defaultValue: true 
+    usuario_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'usuarios',
+        key: 'id'
+      },
+      comment: 'Usuario propietario del débito automático'
     },
-    ultima_fecha_generado: { 
-      type: DataTypes.DATEONLY, 
+    activo: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
+    ultima_fecha_generado: {
+      type: DataTypes.DATEONLY,
       allowNull: true,
-      comment: 'Última fecha en que se generó un gasto a partir de este débito automático'
+      comment: 'Última fecha en que se generó un gasto desde este débito automático'
+    },
+    // 💱 Multi-currency fields
+    moneda_origen: {
+      type: DataTypes.ENUM('ARS', 'USD'),
+      allowNull: false,
+      defaultValue: 'ARS',
+      comment: 'Moneda en la que se cobra el débito automático'
+    },
+    monto_ars: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en pesos argentinos (actualizado diariamente)'
+    },
+    monto_usd: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Monto en dólares estadounidenses (actualizado diariamente)'
+    },
+    tipo_cambio_referencia: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Tipo de cambio de referencia (actualizado diariamente)'
     }
   }, {
     tableName: 'debitos_automaticos',
-    timestamps: true,
+    timestamps: true
   });
 }

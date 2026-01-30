@@ -1,6 +1,7 @@
 import { BaseController } from './base.controller.js';
-import { GastoRecurrente, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
+import { GastoRecurrente, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
+import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
@@ -49,33 +50,68 @@ export class GastoRecurrenteController extends BaseController {
         return sendError(res, 400, 'Campos inválidos', validationResult.message);
       }
 
-      // 1. Crear el gasto recurrente
-      const gastoRecurrente = await this.model.create({
+      // 💱 Calculate multi-currency fields
+      const monto = req.body.monto;
+      const monedaOrigen = req.body.moneda_origen || 'ARS';
+
+      let gastoData = {
         ...req.body,
-        activo: true, // Por defecto activo
-        ultima_fecha_generado: null // Inicialmente no se ha generado ningún gasto
-      }, { 
+        usuario_id: req.user.id,
+        activo: true,
+        ultima_fecha_generado: null,
+        moneda_origen: monedaOrigen
+      };
+
+      // Calculate monto_ars, monto_usd, tipo_cambio_referencia
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        gastoData = {
+          ...gastoData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado  // Note: 'referencia' for recurring
+        };
+
+        logger.debug('Multi-currency conversion applied to GastoRecurrente', {
+          moneda_origen: monedaOrigen,
+          monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        logger.warn('Exchange rate conversion failed for GastoRecurrente', {
+          error: exchangeError.message
+        });
+        gastoData.monto_ars = monto;
+        gastoData.monto_usd = null;
+      }
+
+      // 1. Crear el gasto recurrente
+      const gastoRecurrente = await this.model.create(gastoData, {
         transaction,
         include: [{ model: FrecuenciaGasto, as: 'frecuencia' }]
       });
-      
+
       // 2. Recargar con includes para tener frecuencia disponible
       const gastoRecurrenteCompleto = await this.model.findByPk(gastoRecurrente.id, {
         include: this.getIncludes(),
         transaction
       });
 
-      // 3. Intentar generar primer gasto si corresponde (business rule: job diario)
-      const gasto = await GastoGeneratorService.generateFromGastoRecurrente(gastoRecurrenteCompleto);
-      
+      // 3. NO generar gasto inmediatamente - el scheduler lo hará cuando corresponda
+      // según fecha_inicio y dia_de_pago
+
       await transaction.commit();
-      logger.info('Gasto recurrente creado exitosamente:', { 
+      logger.info('Gasto recurrente creado exitosamente:', {
         gastoRecurrente_id: gastoRecurrente.id,
-        gasto_id: gasto?.id,
-        primera_generacion: !!gasto
+        fecha_inicio: gastoRecurrenteCompleto.fecha_inicio,
+        dia_de_pago: gastoRecurrenteCompleto.dia_de_pago
       });
 
-      return sendSuccess(res, { gastoRecurrente: gastoRecurrenteCompleto, gasto }, 201);
+      return sendSuccess(res, { gastoRecurrente: gastoRecurrenteCompleto }, 201);
     } catch (error) {
       await transaction.rollback();
       logger.error('Error al crear gasto recurrente:', { error });
@@ -87,7 +123,12 @@ export class GastoRecurrenteController extends BaseController {
   async update(req, res) {
     const transaction = await sequelize.transaction();
     try {
-      const gastoRecurrente = await this.model.findByPk(req.params.id);
+      const gastoRecurrente = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!gastoRecurrente) {
         await transaction.rollback();
         return sendError(res, 404, 'Gasto recurrente no encontrado');
@@ -112,12 +153,37 @@ export class GastoRecurrenteController extends BaseController {
       // Limpiar datos del formulario (similar a GastoUnico)
       const cleanData = this.cleanFormData(req.body);
 
+      // 💱 Recalculate multi-currency if monto or moneda_origen changed
+      if (cleanData.monto !== undefined || cleanData.moneda_origen !== undefined) {
+        const monto = cleanData.monto || gastoRecurrente.monto;
+        const monedaOrigen = cleanData.moneda_origen || gastoRecurrente.moneda_origen || 'ARS';
+
+        try {
+          const { monto_ars, monto_usd, tipo_cambio_usado } =
+            await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+          cleanData.monto_ars = monto_ars;
+          cleanData.monto_usd = monto_usd;
+          cleanData.tipo_cambio_referencia = tipo_cambio_usado;
+
+          logger.debug('Multi-currency recalculated for GastoRecurrente update', {
+            id: gastoRecurrente.id, moneda_origen: monedaOrigen, monto, monto_ars, monto_usd
+          });
+        } catch (exchangeError) {
+          logger.warn('Exchange rate conversion failed during GastoRecurrente update', {
+            error: exchangeError.message
+          });
+          cleanData.monto_ars = monto;
+          cleanData.monto_usd = null;
+        }
+      }
+
       // Si se está actualizando el estado activo
       if (cleanData.activo !== undefined && cleanData.activo !== gastoRecurrente.activo) {
-        logger.info('Cambiando estado de gasto recurrente:', { 
-          id: gastoRecurrente.id, 
+        logger.info('Cambiando estado de gasto recurrente:', {
+          id: gastoRecurrente.id,
           estado_anterior: gastoRecurrente.activo,
-          nuevo_estado: cleanData.activo 
+          nuevo_estado: cleanData.activo
         });
       }
 
@@ -143,7 +209,12 @@ export class GastoRecurrenteController extends BaseController {
   // Método delete mejorado: preserva gastos ya generados (business rule)
   async delete(req, res) {
     try {
-      const gastoRecurrente = await this.model.findByPk(req.params.id);
+      const gastoRecurrente = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
       if (!gastoRecurrente) {
         return sendError(res, 404, 'Gasto recurrente no encontrado');
       }
@@ -151,11 +222,11 @@ export class GastoRecurrenteController extends BaseController {
       // ✅ BUSINESS RULE: Solo eliminar GastoRecurrente, NO los Gastos generados
       await gastoRecurrente.destroy();
 
-      logger.info('Gasto recurrente eliminado exitosamente:', { 
+      logger.info('Gasto recurrente eliminado exitosamente:', {
         gastoRecurrente_id: req.params.id
       });
 
-      return sendSuccess(res, { 
+      return sendSuccess(res, {
         message: 'Gasto recurrente eliminado correctamente',
         nota: 'Los gastos ya generados se mantienen como histórico'
       });
@@ -168,7 +239,7 @@ export class GastoRecurrenteController extends BaseController {
   // Helper para limpiar datos del formulario
   cleanFormData(body) {
     const cleaned = { ...body };
-    
+
     // Convertir strings vacíos a null para campos opcionales
     if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
       cleaned.tarjeta_id = null;
@@ -176,7 +247,7 @@ export class GastoRecurrenteController extends BaseController {
     if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
       cleaned.mes_de_pago = null;
     }
-    
+
     // Asegurar tipos numéricos correctos
     if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
     if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
@@ -186,11 +257,11 @@ export class GastoRecurrenteController extends BaseController {
     if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
     if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
     if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-    
+
     // Manejar checkbox de activo
     if (cleaned.activo === 'on') cleaned.activo = true;
     if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
-    
+
     return cleaned;
   }
 
@@ -245,7 +316,10 @@ export class GastoRecurrenteController extends BaseController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
@@ -277,7 +351,7 @@ export class GastoRecurrenteController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const gastosRecurrentes = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: gastosRecurrentes.count,
@@ -286,7 +360,7 @@ export class GastoRecurrenteController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < gastosRecurrentes.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, gastosRecurrentes.rows, pagination);
       } else {
         const gastosRecurrentes = await this.model.findAll(queryOptions);

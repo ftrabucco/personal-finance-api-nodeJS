@@ -5,19 +5,19 @@
 export class BaseExpenseGenerationStrategy {
   /**
    * Genera un gasto real desde una fuente específica
-   * @param {Object} source - El objeto fuente (gastoUnico, gastoRecurrente, etc.)
+   * @param {Object} _source - El objeto fuente (gastoUnico, gastoRecurrente, etc.)
    * @returns {Promise<Object|null>} - El gasto generado o null si no debe generarse
    */
-  async generate(source) {
+  async generate(_source) {
     throw new Error('Method generate() must be implemented by subclass');
   }
 
   /**
    * Verifica si la fuente debe generar un gasto en la fecha actual
-   * @param {Object} source - El objeto fuente
+   * @param {Object} _source - El objeto fuente
    * @returns {Promise<boolean>} - true si debe generar el gasto
    */
-  async shouldGenerate(source) {
+  async shouldGenerate(_source) {
     throw new Error('Method shouldGenerate() must be implemented by subclass');
   }
 
@@ -38,7 +38,8 @@ export class BaseExpenseGenerationStrategy {
     return source &&
            source.categoria_gasto_id &&
            source.importancia_gasto_id &&
-           source.tipo_pago_id;
+           source.tipo_pago_id &&
+           source.usuario_id;
   }
 
   /**
@@ -56,6 +57,7 @@ export class BaseExpenseGenerationStrategy {
       descripcion: source.descripcion,
       tipo_origen: this.getType(),
       id_origen: source.id,
+      usuario_id: source.usuario_id,
       ...additionalData
     };
   }

@@ -1,0 +1,61 @@
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Logs
+logs
+*.log
+*.log.*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Tests
+tests
+coverage
+*.test.js
+*.spec.js
+jest.config.js
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Documentation
+docs
+*.md
+!README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Database
+*.sql
+migrations
+
+# MCP (no necesario en container)
+mcp-server.js
+
+# Scripts de desarrollo
+generate-secrets.js
+run-multi-currency-migrations.js

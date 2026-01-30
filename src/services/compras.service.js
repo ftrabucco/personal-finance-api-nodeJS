@@ -1,7 +1,8 @@
 import { BaseService } from './base.service.js';
-import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../models/index.js';
+import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, Gasto } from '../models/index.js';
 import { InstallmentExpenseStrategy } from '../strategies/expenseGeneration/installmentStrategy.js';
-import { Op } from 'sequelize';
+import { CreditCardDateService } from './creditCardDate.service.js';
+import ExchangeRateService from './exchangeRate.service.js';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
 
@@ -56,18 +57,60 @@ export class ComprasService extends BaseService {
   /**
    * Create purchase with validation and automatic installment setup
    * Sets up purchase for future installment generation
+   * 💱 Handles multi-currency conversion automatically
    */
   async create(data) {
     // Validate purchase data
     this.validatePurchaseData(data);
 
+    // 💱 Calculate both currencies based on moneda_origen
+    const monedaOrigen = data.moneda_origen || 'ARS';
+    const montoTotal = data.monto_total;
+
     // Set default values for purchases
-    const processedData = {
+    let processedData = {
       ...data,
+      moneda_origen: monedaOrigen,
       cantidad_cuotas: data.cantidad_cuotas || 1,
       pendiente_cuotas: true,
       fecha_ultima_cuota_generada: null
     };
+
+    // Only calculate if not already provided
+    if (!data.monto_total_ars || !data.monto_total_usd) {
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(montoTotal, monedaOrigen);
+
+        processedData = {
+          ...processedData,
+          monto_total_ars: monto_ars,
+          monto_total_usd: monto_usd,
+          tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to Compra', {
+          moneda_origen: monedaOrigen,
+          monto_original: montoTotal,
+          monto_total_ars: monto_ars,
+          monto_total_usd: monto_usd,
+          tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        // If exchange rate service fails, use backward compatibility
+        logger.warn('Exchange rate conversion failed, using backward compatibility', {
+          error: exchangeError.message
+        });
+
+        if (monedaOrigen === 'ARS') {
+          processedData.monto_total_ars = montoTotal;
+          processedData.monto_total_usd = null;
+        } else {
+          processedData.monto_total_ars = montoTotal; // Fallback
+          processedData.monto_total_usd = null;
+        }
+      }
+    }
 
     // Validate purchase date is not in future
     const today = moment().tz('America/Argentina/Buenos_Aires');
@@ -79,10 +122,12 @@ export class ComprasService extends BaseService {
 
     const purchase = await super.create(processedData);
 
-    logger.info('Purchase created successfully', {
+    logger.info('Purchase created successfully (multi-currency)', {
       id: purchase.id,
       descripcion: purchase.descripcion,
-      monto_total: purchase.monto_total,
+      monto_total_ars: purchase.monto_total_ars,
+      monto_total_usd: purchase.monto_total_usd,
+      moneda_origen: purchase.moneda_origen,
       cantidad_cuotas: purchase.cantidad_cuotas,
       fecha_compra: purchase.fecha_compra
     });
@@ -196,6 +241,7 @@ export class ComprasService extends BaseService {
 
   /**
    * Get purchase installment summary
+   * 💱 Includes multi-currency information
    */
   async getInstallmentSummary(id) {
     const purchase = await this.findById(id);
@@ -206,13 +252,30 @@ export class ComprasService extends BaseService {
     const generatedCount = await this.getGeneratedInstallmentsCount(id);
     const totalInstallments = purchase.cantidad_cuotas;
     const remainingInstallments = totalInstallments - generatedCount;
-    const installmentAmount = purchase.monto_total / totalInstallments;
+
+    // 💱 Calculate installment amount in both currencies
+    const montoTotalARS = purchase.monto_total_ars || purchase.monto_total;
+    const montoTotalUSD = purchase.monto_total_usd;
+
+    const installmentAmountARS = Math.round((montoTotalARS / totalInstallments) * 100) / 100;
+    const installmentAmountUSD = montoTotalUSD
+      ? Math.round((montoTotalUSD / totalInstallments) * 100) / 100
+      : null;
 
     return {
       purchase_id: id,
       descripcion: purchase.descripcion,
+      // Legacy field for backward compatibility
       monto_total: purchase.monto_total,
-      installment_amount: Math.round(installmentAmount * 100) / 100,
+      installment_amount: installmentAmountARS,
+      // 💱 Multi-currency fields
+      moneda_origen: purchase.moneda_origen || 'ARS',
+      monto_total_ars: montoTotalARS,
+      monto_total_usd: montoTotalUSD,
+      installment_amount_ars: installmentAmountARS,
+      installment_amount_usd: installmentAmountUSD,
+      tipo_cambio_usado: purchase.tipo_cambio_usado,
+      // Summary info
       total_installments: totalInstallments,
       generated_count: generatedCount,
       remaining_count: remainingInstallments,
@@ -326,7 +389,7 @@ export class ComprasService extends BaseService {
    * @param {Object} data - Purchase data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
    */
-  validatePurchaseData(data, isUpdate = false) {
+  validatePurchaseData(data, _isUpdate = false) {
     const errors = [];
 
     // Amount validation
@@ -365,6 +428,126 @@ export class ComprasService extends BaseService {
     if (errors.length > 0) {
       const error = new Error('Validation failed for purchase');
       error.validationErrors = errors;
+      throw error;
+    }
+  }
+
+  /**
+   * Get upcoming payment dates for credit card purchases using smart date logic
+   * @param {number} compraId - Purchase ID
+   * @returns {Object} Payment schedule with smart date calculations
+   */
+  async getSmartPaymentSchedule(compraId) {
+    try {
+      const compra = await this.findById(compraId);
+      if (!compra) {
+        throw new Error('Compra no encontrada');
+      }
+
+      // Get generated installments count
+      const cuotasGeneradas = await Gasto.count({
+        where: {
+          tipo_origen: 'compra',
+          id_origen: compraId
+        }
+      });
+
+      const totalCuotas = compra.cantidad_cuotas || 1;
+      const cuotasPendientes = totalCuotas - cuotasGeneradas;
+
+      // Base payment schedule info
+      const scheduleInfo = {
+        compra_id: compraId,
+        descripcion: compra.descripcion,
+        monto_total: compra.monto_total,
+        monto_cuota: totalCuotas > 1 ? Math.round((compra.monto_total / totalCuotas) * 100) / 100 : compra.monto_total,
+        total_cuotas: totalCuotas,
+        cuotas_generadas: cuotasGeneradas,
+        cuotas_pendientes: cuotasPendientes,
+        pendiente_cuotas: compra.pendiente_cuotas,
+        payment_type: 'regular',
+        upcoming_dates: []
+      };
+
+      // If it's a credit card purchase, use smart date logic
+      if (compra.tarjeta_id && compra.tarjeta?.tipo === 'credito') {
+        try {
+          // Validate credit card configuration
+          const validation = CreditCardDateService.validateCreditCardConfiguration(compra.tarjeta);
+          if (!validation.isValid) {
+            scheduleInfo.payment_type = 'credit_card_invalid';
+            scheduleInfo.validation_errors = validation.errors;
+            scheduleInfo.validation_warnings = validation.warnings;
+            return scheduleInfo;
+          }
+
+          scheduleInfo.payment_type = 'credit_card';
+          scheduleInfo.credit_card_info = {
+            tarjeta_id: compra.tarjeta.id,
+            nombre: compra.tarjeta.nombre,
+            banco: compra.tarjeta.banco,
+            dia_cierre: compra.tarjeta.dia_mes_cierre,
+            dia_vencimiento: compra.tarjeta.dia_mes_vencimiento
+          };
+
+          // Get current cycle info
+          const cycleInfo = CreditCardDateService.getCurrentCycleInfo(compra.tarjeta);
+          scheduleInfo.current_cycle = cycleInfo;
+
+          // Get upcoming payment dates using smart logic
+          const upcomingDates = CreditCardDateService.getUpcomingDueDates(
+            compra,
+            compra.tarjeta,
+            cuotasGeneradas
+          );
+
+          scheduleInfo.upcoming_dates = upcomingDates.map(item => ({
+            cuota: item.cuota,
+            fecha: item.fecha,
+            monto: scheduleInfo.monto_cuota,
+            dias_hasta_vencimiento: item.moment.diff(moment(), 'days')
+          }));
+
+          // Add validation warnings if any
+          if (validation.warnings.length > 0) {
+            scheduleInfo.validation_warnings = validation.warnings;
+          }
+
+        } catch (error) {
+          logger.error('Error calculating smart credit card dates:', {
+            error: error.message,
+            compra_id: compraId,
+            tarjeta_id: compra.tarjeta_id
+          });
+          scheduleInfo.payment_type = 'credit_card_error';
+          scheduleInfo.error = error.message;
+        }
+      } else {
+        // For non-credit card payments, calculate regular schedule
+        const fechaCompra = moment(compra.fecha);
+        for (let i = cuotasGeneradas; i < totalCuotas; i++) {
+          const fechaCuota = moment(fechaCompra).add(i, 'months');
+          scheduleInfo.upcoming_dates.push({
+            cuota: i + 1,
+            fecha: fechaCuota.format('YYYY-MM-DD'),
+            monto: scheduleInfo.monto_cuota,
+            dias_hasta_vencimiento: fechaCuota.diff(moment(), 'days')
+          });
+        }
+      }
+
+      logger.info('Payment schedule calculated:', {
+        compra_id: compraId,
+        payment_type: scheduleInfo.payment_type,
+        upcoming_payments: scheduleInfo.upcoming_dates.length
+      });
+
+      return scheduleInfo;
+    } catch (error) {
+      logger.error('Error getting smart payment schedule:', {
+        error: error.message,
+        compra_id: compraId
+      });
       throw error;
     }
   }

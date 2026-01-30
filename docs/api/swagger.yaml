@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Personal Finance API - Gastos
-  description: API para gestión de gastos en aplicación de finanzas personales
-  version: 1.0.0
+  title: Personal Finance API
+  description: API completa para gestión de finanzas personales con autenticación JWT
+  version: 2.0.0
   contact:
     name: Personal Finance API
     url: http://localhost:3030
@@ -12,6 +12,8 @@ servers:
     description: Development server
 
 tags:
+  - name: auth
+    description: Autenticación y gestión de usuarios
   - name: gastos
     description: Operaciones con gastos reales generados
   - name: gastos-unicos
@@ -22,8 +24,19 @@ tags:
     description: Operaciones con gastos recurrentes (mensuales, anuales, etc.)
   - name: debitos-automaticos
     description: Operaciones con débitos automáticos (suscripciones, servicios)
+  - name: tarjetas
+    description: Gestión de tarjetas de débito y crédito del usuario
+  - name: tipo-cambio
+    description: Sistema multi-moneda - Gestión de tipos de cambio USD/ARS
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtenido del endpoint de login
+
   schemas:
     StandardResponse:
       type: object
@@ -218,7 +231,7 @@ components:
         monto:
           type: number
           minimum: 0.01
-          description: Monto del gasto
+          description: Monto del gasto (en la moneda especificada en moneda_origen)
           example: 2500.75
         fecha:
           type: string
@@ -246,6 +259,26 @@ components:
           type: boolean
           description: Indica si ya fue procesado para generar gasto real
           example: true
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto originalmente
+          example: "ARS"
+        monto_ars:
+          type: number
+          description: Monto calculado en pesos argentinos (calculado automáticamente)
+          example: 2500.75
+        monto_usd:
+          type: number
+          nullable: true
+          description: Monto calculado en dólares estadounidenses (calculado automáticamente)
+          example: 2.50
+        tipo_cambio_usado:
+          type: number
+          nullable: true
+          description: Tipo de cambio usado para la conversión (snapshot histórico)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -277,7 +310,7 @@ components:
         monto_total:
           type: number
           minimum: 0.01
-          description: Monto total de la compra
+          description: Monto total de la compra (en la moneda especificada en moneda_origen)
           example: 120000.00
         fecha_compra:
           type: string
@@ -308,6 +341,26 @@ components:
           type: integer
           nullable: true
           description: ID de la tarjeta (opcional)
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto total originalmente
+          example: "ARS"
+        monto_total_ars:
+          type: number
+          description: Monto total calculado en pesos argentinos (calculado automáticamente)
+          example: 120000.00
+        monto_total_usd:
+          type: number
+          nullable: true
+          description: Monto total calculado en dólares (calculado automáticamente)
+          example: 120.00
+        tipo_cambio_usado:
+          type: number
+          nullable: true
+          description: Tipo de cambio usado para la conversión (snapshot histórico)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -339,7 +392,7 @@ components:
         monto:
           type: number
           minimum: 0.01
-          description: Monto del gasto
+          description: Monto del gasto (en la moneda especificada en moneda_origen)
           example: 50000.00
         dia_de_pago:
           type: integer
@@ -380,6 +433,26 @@ components:
         frecuencia_gasto_id:
           type: integer
           description: ID de la frecuencia (mensual, anual, etc.)
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto originalmente
+          example: "ARS"
+        monto_ars:
+          type: number
+          description: Monto calculado en pesos argentinos (calculado automáticamente)
+          example: 50000.00
+        monto_usd:
+          type: number
+          nullable: true
+          description: Monto calculado en dólares (calculado automáticamente)
+          example: 50.00
+        tipo_cambio_referencia:
+          type: number
+          nullable: true
+          description: Tipo de cambio de referencia usado (se actualiza diariamente)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -413,7 +486,7 @@ components:
         monto:
           type: number
           minimum: 0.01
-          description: Monto del débito
+          description: Monto del débito (en la moneda especificada en moneda_origen)
           example: 1200.00
         dia_de_pago:
           type: integer
@@ -442,6 +515,26 @@ components:
         frecuencia_gasto_id:
           type: integer
           description: ID de la frecuencia
+        moneda_origen:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda en la que se ingresó el monto originalmente
+          example: "ARS"
+        monto_ars:
+          type: number
+          description: Monto calculado en pesos argentinos (calculado automáticamente)
+          example: 1200.00
+        monto_usd:
+          type: number
+          nullable: true
+          description: Monto calculado en dólares (calculado automáticamente)
+          example: 1.20
+        tipo_cambio_referencia:
+          type: number
+          nullable: true
+          description: Tipo de cambio de referencia usado (se actualiza diariamente)
+          example: 1000.00
         createdAt:
           type: string
           format: date-time
@@ -490,18 +583,162 @@ components:
       properties:
         id:
           type: integer
+          description: ID único de la tarjeta
+          example: 1
         nombre:
           type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre descriptivo de la tarjeta
+          example: "Visa Platinum ICBC"
         tipo:
           type: string
+          enum: [debito, credito, virtual]
+          description: Tipo de tarjeta
+          example: "credito"
         banco:
           type: string
-        dia_cierre:
+          minLength: 2
+          maxLength: 100
+          description: Nombre del banco emisor
+          example: "ICBC"
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: '^\d{4}$'
+          nullable: true
+          description: Últimos 4 dígitos de la tarjeta para identificación
+          example: "1234"
+        dia_mes_cierre:
           type: integer
-        dia_vencimiento:
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: Día del mes de cierre (solo tarjetas de crédito)
+          example: 20
+        dia_mes_vencimiento:
           type: integer
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: Día del mes de vencimiento (solo tarjetas de crédito)
+          example: 10
         permite_cuotas:
           type: boolean
+          description: Indica si la tarjeta permite compras en cuotas
+          example: true
+        usuario_id:
+          type: integer
+          description: ID del usuario propietario
+          example: 1
+
+    TarjetaInput:
+      type: object
+      required: [nombre, tipo, banco]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre descriptivo de la tarjeta
+          example: "Visa Platinum ICBC"
+        tipo:
+          type: string
+          enum: [debito, credito, virtual]
+          description: Tipo de tarjeta
+          example: "credito"
+        banco:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre del banco emisor
+          example: "ICBC"
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: '^\d{4}$'
+          description: Últimos 4 dígitos de la tarjeta para identificación (opcional)
+          example: "1234"
+        dia_mes_cierre:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Día del mes de cierre (requerido para tarjetas de crédito)
+          example: 20
+        dia_mes_vencimiento:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Día del mes de vencimiento (requerido para tarjetas de crédito)
+          example: 10
+        permite_cuotas:
+          type: boolean
+          description: Permite compras en cuotas (se auto-configura según tipo)
+          example: true
+
+    TarjetaStats:
+      type: object
+      properties:
+        estadisticas:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total de tarjetas del usuario
+              example: 5
+            credito:
+              type: integer
+              description: Cantidad de tarjetas de crédito
+              example: 3
+            debito:
+              type: integer
+              description: Cantidad de tarjetas de débito
+              example: 2
+            virtual:
+              type: integer
+              description: Cantidad de tarjetas virtuales
+              example: 0
+        usuario_id:
+          type: integer
+          description: ID del usuario
+          example: 1
+
+    TarjetaUsage:
+      type: object
+      properties:
+        tarjeta:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            nombre:
+              type: string
+              example: "Visa Platinum ICBC"
+            tipo:
+              type: string
+              example: "credito"
+        inUse:
+          type: boolean
+          description: Indica si la tarjeta está siendo utilizada
+          example: false
+        usage:
+          type: object
+          properties:
+            gastos:
+              type: integer
+              description: Cantidad de gastos que usan esta tarjeta
+              example: 5
+            compras:
+              type: integer
+              description: Cantidad de compras que usan esta tarjeta
+              example: 2
+            total:
+              type: integer
+              description: Total de registros que usan esta tarjeta
+              example: 7
 
     Frecuencia:
       type: object
@@ -604,6 +841,208 @@ components:
               items:
                 type: object
 
+    # Authentication Schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del usuario
+          example: 1
+        nombre:
+          type: string
+          description: Nombre completo del usuario
+          example: "Juan Pérez"
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+          example: "juan@example.com"
+      required:
+        - id
+        - nombre
+        - email
+
+    RegisterRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre completo del usuario
+          example: "Juan Pérez"
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+          example: "juan@example.com"
+        password:
+          type: string
+          minLength: 6
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+          description: "Contraseña (mín 6 chars, 1 mayúscula, 1 minúscula, 1 número)"
+          example: "Password123"
+      required:
+        - nombre
+        - email
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+          example: "juan@example.com"
+        password:
+          type: string
+          description: Contraseña del usuario
+          example: "Password123"
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Login exitoso"
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: JWT token para autenticación
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            user:
+              $ref: '#/components/schemas/User'
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nuevo nombre del usuario
+          example: "Juan Carlos Pérez"
+        email:
+          type: string
+          format: email
+          description: Nuevo email del usuario
+          example: "juan.carlos@example.com"
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          description: Contraseña actual
+          example: "OldPassword123"
+        newPassword:
+          type: string
+          minLength: 6
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)"
+          description: "Nueva contraseña (mín 6 chars, 1 mayúscula, 1 minúscula, 1 número)"
+          example: "NewPassword123"
+      required:
+        - currentPassword
+        - newPassword
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operación exitosa"
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+
+    AuthErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Error de autenticación"
+        error:
+          type: string
+          enum:
+            - MISSING_TOKEN
+            - INVALID_TOKEN
+            - INVALID_CREDENTIALS
+            - EMAIL_ALREADY_EXISTS
+            - INVALID_CURRENT_PASSWORD
+            - INSUFFICIENT_PERMISSIONS
+          example: "INVALID_CREDENTIALS"
+
+    # Multi-Currency Schemas
+    TipoCambio:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único del registro de tipo de cambio
+          example: 1
+        fecha:
+          type: string
+          format: date
+          description: Fecha del tipo de cambio
+          example: "2024-01-15"
+        valor_compra:
+          type: number
+          format: decimal
+          description: Valor de compra del dólar (lo que pagas para comprar USD)
+          example: 995.50
+        valor_venta:
+          type: number
+          format: decimal
+          description: Valor de venta del dólar (lo que recibes al vender USD)
+          example: 1005.50
+        fuente:
+          type: string
+          description: Fuente de donde se obtuvo el tipo de cambio
+          example: "BCRA"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Token de autenticación inválido o ausente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          example:
+            success: false
+            message: "Token de acceso requerido"
+            error: "MISSING_TOKEN"
+
+    ValidationError:
+      description: Error de validación en los datos de entrada
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
   parameters:
     GastoIdParam:
       name: id
@@ -655,6 +1094,326 @@ components:
       example: DESC
 
 paths:
+  # AUTHENTICATION ENDPOINTS
+  /auth/register:
+    post:
+      tags:
+        - auth
+      summary: Registrar nuevo usuario
+      description: |
+        Registra un nuevo usuario en el sistema.
+
+        **Validaciones:**
+        - Email único en el sistema
+        - Contraseña debe cumplir con política de seguridad
+        - Nombre debe tener al menos 2 caracteres
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario registrado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Usuario registrado exitosamente"
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/AuthErrorResponse'
+              examples:
+                validation_error:
+                  summary: Error de validación de datos
+                  value:
+                    success: false
+                    message: "Datos de registro inválidos"
+                    errors: ["La contraseña debe tener al menos 6 caracteres"]
+                email_exists:
+                  summary: Email ya registrado
+                  value:
+                    success: false
+                    message: "Email ya está registrado"
+                    error: "EMAIL_ALREADY_EXISTS"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Iniciar sesión
+      description: |
+        Autentica un usuario y devuelve un JWT token para acceso a endpoints protegidos.
+
+        **Uso del token:**
+        - Incluir en header `Authorization: Bearer <token>`
+        - Token válido por 7 días (configurable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Error de validación en datos de entrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                success: false
+                message: "Datos de login inválidos"
+                errors: ["Debe ser un email válido"]
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+              example:
+                success: false
+                message: "Email o contraseña incorrectos"
+                error: "INVALID_CREDENTIALS"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/profile:
+    get:
+      tags:
+        - auth
+      summary: Obtener perfil del usuario
+      description: Obtiene la información del perfil del usuario autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+              example:
+                success: true
+                message: "Perfil obtenido exitosamente"
+                data:
+                  user:
+                    id: 1
+                    nombre: "Juan Pérez"
+                    email: "juan@example.com"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+              example:
+                success: false
+                message: "Token de acceso requerido"
+                error: "MISSING_TOKEN"
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+    put:
+      tags:
+        - auth
+      summary: Actualizar perfil del usuario
+      description: |
+        Actualiza la información del perfil del usuario autenticado.
+        Solo se actualizan los campos proporcionados.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Perfil actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+              example:
+                success: true
+                message: "Perfil actualizado exitosamente"
+                data:
+                  user:
+                    id: 1
+                    nombre: "Juan Carlos Pérez"
+                    email: "juan.carlos@example.com"
+        '400':
+          description: Error de validación o email ya en uso
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/AuthErrorResponse'
+              examples:
+                validation_error:
+                  summary: Error de validación
+                  value:
+                    success: false
+                    message: "Datos inválidos"
+                    errors: ["El nombre debe tener al menos 2 caracteres"]
+                email_exists:
+                  summary: Email ya en uso
+                  value:
+                    success: false
+                    message: "Email ya está en uso"
+                    error: "EMAIL_ALREADY_EXISTS"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/change-password:
+    post:
+      tags:
+        - auth
+      summary: Cambiar contraseña
+      description: |
+        Cambia la contraseña del usuario autenticado.
+        Requiere proporcionar la contraseña actual para validación.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Contraseña actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Contraseña actualizada exitosamente"
+        '400':
+          description: Error de validación o contraseña actual incorrecta
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/AuthErrorResponse'
+              examples:
+                validation_error:
+                  summary: Nueva contraseña inválida
+                  value:
+                    success: false
+                    message: "Datos inválidos"
+                    errors: ["La contraseña debe tener al menos 6 caracteres"]
+                invalid_current:
+                  summary: Contraseña actual incorrecta
+                  value:
+                    success: false
+                    message: "Password actual incorrecto"
+                    error: "INVALID_CURRENT_PASSWORD"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Cerrar sesión
+      description: |
+        Cierra la sesión del usuario autenticado.
+
+        **Nota:** En JWT stateless, el logout es principalmente informativo.
+        El token seguirá siendo válido hasta su expiración.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Sesión cerrada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Sesión cerrada exitosamente"
+        '401':
+          description: Token inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
   /gastos/all:
     get:
       tags:
@@ -2275,3 +3034,1100 @@ paths:
       responses:
         '200':
           description: Débito automático eliminado exitosamente
+
+  # =============================================================================
+  # TARJETAS ENDPOINTS
+  # =============================================================================
+  /tarjetas:
+    get:
+      tags:
+        - tarjetas
+      summary: Listar tarjetas del usuario
+      description: |
+        Obtiene todas las tarjetas del usuario autenticado con filtros opcionales y paginación.
+
+        **Filtros disponibles:**
+        - `tipo`: Filtrar por tipo de tarjeta (debito, credito, virtual)
+        - `banco`: Búsqueda parcial por nombre del banco
+        - `permite_cuotas`: Filtrar por capacidad de cuotas (true/false)
+        - `limit`: Límite de resultados (1-100)
+        - `offset`: Offset para paginación
+        - `orderBy`: Campo de ordenamiento (nombre, tipo, banco, id)
+        - `orderDirection`: Dirección del ordenamiento (ASC, DESC)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+            enum: [debito, credito, virtual]
+          description: Filtrar por tipo de tarjeta
+          example: credito
+        - name: banco
+          in: query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Búsqueda parcial por nombre del banco
+          example: Galicia
+        - name: permite_cuotas
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Filtrar por capacidad de cuotas
+          example: "true"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Límite de resultados
+          example: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Offset para paginación
+          example: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [nombre, tipo, banco, id]
+            default: nombre
+          description: Campo de ordenamiento
+          example: nombre
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+          description: Dirección del ordenamiento
+          example: ASC
+      responses:
+        '200':
+          description: Lista de tarjetas obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Tarjeta'
+              examples:
+                success:
+                  summary: Respuesta exitosa
+                  value:
+                    success: true
+                    data:
+                      - id: 1
+                        nombre: "Visa Platinum ICBC"
+                        tipo: "credito"
+                        banco: "ICBC"
+                        dia_mes_cierre: 20
+                        dia_mes_vencimiento: 10
+                        permite_cuotas: true
+                        usuario_id: 1
+                      - id: 2
+                        nombre: "Débito Santander"
+                        tipo: "debito"
+                        banco: "Banco Santander"
+                        dia_mes_cierre: null
+                        dia_mes_vencimiento: null
+                        permite_cuotas: false
+                        usuario_id: 1
+                    meta:
+                      total: 2
+                      type: collection
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+    post:
+      tags:
+        - tarjetas
+      summary: Crear nueva tarjeta
+      description: |
+        Crea una nueva tarjeta para el usuario autenticado.
+
+        **Reglas de validación:**
+        - Tarjetas de crédito REQUIEREN `dia_mes_cierre` y `dia_mes_vencimiento`
+        - Tarjetas de débito NO deben incluir fechas de cierre/vencimiento
+        - El campo `permite_cuotas` se auto-configura según el tipo
+        - El `usuario_id` se extrae automáticamente del JWT token
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TarjetaInput'
+            examples:
+              credito:
+                summary: Tarjeta de crédito
+                value:
+                  nombre: "Visa Platinum ICBC"
+                  tipo: "credito"
+                  banco: "ICBC"
+                  dia_mes_cierre: 20
+                  dia_mes_vencimiento: 10
+              debito:
+                summary: Tarjeta de débito
+                value:
+                  nombre: "Débito Santander"
+                  tipo: "debito"
+                  banco: "Banco Santander"
+      responses:
+        '201':
+          description: Tarjeta creada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tarjeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tarjetas/stats:
+    get:
+      tags:
+        - tarjetas
+      summary: Obtener estadísticas de tarjetas
+      description: |
+        Obtiene estadísticas resumidas de las tarjetas del usuario autenticado.
+        Incluye totales por tipo (crédito, débito, virtual).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Estadísticas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TarjetaStats'
+              example:
+                success: true
+                data:
+                  estadisticas:
+                    total: 5
+                    credito: 3
+                    debito: 2
+                    virtual: 0
+                  usuario_id: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tarjetas/{id}:
+    get:
+      tags:
+        - tarjetas
+      summary: Obtener tarjeta por ID
+      description: |
+        Obtiene una tarjeta específica por su ID. Solo permite acceso a tarjetas
+        que pertenecen al usuario autenticado.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      responses:
+        '200':
+          description: Tarjeta obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tarjeta'
+        '404':
+          description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Tarjeta no encontrada"
+                timestamp: "2025-01-15T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - tarjetas
+      summary: Actualizar tarjeta
+      description: |
+        Actualiza una tarjeta existente. Solo permite modificar tarjetas
+        que pertenecen al usuario autenticado.
+
+        **Reglas de validación:**
+        - Mismas reglas que la creación (crédito requiere fechas, débito no)
+        - No se puede cambiar el `usuario_id`
+        - Se valida ownership antes de la actualización
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TarjetaInput'
+      responses:
+        '200':
+          description: Tarjeta actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tarjeta'
+        '404':
+          description: Tarjeta no encontrada
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - tarjetas
+      summary: Eliminar tarjeta
+      description: |
+        Elimina una tarjeta del usuario. Antes de eliminar, verifica que la tarjeta
+        no esté siendo utilizada en gastos o compras existentes.
+
+        **Validaciones:**
+        - Solo permite eliminar tarjetas del usuario autenticado
+        - Verifica que no esté en uso por gastos o compras
+        - Si está en uso, devuelve error con detalles de uso
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      responses:
+        '200':
+          description: Tarjeta eliminada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tarjeta eliminada exitosamente"
+                          tarjeta:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                                example: 1
+                              nombre:
+                                type: string
+                                example: "Visa Platinum ICBC"
+                              tipo:
+                                type: string
+                                example: "credito"
+        '400':
+          description: Tarjeta en uso, no se puede eliminar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "No se puede eliminar la tarjeta"
+                details: "La tarjeta está siendo utilizada en 7 registro(s) (5 gastos, 2 compras)"
+                timestamp: "2025-01-15T10:30:00Z"
+        '404':
+          description: Tarjeta no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tarjetas/{id}/usage:
+    get:
+      tags:
+        - tarjetas
+      summary: Validar uso de tarjeta
+      description: |
+        Verifica si una tarjeta está siendo utilizada en gastos o compras.
+        Útil antes de intentar eliminar una tarjeta.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID de la tarjeta
+          example: 1
+      responses:
+        '200':
+          description: Información de uso obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TarjetaUsage'
+              example:
+                success: true
+                data:
+                  tarjeta:
+                    id: 1
+                    nombre: "Visa Platinum ICBC"
+                    tipo: "credito"
+                  inUse: true
+                  usage:
+                    gastos: 5
+                    compras: 2
+                    total: 7
+        '404':
+          description: Tarjeta no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # =============================================================================
+  # TIPO DE CAMBIO ENDPOINTS (Multi-Currency System)
+  # =============================================================================
+  /tipo-cambio:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipos de cambio con filtros
+      description: |
+        Obtiene registros históricos de tipos de cambio USD/ARS con filtros opcionales.
+
+        **Casos de uso:**
+        - Ver historial de tipos de cambio por fecha
+        - Filtrar por fuente (BCRA, DolarAPI)
+        - Obtener el tipo de cambio actual (fecha más reciente)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filtrar por fecha específica
+          example: "2024-01-15"
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de inicio del rango
+          example: "2024-01-01"
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha de fin del rango
+          example: "2024-01-31"
+        - name: fuente
+          in: query
+          schema:
+            type: string
+          description: Filtrar por fuente (BCRA, DolarAPI)
+          example: "BCRA"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+          description: Límite de resultados
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Offset para paginación
+      responses:
+        '200':
+          description: Lista de tipos de cambio
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TipoCambio'
+              example:
+                success: true
+                data:
+                  - id: 1
+                    fecha: "2024-01-15"
+                    valor_compra: 995.50
+                    valor_venta: 1005.50
+                    fuente: "BCRA"
+                    createdAt: "2024-01-15T00:05:00Z"
+                    updatedAt: "2024-01-15T00:05:00Z"
+                meta:
+                  total: 1
+                  type: collection
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/actual:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipo de cambio actual
+      description: |
+        Obtiene el tipo de cambio más reciente (última fecha registrada).
+
+        **Uso típico:** Consultar el tipo de cambio antes de crear un gasto/compra.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tipo de cambio actual obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TipoCambio'
+              example:
+                success: true
+                data:
+                  id: 1
+                  fecha: "2024-01-15"
+                  valor_compra: 995.50
+                  valor_venta: 1005.50
+                  fuente: "BCRA"
+                  createdAt: "2024-01-15T00:05:00Z"
+                  updatedAt: "2024-01-15T00:05:00Z"
+                meta:
+                  type: single
+        '404':
+          description: No hay tipos de cambio registrados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "No se encontró ningún tipo de cambio"
+                timestamp: "2024-01-15T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/fecha/{fecha}:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipo de cambio por fecha
+      description: |
+        Obtiene el tipo de cambio de una fecha específica.
+
+        **Reglas:**
+        - Si existe registro para esa fecha: lo devuelve
+        - Si NO existe: devuelve el más cercano anterior (fallback)
+        - Si no hay ninguno anterior: error 404
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Fecha del tipo de cambio (YYYY-MM-DD)
+          example: "2024-01-15"
+      responses:
+        '200':
+          description: Tipo de cambio encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TipoCambio'
+              example:
+                success: true
+                data:
+                  id: 1
+                  fecha: "2024-01-15"
+                  valor_compra: 995.50
+                  valor_venta: 1005.50
+                  fuente: "BCRA"
+                meta:
+                  type: single
+        '404':
+          description: No hay tipo de cambio disponible para esa fecha
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/{id}:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener tipo de cambio por ID
+      description: Obtiene un tipo de cambio específico por su ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID del tipo de cambio
+          example: 1
+      responses:
+        '200':
+          description: Tipo de cambio encontrado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TipoCambio'
+        '404':
+          description: Tipo de cambio no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - tipo-cambio
+      summary: Eliminar tipo de cambio
+      description: |
+        Elimina un registro de tipo de cambio.
+
+        **Advertencia:** Eliminar tipos de cambio históricos puede afectar
+        la integridad de los registros de gastos que los utilizaron.
+        Solo usar en casos de corrección de errores.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ID del tipo de cambio
+          example: 1
+      responses:
+        '200':
+          description: Tipo de cambio eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tipo de cambio eliminado correctamente"
+        '404':
+          description: Tipo de cambio no encontrado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/actualizar:
+    post:
+      tags:
+        - tipo-cambio
+      summary: Actualizar tipo de cambio desde APIs externas
+      description: |
+        Fuerza una actualización del tipo de cambio desde las APIs externas.
+
+        **Fuentes:**
+        1. DolarAPI.com (primaria)
+        2. BCRA (fallback)
+
+        **Nota:** Normalmente el scheduler ejecuta esto automáticamente a las 00:00 diariamente.
+        Este endpoint es útil para actualizaciones manuales.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tipo de cambio actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tipo de cambio actualizado exitosamente"
+                          tipoCambio:
+                            $ref: '#/components/schemas/TipoCambio'
+                          fuente:
+                            type: string
+                            example: "DolarAPI"
+              example:
+                success: true
+                data:
+                  message: "Tipo de cambio actualizado exitosamente"
+                  tipoCambio:
+                    id: 1
+                    fecha: "2024-01-15"
+                    valor_compra: 995.50
+                    valor_venta: 1005.50
+                    fuente: "DolarAPI"
+                  fuente: "DolarAPI"
+        '500':
+          description: Error al obtener tipo de cambio desde APIs externas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Error al obtener tipo de cambio desde APIs externas"
+                details: "Ambas fuentes (DolarAPI y BCRA) fallaron"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tipo-cambio/manual:
+    post:
+      tags:
+        - tipo-cambio
+      summary: Configurar tipo de cambio manualmente
+      description: |
+        Configura un nuevo tipo de cambio manualmente para una fecha específica.
+
+        **Nota:** Normalmente los tipos de cambio se obtienen automáticamente
+        mediante el scheduler diario. Este endpoint es útil para:
+        - Corregir datos históricos
+        - Agregar tipos de cambio manualmente cuando falla la API externa
+        - Configurar TC para fechas específicas
+
+        **Validaciones:**
+        - valor_venta_usd_ars es requerido
+        - valor_compra_usd_ars es opcional (si no se provee, usa el de venta)
+        - Ambos valores deben ser números positivos
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - valor_venta_usd_ars
+              properties:
+                fecha:
+                  type: string
+                  format: date
+                  description: Fecha del tipo de cambio (opcional, por defecto usa hoy)
+                  example: "2024-01-15"
+                valor_compra_usd_ars:
+                  type: number
+                  minimum: 0.01
+                  description: Valor de compra USD-ARS (opcional, por defecto usa el de venta)
+                  example: 995.50
+                valor_venta_usd_ars:
+                  type: number
+                  minimum: 0.01
+                  description: Valor de venta USD-ARS (requerido)
+                  example: 1005.50
+            example:
+              fecha: "2024-01-15"
+              valor_compra_usd_ars: 995.50
+              valor_venta_usd_ars: 1005.50
+      responses:
+        '201':
+          description: Tipo de cambio configurado exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mensaje:
+                            type: string
+                            example: "Tipo de cambio configurado exitosamente"
+                          tipo_cambio:
+                            type: object
+                            properties:
+                              fecha:
+                                type: string
+                                format: date
+                              valor_compra_usd_ars:
+                                type: number
+                              valor_venta_usd_ars:
+                                type: number
+                              fuente:
+                                type: string
+                                example: "manual"
+                              activo:
+                                type: boolean
+              example:
+                success: true
+                data:
+                  mensaje: "Tipo de cambio configurado exitosamente"
+                  tipo_cambio:
+                    fecha: "2024-01-15"
+                    valor_compra_usd_ars: 995.50
+                    valor_venta_usd_ars: 1005.50
+                    fuente: "manual"
+                    activo: true
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              examples:
+                missing_field:
+                  summary: Campo requerido faltante
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "El campo valor_venta_usd_ars es requerido"
+                invalid_value:
+                  summary: Valor inválido
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "valor_venta_usd_ars debe ser un número positivo"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tipo-cambio/historico:
+    get:
+      tags:
+        - tipo-cambio
+      summary: Obtener histórico de tipos de cambio
+      description: |
+        Obtiene el historial de tipos de cambio con filtros opcionales.
+
+        **Filtros disponibles:**
+        - `fecha_desde`: Filtrar desde una fecha específica
+        - `fecha_hasta`: Filtrar hasta una fecha específica
+        - `fuente`: Filtrar por fuente (manual, api_dolar_api, api_bcra)
+        - `limit`: Limitar cantidad de resultados (default: 30)
+
+        **Orden:** Los resultados se devuelven ordenados por fecha descendente (más recientes primero)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha desde (YYYY-MM-DD)
+          example: "2024-01-01"
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Fecha hasta (YYYY-MM-DD)
+          example: "2024-01-31"
+        - name: fuente
+          in: query
+          schema:
+            type: string
+            enum: [manual, api_dolar_api, api_bcra]
+          description: Filtrar por fuente del tipo de cambio
+          example: "api_dolar_api"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+          description: Límite de resultados a devolver
+          example: 30
+      responses:
+        '200':
+          description: Histórico obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                            description: Total de registros encontrados
+                          filtros:
+                            type: object
+                            properties:
+                              fecha_desde:
+                                type: string
+                              fecha_hasta:
+                                type: string
+                              fuente:
+                                type: string
+                              limit:
+                                type: integer
+                          datos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                fecha:
+                                  type: string
+                                  format: date
+                                valor_compra_usd_ars:
+                                  type: number
+                                valor_venta_usd_ars:
+                                  type: number
+                                fuente:
+                                  type: string
+                                activo:
+                                  type: boolean
+              example:
+                success: true
+                data:
+                  total: 15
+                  filtros:
+                    fecha_desde: "2024-01-01"
+                    fecha_hasta: "2024-01-31"
+                    fuente: null
+                    limit: 30
+                  datos:
+                    - fecha: "2024-01-15"
+                      valor_compra_usd_ars: 995.50
+                      valor_venta_usd_ars: 1005.50
+                      fuente: "api_dolar_api"
+                      activo: true
+                    - fecha: "2024-01-14"
+                      valor_compra_usd_ars: 992.00
+                      valor_venta_usd_ars: 1002.00
+                      fuente: "api_dolar_api"
+                      activo: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tipo-cambio/convertir:
+    post:
+      tags:
+        - tipo-cambio
+      summary: Convertir monto entre monedas
+      description: |
+        Convierte un monto entre ARS y USD usando el tipo de cambio actual.
+
+        **Reglas de conversión:**
+        - ARS → USD: Usa `valor_venta_usd_ars` (lo que el banco "vende" dólares)
+        - USD → ARS: Usa `valor_compra_usd_ars` (lo que el banco "compra" dólares)
+
+        **Nota:** Usa el tipo de cambio más reciente disponible en el sistema.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - monto
+                - moneda_origen
+              properties:
+                monto:
+                  type: number
+                  minimum: 0.01
+                  description: Monto a convertir
+                  example: 100000
+                moneda_origen:
+                  type: string
+                  enum: [ARS, USD]
+                  description: Moneda del monto original
+                  example: "ARS"
+            example:
+              monto: 100000
+              moneda_origen: "ARS"
+      responses:
+        '200':
+          description: Conversión realizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          monto_original:
+                            type: number
+                            description: Monto original proporcionado
+                          moneda_origen:
+                            type: string
+                            description: Moneda origen
+                          conversion:
+                            type: object
+                            properties:
+                              monto_ars:
+                                type: number
+                                description: Monto equivalente en pesos argentinos
+                              monto_usd:
+                                type: number
+                                description: Monto equivalente en dólares
+                              tipo_cambio_usado:
+                                type: number
+                                description: Tipo de cambio usado para la conversión
+                              fecha_tipo_cambio:
+                                type: string
+                                format: date
+                                description: Fecha del tipo de cambio usado
+              example:
+                success: true
+                data:
+                  monto_original: 100000
+                  moneda_origen: "ARS"
+                  conversion:
+                    monto_ars: 100000
+                    monto_usd: 99.50
+                    tipo_cambio_usado: 1005.50
+                    fecha_tipo_cambio: "2024-01-15"
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              examples:
+                missing_fields:
+                  summary: Campos requeridos faltantes
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "Los campos monto y moneda_origen son requeridos"
+                invalid_currency:
+                  summary: Moneda inválida
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "moneda_origen debe ser ARS o USD"
+                invalid_amount:
+                  summary: Monto inválido
+                  value:
+                    success: false
+                    error: "Validación fallida"
+                    details: "monto debe ser un número positivo"
+        '404':
+          description: Tipo de cambio no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+              example:
+                success: false
+                error: "Tipo de cambio no disponible"
+                details: "No hay tipo de cambio configurado"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'

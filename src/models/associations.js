@@ -45,6 +45,9 @@ export function setupAssociations(models) {
   Compra.belongsTo(Tarjeta, { foreignKey: 'tarjeta_id', as: 'tarjeta' });
   Tarjeta.hasMany(Compra, { foreignKey: 'tarjeta_id', as: 'compras' });
 
+  Compra.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(Compra, { foreignKey: 'usuario_id', as: 'compras' });
+
   // Débito Automático
   DebitoAutomatico.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPago' });
   TipoPago.hasMany(DebitoAutomatico, { foreignKey: 'tipo_pago_id', as: 'debitos' });
@@ -60,6 +63,9 @@ export function setupAssociations(models) {
 
   DebitoAutomatico.belongsTo(Tarjeta, { foreignKey: 'tarjeta_id', as: 'tarjeta' });
   Tarjeta.hasMany(DebitoAutomatico, { foreignKey: 'tarjeta_id', as: 'debitos' });
+
+  DebitoAutomatico.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(DebitoAutomatico, { foreignKey: 'usuario_id', as: 'debitosAutomaticos' });
 
   //Gasto Recurrente
   GastoRecurrente.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPago' });
@@ -77,6 +83,9 @@ export function setupAssociations(models) {
   GastoRecurrente.belongsTo(Tarjeta, { foreignKey: 'tarjeta_id', as: 'tarjeta' });
   Tarjeta.hasMany(GastoRecurrente, { foreignKey: 'tarjeta_id', as: 'gastosRecurrentes' });
 
+  GastoRecurrente.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(GastoRecurrente, { foreignKey: 'usuario_id', as: 'gastosRecurrentes' });
+
   //Gasto Unico
   GastoUnico.belongsTo(TipoPago, { foreignKey: 'tipo_pago_id', as: 'tipoPago' });
   TipoPago.hasMany(GastoUnico, { foreignKey: 'tipo_pago_id', as: 'gastosUnicos' });
@@ -89,5 +98,12 @@ export function setupAssociations(models) {
 
   GastoUnico.belongsTo(Tarjeta, { foreignKey: 'tarjeta_id', as: 'tarjeta' });
   Tarjeta.hasMany(GastoUnico, { foreignKey: 'tarjeta_id', as: 'gastosUnicos' });
+
+  GastoUnico.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(GastoUnico, { foreignKey: 'usuario_id', as: 'gastosUnicos' });
+
+  // Tarjeta
+  Tarjeta.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(Tarjeta, { foreignKey: 'usuario_id', as: 'tarjetas' });
 
 }

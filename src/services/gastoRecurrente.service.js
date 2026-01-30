@@ -1,5 +1,6 @@
 import { BaseService } from './base.service.js';
 import { GastoRecurrente, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../models/index.js';
+import ExchangeRateService from './exchangeRate.service.js';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
 
@@ -55,24 +56,68 @@ export class GastoRecurrenteService extends BaseService {
   /**
    * Create recurring expense with validation
    * Adds business logic specific to recurring expenses
+   * 💱 Handles multi-currency conversion automatically
    */
   async create(data) {
     // Validate recurring expense specific rules
     this.validateRecurringExpenseData(data);
 
+    // 💱 Calculate both currencies based on moneda_origen
+    const monedaOrigen = data.moneda_origen || 'ARS';
+    const monto = data.monto;
+
     // Set default values for recurring expenses
-    const processedData = {
+    let processedData = {
       ...data,
+      moneda_origen: monedaOrigen,
       activo: data.activo ?? true,
       ultima_fecha_generado: null
     };
 
+    // Only calculate if not already provided
+    if (!data.monto_ars || !data.monto_usd) {
+      try {
+        const { monto_ars, monto_usd, tipo_cambio_usado } =
+          await ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen);
+
+        processedData = {
+          ...processedData,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        };
+
+        logger.debug('Multi-currency conversion applied to GastoRecurrente', {
+          moneda_origen: monedaOrigen,
+          monto_original: monto,
+          monto_ars,
+          monto_usd,
+          tipo_cambio_referencia: tipo_cambio_usado
+        });
+      } catch (exchangeError) {
+        // If exchange rate service fails, use backward compatibility
+        logger.warn('Exchange rate conversion failed, using backward compatibility', {
+          error: exchangeError.message
+        });
+
+        if (monedaOrigen === 'ARS') {
+          processedData.monto_ars = monto;
+          processedData.monto_usd = null;
+        } else {
+          processedData.monto_ars = monto; // Fallback
+          processedData.monto_usd = null;
+        }
+      }
+    }
+
     const recurringExpense = await super.create(processedData);
 
-    logger.info('Recurring expense created successfully', {
+    logger.info('Recurring expense created successfully (multi-currency)', {
       id: recurringExpense.id,
       descripcion: recurringExpense.descripcion,
-      monto: recurringExpense.monto,
+      monto_ars: recurringExpense.monto_ars,
+      monto_usd: recurringExpense.monto_usd,
+      moneda_origen: recurringExpense.moneda_origen,
       frecuencia_id: recurringExpense.frecuencia_gasto_id
     });
 
@@ -131,45 +176,525 @@ export class GastoRecurrenteService extends BaseService {
   }
 
   /**
-   * Find recurring expenses that should generate today
-   * Used by the scheduler service
+   * Find recurring expenses ready for generation today with advanced logic
+   * Handles different frequencies, edge cases, and provides tolerance for missed dates
    */
   async findReadyForGeneration() {
     const today = moment().tz('America/Argentina/Buenos_Aires');
     const diaActual = today.date();
     const mesActual = today.month() + 1;
+    const anoActual = today.year();
 
-    const activeExpenses = await this.findActive();
+    logger.debug('Starting recurring expense generation check', {
+      today: today.format('YYYY-MM-DD'),
+      dia: diaActual,
+      mes: mesActual,
+      ano: anoActual
+    });
 
-    return activeExpenses.filter(expense => {
-      // Check if it's the payment day
-      if (expense.dia_de_pago !== diaActual) {
-        return false;
+    // Optimized query: get active expenses with frequency data
+    const activeExpenses = await this.model.findAll({
+      where: { activo: true },
+      include: [
+        { model: CategoriaGasto, as: 'categoria' },
+        { model: ImportanciaGasto, as: 'importancia' },
+        { model: TipoPago, as: 'tipoPago' },
+        { model: Tarjeta, as: 'tarjeta' },
+        { model: FrecuenciaGasto, as: 'frecuencia' }
+      ]
+    });
+
+    const readyExpenses = [];
+
+    for (const expense of activeExpenses) {
+      try {
+        const shouldGenerate = await this.shouldGenerateExpense(expense, today);
+        if (shouldGenerate.canGenerate) {
+          // Keep the Sequelize instance, add metadata as properties
+          expense.generationReason = shouldGenerate.reason;
+          expense.adjustedDate = shouldGenerate.adjustedDate;
+          readyExpenses.push(expense);
+        }
+      } catch (error) {
+        logger.error('Error checking expense generation readiness', {
+          expenseId: expense.id,
+          error: error.message
+        });
       }
+    }
 
-      // For annual frequency, check month
-      if (expense.mes_de_pago && expense.mes_de_pago !== mesActual) {
-        return false;
-      }
+    logger.info('Recurring expense generation check completed', {
+      totalActive: activeExpenses.length,
+      readyForGeneration: readyExpenses.length
+    });
 
-      // Check if already generated today
-      if (expense.ultima_fecha_generado) {
-        const ultimaFecha = moment(expense.ultima_fecha_generado);
+    return readyExpenses;
+  }
+
+  /**
+   * Advanced logic to determine if an expense should be generated
+   * Handles multiple frequencies and edge cases
+   */
+  async shouldGenerateExpense(expense, today) {
+    const result = {
+      canGenerate: false,
+      reason: '',
+      adjustedDate: null
+    };
+
+    // Get frequency information first to determine how to check duplicates
+    const frecuencia = expense.frecuencia;
+    if (!frecuencia) {
+      result.reason = 'No frequency defined';
+      return result;
+    }
+
+    // Check if already generated (period depends on frequency)
+    if (expense.ultima_fecha_generado) {
+      const ultimaFecha = moment(expense.ultima_fecha_generado);
+      const frecuenciaNombre = frecuencia.nombre_frecuencia?.toLowerCase();
+
+      // For monthly/biweekly frequencies, check if already generated this month
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this month';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        // For weekly, check if already generated this week
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this week';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        // For daily, check if already generated today
         if (ultimaFecha.isSame(today, 'day')) {
-          return false;
+          result.reason = 'Already generated today';
+          return result;
         }
       }
+    }
 
-      // Check start date
+    // Check start date
+    if (expense.fecha_inicio) {
+      const fechaInicio = moment(expense.fecha_inicio);
+      if (today.isBefore(fechaInicio, 'day')) {
+        result.reason = 'Start date not reached';
+        return result;
+      }
+    }
+
+    // Handle different frequency types
+    const frequencyCheck = this.checkFrequencyMatch(expense, today, frecuencia);
+
+    if (frequencyCheck.matches) {
+      result.canGenerate = true;
+      result.reason = frequencyCheck.reason;
+      result.adjustedDate = frequencyCheck.adjustedDate;
+    } else {
+      result.reason = frequencyCheck.reason;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if current date matches the frequency pattern
+   */
+  checkFrequencyMatch(expense, today, frecuencia) {
+    const diaActual = today.date();
+    const mesActual = today.month() + 1;
+
+    switch (frecuencia.nombre_frecuencia?.toLowerCase()) {
+    case 'único':
+    case 'unico':
+      return {
+        matches: false,
+        reason: 'One-time frequency - should not generate recurring expenses',
+        adjustedDate: null
+      };
+
+    case 'diario':
+      return {
+        matches: true,
+        reason: 'Daily frequency - generate every day',
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+
+    case 'semanal':
+      // Generate every 7 days from last generation or start date
+      return this.checkWeeklyFrequency(expense, today);
+
+    case 'quincenal':
+      // Generate on 1st and 15th of each month
+      return this.checkBiweeklyFrequency(expense, today, diaActual);
+
+    case 'mensual':
+      return this.checkMonthlyFrequency(expense, today, diaActual);
+
+    case 'bimestral':
+      return this.checkBimonthlyFrequency(expense, today, diaActual, mesActual);
+
+    case 'trimestral':
+      return this.checkQuarterlyFrequency(expense, today, diaActual, mesActual);
+
+    case 'semestral':
+      return this.checkSemiannualFrequency(expense, today, diaActual, mesActual);
+
+    case 'anual':
+      return this.checkAnnualFrequency(expense, today, diaActual, mesActual);
+
+    default:
+      return {
+        matches: false,
+        reason: `Unknown frequency: ${frecuencia.nombre_frecuencia}`,
+        adjustedDate: null
+      };
+    }
+  }
+
+  /**
+   * Check weekly frequency (every 7 days)
+   */
+  checkWeeklyFrequency(expense, today) {
+    if (!expense.ultima_fecha_generado) {
+      return {
+        matches: true,
+        reason: 'First weekly generation',
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+    }
+
+    const lastGeneration = moment(expense.ultima_fecha_generado);
+    const daysSince = today.diff(lastGeneration, 'days');
+
+    if (daysSince >= 7) {
+      return {
+        matches: true,
+        reason: `Weekly frequency - ${daysSince} days since last generation`,
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+    }
+
+    return {
+      matches: false,
+      reason: `Weekly frequency - only ${daysSince} days since last generation`,
+      adjustedDate: null
+    };
+  }
+
+  /**
+   * Check biweekly frequency (1st and 15th of month)
+   */
+  checkBiweeklyFrequency(expense, today, diaActual) {
+    const validDays = [1, 15];
+
+    if (validDays.includes(diaActual)) {
+      return {
+        matches: true,
+        reason: `Biweekly frequency - generating on day ${diaActual}`,
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+    }
+
+    // CATCH-UP LOGIC: If never generated and we're past one of the valid days
+    // BUT only if that day is on or after fecha_inicio
+    if (!expense.ultima_fecha_generado) {
+      const lastValidDay = validDays.filter(d => d < diaActual).pop();
+      if (lastValidDay) {
+        const catchUpDate = today.clone().date(lastValidDay);
+        // Check fecha_inicio constraint
+        if (expense.fecha_inicio) {
+          const fechaInicio = moment(expense.fecha_inicio);
+          if (catchUpDate.isBefore(fechaInicio, 'day')) {
+            return {
+              matches: false,
+              reason: `Biweekly frequency - catch-up day ${lastValidDay} is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+              adjustedDate: null
+            };
+          }
+        }
+        return {
+          matches: true,
+          reason: `Biweekly frequency - catch-up for day ${lastValidDay} (never generated before, currently day ${diaActual})`,
+          adjustedDate: catchUpDate.format('YYYY-MM-DD')
+        };
+      }
+    }
+
+    // Regular tolerance: if it's a few days past 1st or 15th and not generated yet
+    const tolerance = this.calculateDateTolerance(diaActual, validDays);
+    if (tolerance.withinTolerance) {
+      return {
+        matches: true,
+        reason: `Biweekly frequency - tolerance applied for day ${tolerance.targetDay}`,
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+    }
+
+    return {
+      matches: false,
+      reason: `Biweekly frequency - not on 1st or 15th (current: ${diaActual})`,
+      adjustedDate: null
+    };
+  }
+
+  /**
+   * Check monthly frequency with date adjustment for invalid dates
+   */
+  checkMonthlyFrequency(expense, today, diaActual) {
+    const targetDay = expense.dia_de_pago;
+
+    // Handle edge cases like day 31 in months with fewer days
+    const adjustedDate = this.getValidMonthlyDate(today, targetDay);
+    const adjustedDay = adjustedDate.date();
+
+    if (diaActual === adjustedDay) {
+      return {
+        matches: true,
+        reason: `Monthly frequency - exact match on day ${adjustedDay}`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    // CATCH-UP LOGIC: If never generated before and target day has passed this month
+    // BUT only if the target day this month is ON or AFTER fecha_inicio
+    if (!expense.ultima_fecha_generado && diaActual > adjustedDay) {
+      // If there's a fecha_inicio, check if the target day this month was after fecha_inicio
       if (expense.fecha_inicio) {
         const fechaInicio = moment(expense.fecha_inicio);
-        if (today.isBefore(fechaInicio, 'day')) {
-          return false;
+        // The adjusted date (target day this month) must be on or after fecha_inicio
+        // Otherwise, the first generation should be next month
+        if (adjustedDate.isBefore(fechaInicio, 'day')) {
+          return {
+            matches: false,
+            reason: `Monthly frequency - target day ${targetDay} this month (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+            adjustedDate: null
+          };
         }
       }
+      return {
+        matches: true,
+        reason: `Monthly frequency - catch-up for day ${targetDay} (never generated before, currently day ${diaActual})`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
 
-      return true;
-    });
+    // Regular tolerance for missed dates (3 days)
+    const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
+    if (tolerance.withinTolerance) {
+      return {
+        matches: true,
+        reason: `Monthly frequency - tolerance applied for day ${targetDay} (adjusted to ${adjustedDay})`,
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+    }
+
+    return {
+      matches: false,
+      reason: `Monthly frequency - target day ${targetDay} (adjusted to ${adjustedDay}), current ${diaActual}`,
+      adjustedDate: null
+    };
+  }
+
+  /**
+   * Check bimonthly frequency (every 2 months)
+   */
+  checkBimonthlyFrequency(expense, today, diaActual, _mesActual) {
+    const targetDay = expense.dia_de_pago;
+    const adjustedDate = this.getValidMonthlyDate(today, targetDay);
+    const adjustedDay = adjustedDate.date();
+
+    if (diaActual !== adjustedDay) {
+      return {
+        matches: false,
+        reason: `Bimonthly frequency - wrong day ${diaActual}, expected ${adjustedDay}`,
+        adjustedDate: null
+      };
+    }
+
+    // Check if it's been 2 months since last generation
+    if (!expense.ultima_fecha_generado) {
+      return {
+        matches: true,
+        reason: 'First bimonthly generation',
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    const lastGeneration = moment(expense.ultima_fecha_generado);
+    const monthsSince = today.diff(lastGeneration, 'months');
+
+    if (monthsSince >= 2) {
+      return {
+        matches: true,
+        reason: `Bimonthly frequency - ${monthsSince} months since last generation`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    return {
+      matches: false,
+      reason: `Bimonthly frequency - only ${monthsSince} months since last generation`,
+      adjustedDate: null
+    };
+  }
+
+  /**
+   * Check quarterly frequency (every 3 months)
+   */
+  checkQuarterlyFrequency(expense, today, diaActual, mesActual) {
+    const targetDay = expense.dia_de_pago;
+    const adjustedDate = this.getValidMonthlyDate(today, targetDay);
+    const adjustedDay = adjustedDate.date();
+
+    if (diaActual !== adjustedDay) {
+      return {
+        matches: false,
+        reason: `Quarterly frequency - wrong day ${diaActual}, expected ${adjustedDay}`,
+        adjustedDate: null
+      };
+    }
+
+    // Check if current month is a quarter month (1, 4, 7, 10)
+    const quarterMonths = [1, 4, 7, 10];
+    if (!quarterMonths.includes(mesActual)) {
+      return {
+        matches: false,
+        reason: `Quarterly frequency - not a quarter month (${mesActual})`,
+        adjustedDate: null
+      };
+    }
+
+    return {
+      matches: true,
+      reason: `Quarterly frequency - generating in quarter month ${mesActual}`,
+      adjustedDate: adjustedDate.format('YYYY-MM-DD')
+    };
+  }
+
+  /**
+   * Check semiannual frequency (every 6 months)
+   */
+  checkSemiannualFrequency(expense, today, diaActual, mesActual) {
+    const targetDay = expense.dia_de_pago;
+    const adjustedDate = this.getValidMonthlyDate(today, targetDay);
+    const adjustedDay = adjustedDate.date();
+
+    if (diaActual !== adjustedDay) {
+      return {
+        matches: false,
+        reason: `Semiannual frequency - wrong day ${diaActual}, expected ${adjustedDay}`,
+        adjustedDate: null
+      };
+    }
+
+    // Check if current month is a semiannual month (1, 7)
+    const semiannualMonths = [1, 7];
+    if (!semiannualMonths.includes(mesActual)) {
+      return {
+        matches: false,
+        reason: `Semiannual frequency - not a semiannual month (${mesActual})`,
+        adjustedDate: null
+      };
+    }
+
+    return {
+      matches: true,
+      reason: `Semiannual frequency - generating in month ${mesActual}`,
+      adjustedDate: adjustedDate.format('YYYY-MM-DD')
+    };
+  }
+
+  /**
+   * Check annual frequency
+   */
+  checkAnnualFrequency(expense, today, diaActual, mesActual) {
+    const targetDay = expense.dia_de_pago;
+    const targetMonth = expense.mes_de_pago;
+
+    if (!targetMonth) {
+      return {
+        matches: false,
+        reason: 'Annual frequency requires mes_de_pago to be set',
+        adjustedDate: null
+      };
+    }
+
+    if (mesActual !== targetMonth) {
+      return {
+        matches: false,
+        reason: `Annual frequency - wrong month ${mesActual}, expected ${targetMonth}`,
+        adjustedDate: null
+      };
+    }
+
+    const adjustedDate = this.getValidMonthlyDate(today, targetDay);
+    const adjustedDay = adjustedDate.date();
+
+    if (diaActual === adjustedDay) {
+      return {
+        matches: true,
+        reason: `Annual frequency - exact match on ${mesActual}/${adjustedDay}`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    // Tolerance for annual frequency
+    const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
+    if (tolerance.withinTolerance) {
+      return {
+        matches: true,
+        reason: `Annual frequency - tolerance applied for ${targetMonth}/${targetDay}`,
+        adjustedDate: today.format('YYYY-MM-DD')
+      };
+    }
+
+    return {
+      matches: false,
+      reason: `Annual frequency - target ${targetMonth}/${targetDay} (adjusted to ${adjustedDay}), current ${mesActual}/${diaActual}`,
+      adjustedDate: null
+    };
+  }
+
+  /**
+   * Get valid date for monthly recurring, handling edge cases like Feb 31
+   */
+  getValidMonthlyDate(today, targetDay) {
+    const year = today.year();
+    const month = today.month(); // 0-based
+
+    // Create date with target day
+    const targetDate = moment({ year, month, date: targetDay });
+
+    // If the date is invalid (e.g., Feb 31), get last day of month
+    if (!targetDate.isValid() || targetDate.date() !== targetDay) {
+      return moment({ year, month }).endOf('month');
+    }
+
+    return targetDate;
+  }
+
+  /**
+   * Calculate tolerance for missed dates (up to 3 days)
+   */
+  calculateDateTolerance(currentDay, validDays) {
+    const tolerance = 3; // days
+
+    for (const validDay of validDays) {
+      const diff = currentDay - validDay;
+      if (diff > 0 && diff <= tolerance) {
+        return {
+          withinTolerance: true,
+          targetDay: validDay
+        };
+      }
+    }
+
+    return {
+      withinTolerance: false,
+      targetDay: null
+    };
   }
 
   /**
@@ -198,7 +723,7 @@ export class GastoRecurrenteService extends BaseService {
    * @param {Object} data - Expense data to validate
    * @param {boolean} isUpdate - Whether this is an update operation
    */
-  validateRecurringExpenseData(data, isUpdate = false) {
+  validateRecurringExpenseData(data, _isUpdate = false) {
     const errors = [];
 
     // Amount validation

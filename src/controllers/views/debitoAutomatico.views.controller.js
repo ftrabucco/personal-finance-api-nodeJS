@@ -20,7 +20,7 @@ function createMockResponse() {
 // Helper para limpiar datos del formulario antes de enviar al API
 function cleanFormData(body) {
   const cleaned = { ...body };
-  
+
   // Convertir strings vacíos a null para campos opcionales
   if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
     cleaned.tarjeta_id = null;
@@ -28,7 +28,7 @@ function cleanFormData(body) {
   if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
     cleaned.mes_de_pago = null;
   }
-  
+
   // Asegurar tipos numéricos correctos
   if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
   if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
@@ -38,11 +38,11 @@ function cleanFormData(body) {
   if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
   if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
   if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-  
+
   // Manejar checkbox de activo
   if (cleaned.activo === 'on') cleaned.activo = true;
   if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
-  
+
   return cleaned;
 }
 
@@ -55,7 +55,7 @@ async function getReferenceData() {
     Tarjeta.findAll(),
     FrecuenciaGasto.findAll()
   ]);
-  
+
   return {
     categorias: categorias.map(c => c.get({ plain: true })),
     importancias: importancias.map(i => i.get({ plain: true })),
@@ -144,16 +144,16 @@ export const handleFormNuevoDebitoAutomatico = async (req, res) => {
   try {
     // Limpiar datos del formulario
     const cleanData = cleanFormData(req.body);
-    
+
     // Usar el API controller para crear el débito automático
     const mockRes = createMockResponse();
     await apiController.create({ body: cleanData }, mockRes);
     const result = mockRes.getResult();
-    
+
     if (result.status !== 201) {
       throw new Error(result.data.message || 'Error al crear débito automático');
     }
-    
+
     logger.info('Débito automático creado desde vista:', { id: result.data.debitoAutomatico.id });
     res.redirect('/debitos-automaticos');
   } catch (error) {
@@ -171,16 +171,16 @@ export const handleFormEditarDebitoAutomatico = async (req, res) => {
   try {
     // Limpiar datos del formulario
     const cleanData = cleanFormData(req.body);
-    
+
     // Usar el API controller para actualizar el débito automático
     const mockRes = createMockResponse();
     await apiController.update({ params: req.params, body: cleanData }, mockRes);
     const result = mockRes.getResult();
-    
+
     if (result.status >= 400) {
       throw new Error(result.data.message || 'Error al actualizar débito automático');
     }
-    
+
     logger.info('Débito automático actualizado desde vista:', { id: req.params.id });
     res.redirect('/debitos-automaticos');
   } catch (error) {
@@ -200,15 +200,15 @@ export const handleDeleteDebitoAutomatico = async (req, res) => {
     const mockRes = createMockResponse();
     await apiController.delete({ params: req.params }, mockRes);
     const result = mockRes.getResult();
-    
+
     if (result.status >= 400) {
       throw new Error(result.data.message || 'Error al eliminar débito automático');
     }
-    
+
     logger.info('Débito automático eliminado desde vista:', { id: req.params.id });
     res.redirect('/debitos-automaticos');
   } catch (error) {
     logger.error('Error al eliminar débito automático:', { error });
     res.status(500).send('Error al eliminar el débito automático');
   }
-}; 
+};

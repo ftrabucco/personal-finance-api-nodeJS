@@ -28,4 +28,4 @@ router.put('/:id', handleFormEditarGastoRecurrente);
 // Eliminar gasto recurrente
 router.delete('/:id', handleDeleteGastoRecurrente);
 
-export default router; 
+export default router;

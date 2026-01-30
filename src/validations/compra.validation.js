@@ -9,7 +9,13 @@ export const createCompraSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive().required(),
   tipo_pago_id: Joi.number().integer().positive().required(),
   tarjeta_id: Joi.number().integer().positive().optional().allow(null),
-  pendiente_cuotas: Joi.boolean().default(true)
+  pendiente_cuotas: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  // Estos campos son calculados por el backend:
+  monto_total_ars: Joi.forbidden(),
+  monto_total_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
 });
 
 export const updateCompraSchema = Joi.object({
@@ -21,5 +27,11 @@ export const updateCompraSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive(),
   tipo_pago_id: Joi.number().integer().positive(),
   tarjeta_id: Joi.number().integer().positive().allow(null),
-  pendiente_cuotas: Joi.boolean()
+  pendiente_cuotas: Joi.boolean(),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD'),
+  // Estos campos son calculados por el backend:
+  monto_total_ars: Joi.forbidden(),
+  monto_total_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
 });

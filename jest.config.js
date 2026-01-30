@@ -1,5 +1,6 @@
 export default {
   testEnvironment: 'node',
+  transform: {},
   testMatch: [
     '**/tests/**/*.test.js',
     '**/tests/**/*.spec.js',
@@ -18,5 +19,8 @@ export default {
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   testTimeout: 10000,
-  verbose: true
+  verbose: true,
+  clearMocks: true,
+  resetMocks: true,
+  restoreMocks: true
 };

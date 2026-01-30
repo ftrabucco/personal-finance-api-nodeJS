@@ -36,7 +36,8 @@ jest.unstable_mockModule('../../../src/models/index.js', () => ({
   ImportanciaGasto: {},
   TipoPago: {},
   Tarjeta: {},
-  FrecuenciaGasto: {}
+  FrecuenciaGasto: {},
+  TipoCambio: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn() }
 }));
 
 // Import services after mocking

@@ -384,3 +384,404 @@ const gastos = await GET(`/api/gastos?fecha_desde=${data.fecha}&fecha_hasta=${da
 const gastoEncontrado = gastos.data.find(g => g.descripcion === data.descripcion);
 assert(gastoEncontrado !== undefined);
 ```
+
+---
+
+## 💱 API Tipo de Cambio - Sistema Multi-Moneda
+
+### Resumen de Endpoints
+
+| Endpoint | Método | Propósito | Estado | Autenticación |
+|----------|---------|-----------|--------|---------------|
+| `/api/tipo-cambio` | GET | Obtener historial de tipos de cambio | ✅ IMPLEMENTADO | Requerida |
+| `/api/tipo-cambio/actual` | GET | Obtener tipo de cambio más reciente | ✅ IMPLEMENTADO | Requerida |
+| `/api/tipo-cambio/fecha/:fecha` | GET | Obtener TC por fecha específica | ✅ IMPLEMENTADO | Requerida |
+| `/api/tipo-cambio/:id` | GET | Obtener TC por ID | ✅ IMPLEMENTADO | Requerida |
+| `/api/tipo-cambio` | POST | Crear TC manualmente | ✅ IMPLEMENTADO | Requerida |
+| `/api/tipo-cambio/:id` | DELETE | Eliminar TC | ✅ IMPLEMENTADO | Requerida |
+| `/api/tipo-cambio/actualizar` | POST | Forzar actualización desde APIs externas | ✅ IMPLEMENTADO | Requerida |
+
+---
+
+### 1. GET `/api/tipo-cambio`
+**Propósito:** Obtener historial de tipos de cambio USD/ARS con filtros opcionales.
+
+**Parámetros de Query:**
+| Parámetro | Tipo | Descripción | Ejemplo |
+|-----------|------|-------------|---------|
+| `fecha` | date (ISO) | Filtrar por fecha específica | `2024-01-15` |
+| `fecha_desde` | date (ISO) | Fecha inicio del rango | `2024-01-01` |
+| `fecha_hasta` | date (ISO) | Fecha fin del rango | `2024-01-31` |
+| `fuente` | string | Filtrar por fuente | `BCRA`, `DolarAPI` |
+| `limit` | number (1-100) | Límite de resultados | `30` (default) |
+| `offset` | number (≥0) | Offset para paginación | `0` (default) |
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "fecha": "2024-01-15",
+      "valor_compra": 995.50,
+      "valor_venta": 1005.50,
+      "fuente": "BCRA",
+      "createdAt": "2024-01-15T00:05:00Z",
+      "updatedAt": "2024-01-15T00:05:00Z"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "type": "collection"
+  }
+}
+```
+
+**Casos de uso:**
+```bash
+# Historial del último mes
+GET /api/tipo-cambio?fecha_desde=2024-01-01&fecha_hasta=2024-01-31
+
+# Solo tipos de cambio del BCRA
+GET /api/tipo-cambio?fuente=BCRA&limit=10
+
+# Tipo de cambio de una fecha específica
+GET /api/tipo-cambio?fecha=2024-01-15
+```
+
+---
+
+### 2. GET `/api/tipo-cambio/actual`
+**Propósito:** Obtener el tipo de cambio más reciente (última fecha registrada).
+
+**Parámetros:** Ninguno
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "fecha": "2024-01-15",
+    "valor_compra": 995.50,
+    "valor_venta": 1005.50,
+    "fuente": "BCRA"
+  },
+  "meta": {
+    "type": "single"
+  }
+}
+```
+
+**Respuesta cuando no hay datos (404):**
+```json
+{
+  "success": false,
+  "error": "No se encontró ningún tipo de cambio",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+**Casos de uso:**
+- Consultar TC antes de crear un gasto/compra en USD
+- Mostrar TC actual en dashboard
+- Calcular conversión en tiempo real para el usuario
+
+---
+
+### 3. GET `/api/tipo-cambio/fecha/:fecha`
+**Propósito:** Obtener tipo de cambio de una fecha específica con fallback automático.
+
+**Parámetros:**
+- `fecha` (path): Fecha en formato YYYY-MM-DD
+
+**Comportamiento con fallback:**
+- Si existe registro para esa fecha → lo devuelve
+- Si NO existe → devuelve el más cercano anterior (fallback)
+- Si no hay ninguno anterior → error 404
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "fecha": "2024-01-15",
+    "valor_compra": 995.50,
+    "valor_venta": 1005.50,
+    "fuente": "BCRA"
+  },
+  "meta": {
+    "type": "single"
+  }
+}
+```
+
+**Casos de uso:**
+```bash
+# TC de una fecha específica
+GET /api/tipo-cambio/fecha/2024-01-15
+
+# TC histórico (usa fallback si no existe esa fecha exacta)
+GET /api/tipo-cambio/fecha/2024-01-20
+```
+
+---
+
+### 4. GET `/api/tipo-cambio/:id`
+**Propósito:** Obtener un tipo de cambio específico por su ID.
+
+**Parámetros:**
+- `id` (path): ID numérico del registro de tipo de cambio
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "fecha": "2024-01-15",
+    "valor_compra": 995.50,
+    "valor_venta": 1005.50,
+    "fuente": "BCRA"
+  }
+}
+```
+
+**Casos de uso:**
+- Ver detalles de un TC específico
+- Auditoría de registros históricos
+- Referencias desde gastos/compras que usan ese TC
+
+---
+
+### 5. POST `/api/tipo-cambio`
+**Propósito:** Crear un tipo de cambio manualmente (para correcciones o cuando falla la API externa).
+
+**Cuerpo de la petición:**
+```json
+{
+  "fecha": "2024-01-15",       // Requerido, formato YYYY-MM-DD
+  "valor_compra": 995.50,      // Requerido, positivo
+  "valor_venta": 1005.50,      // Requerido, positivo
+  "fuente": "manual"           // Opcional, default: "manual"
+}
+```
+
+**Validaciones:**
+- `fecha` debe ser válida (YYYY-MM-DD)
+- `valor_compra` y `valor_venta` deben ser números positivos
+- `fuente` es opcional (default: "manual")
+
+**Respuesta exitosa (201):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "fecha": "2024-01-15",
+    "valor_compra": 995.50,
+    "valor_venta": 1005.50,
+    "fuente": "manual",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+**Casos de uso:**
+- Corregir datos históricos
+- Agregar TC manualmente cuando fallan las APIs externas
+- Cargar datos de un período anterior al inicio del sistema
+
+---
+
+### 6. DELETE `/api/tipo-cambio/:id`
+**Propósito:** Eliminar un registro de tipo de cambio.
+
+**⚠️ Advertencia:** Eliminar tipos de cambio históricos puede afectar la integridad de gastos/compras que los utilizaron. Solo usar en casos de corrección de errores.
+
+**Parámetros:**
+- `id` (path): ID del registro a eliminar
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Tipo de cambio eliminado correctamente"
+  }
+}
+```
+
+**Casos de uso:**
+- Eliminar duplicados
+- Corregir errores de carga
+- Limpieza de datos de prueba
+
+---
+
+### 7. POST `/api/tipo-cambio/actualizar`
+**Propósito:** Forzar una actualización del tipo de cambio desde las APIs externas.
+
+**⚠️ Nota:** El scheduler ejecuta esto automáticamente a las 00:00 diariamente. Este endpoint es para actualizaciones manuales.
+
+**Fuentes consultadas (en orden):**
+1. **DolarAPI.com** (primaria) - Dólar oficial
+2. **BCRA** (fallback) - Si falla DolarAPI
+
+**Parámetros:** Ninguno
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Tipo de cambio actualizado exitosamente",
+    "tipoCambio": {
+      "id": 1,
+      "fecha": "2024-01-15",
+      "valor_compra": 995.50,
+      "valor_venta": 1005.50,
+      "fuente": "DolarAPI"
+    },
+    "fuente": "DolarAPI"
+  }
+}
+```
+
+**Respuesta de error (500):**
+```json
+{
+  "success": false,
+  "error": "Error al obtener tipo de cambio desde APIs externas",
+  "details": "Ambas fuentes (DolarAPI y BCRA) fallaron",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+**Casos de uso:**
+- Botón "Actualizar TC" en dashboard
+- Actualización inmediata después de un deploy
+- Forzar actualización si el scheduler falló
+- Testing de integración con APIs externas
+
+---
+
+## 💱 Campos Multi-Moneda en Endpoints de Gastos
+
+Los siguientes endpoints ahora incluyen soporte multi-moneda (USD/ARS):
+
+### Campos añadidos a modelos:
+
+**GastoUnico, GastoRecurrente, DebitoAutomatico:**
+```json
+{
+  "monto": 100.00,              // Monto en moneda original
+  "moneda_origen": "USD",       // "ARS" o "USD" (default: "ARS")
+  "monto_ars": 100000.00,       // Calculado automáticamente
+  "monto_usd": 100.00,          // Calculado automáticamente
+  "tipo_cambio_usado": 1000.00  // TC usado para conversión (snapshot)
+}
+```
+
+**Compra:**
+```json
+{
+  "monto_total": 120000.00,           // Monto total en moneda original
+  "moneda_origen": "ARS",             // "ARS" o "USD" (default: "ARS")
+  "monto_total_ars": 120000.00,       // Calculado automáticamente
+  "monto_total_usd": 120.00,          // Calculado automáticamente
+  "tipo_cambio_usado": 1000.00        // TC usado para conversión
+}
+```
+
+### Validación Joi:
+
+**Campos permitidos para el usuario:**
+- `monto` (o `monto_total` para compras) - Requerido
+- `moneda_origen` - Opcional (default: "ARS")
+
+**Campos calculados por el backend (Joi.forbidden()):**
+- `monto_ars` / `monto_total_ars`
+- `monto_usd` / `monto_total_usd`
+- `tipo_cambio_usado` / `tipo_cambio_referencia`
+
+Si el usuario intenta enviar campos calculados, recibirá error 400:
+```json
+{
+  "success": false,
+  "error": "Error de validación",
+  "details": [
+    {
+      "field": "monto_usd",
+      "message": "\"monto_usd\" is not allowed"
+    }
+  ]
+}
+```
+
+### Ejemplo de creación con multi-moneda:
+
+**Crear gasto en USD:**
+```bash
+POST /api/gastos-unicos
+{
+  "descripcion": "Suscripción Netflix",
+  "monto": 15.00,
+  "moneda_origen": "USD",        # El backend calculará automáticamente ARS
+  "fecha": "2024-01-15",
+  "categoria_gasto_id": 5,
+  "importancia_gasto_id": 2,
+  "tipo_pago_id": 3
+}
+```
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "descripcion": "Suscripción Netflix",
+    "monto": 15.00,
+    "moneda_origen": "USD",
+    "monto_ars": 15075.00,         # Calculado: 15 * 1005
+    "monto_usd": 15.00,
+    "tipo_cambio_usado": 1005.00,  # Snapshot del TC al momento de creación
+    "fecha": "2024-01-15",
+    ...
+  }
+}
+```
+
+---
+
+## 🧪 Casos de Prueba Multi-Moneda
+
+### Pruebas Funcionales - Tipo de Cambio
+1. **Obtener TC actual** - `GET /api/tipo-cambio/actual`
+2. **Obtener TC por fecha existente** - `GET /api/tipo-cambio/fecha/2024-01-15`
+3. **Obtener TC con fallback** - `GET /api/tipo-cambio/fecha/2024-01-16` (fecha sin registro)
+4. **Crear TC manualmente** - `POST /api/tipo-cambio`
+5. **Actualizar TC desde API externa** - `POST /api/tipo-cambio/actualizar`
+6. **Filtrar TC por fuente** - `GET /api/tipo-cambio?fuente=BCRA`
+7. **Paginación de TC** - `GET /api/tipo-cambio?limit=10&offset=10`
+
+### Pruebas Funcionales - Gastos Multi-Moneda
+8. **Crear gasto en USD** - Verificar conversión automática a ARS
+9. **Crear gasto en ARS** - Verificar conversión automática a USD
+10. **Crear compra en USD** - Verificar cálculo de cuotas en ambas monedas
+11. **Verificar snapshot de TC** - El TC usado no cambia si se actualiza el TC actual
+
+### Pruebas de Validación - Multi-Moneda
+12. **Enviar monto_ars explícito** - Debe rechazarse (Joi.forbidden)
+13. **Enviar monto_usd explícito** - Debe rechazarse (Joi.forbidden)
+14. **Moneda origen inválida** - Debe aceptar solo "ARS" o "USD"
+15. **Crear gasto sin TC disponible** - Debe usar fallback o error claro
+
+### Pruebas de Integridad
+16. **TC usado permanece constante** - Gasto creado con TC=1000 no cambia si TC actual pasa a 1100
+17. **Gastos recurrentes actualizan TC** - Cada vez que se genera, usa el TC actual (se actualiza diariamente)
+18. **Conversión bidireccional correcta** - `monto_ars / tipo_cambio = monto_usd`

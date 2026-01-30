@@ -1,5 +1,5 @@
 export const helpers = {
-  formatDate: function(date) {
+  formatDate: function (date) {
     if (!date) return '';
     const d = new Date(date);
     return d.toLocaleDateString('es-AR', {
@@ -8,45 +8,45 @@ export const helpers = {
       day: '2-digit'
     });
   },
-  
-  eq: function(a, b) {
+
+  eq: function (a, b) {
     return a === b;
   },
-  
+
   // Helpers de comparación
-  gte: function(a, b) {
+  gte: function (a, b) {
     return a >= b;
   },
-  
-  gt: function(a, b) {
+
+  gt: function (a, b) {
     return a > b;
   },
-  
-  lte: function(a, b) {
+
+  lte: function (a, b) {
     return a <= b;
   },
-  
-  lt: function(a, b) {
+
+  lt: function (a, b) {
     return a < b;
   },
-  
+
   // Helper para verificar si string contiene otro string
-  contains: function(str, search) {
+  contains: function (str, search) {
     if (!str || !search) return false;
     return str.toLowerCase().includes(search.toLowerCase());
   },
-  
+
   // Helper para dividir
-  div: function(a, b) {
+  div: function (a, b) {
     return parseFloat(a) / parseFloat(b);
   },
-  
+
   // Helper para JSON
-  JSON: function(obj) {
+  JSON: function (obj) {
     return JSON.stringify(obj);
   },
-  
-  formatMoney: function(amount) {
+
+  formatMoney: function (amount) {
     if (!amount) return '$0,00';
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -55,16 +55,16 @@ export const helpers = {
     }).format(amount);
   },
 
-  selected: function(option, value) {
+  selected: function (option, value) {
     return option === value ? 'selected' : '';
   },
 
-  checked: function(option, value) {
+  checked: function (option, value) {
     return option === value ? 'checked' : '';
   },
 
-  formatDayOfMonth: function(day) {
+  formatDayOfMonth: function (day) {
     if (!day) return '';
     return `${day}º día`;
   }
-}; 
+};

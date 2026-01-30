@@ -40,11 +40,11 @@ export class BaseController {
       const item = await this.model.findByPk(req.params.id, {
         include: this.getIncludes()
       });
-      
+
       if (!item) {
         return sendError(res, 404, `${this.modelName} no encontrado`);
       }
-      
+
       return sendSuccess(res, item);
     } catch (error) {
       logger.error(`Error al obtener ${this.modelName}:`, { error });
@@ -63,7 +63,7 @@ export class BaseController {
 
       const item = await this.model.create(req.body);
       logger.info(`${this.modelName} creado:`, { id: item.id });
-      
+
       return sendSuccess(res, item, 201);
     } catch (error) {
       logger.error(`Error al crear ${this.modelName}:`, { error });
@@ -87,7 +87,7 @@ export class BaseController {
 
       await item.update(req.body);
       logger.info(`${this.modelName} actualizado:`, { id: item.id });
-      
+
       return sendSuccess(res, item);
     } catch (error) {
       logger.error(`Error al actualizar ${this.modelName}:`, { error });
@@ -100,14 +100,14 @@ export class BaseController {
     try {
       const item = await this.model.findByPk(req.params.id);
       if (!item) {
-        return res.status(404).json({ 
-          error: `${this.modelName} no encontrado` 
+        return res.status(404).json({
+          error: `${this.modelName} no encontrado`
         });
       }
 
       await item.destroy();
       logger.info(`${this.modelName} eliminado:`, { id: req.params.id });
-      
+
       return sendSuccess(res, { message: `${this.modelName} eliminado correctamente` });
     } catch (error) {
       logger.error(`Error al eliminar ${this.modelName}:`, { error });
@@ -124,4 +124,4 @@ export class BaseController {
   getRelationships() {
     return {};
   }
-} 
+}

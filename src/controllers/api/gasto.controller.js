@@ -3,7 +3,7 @@ import { Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaG
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
-import { sendError, sendSuccess, sendPaginatedSuccess } from '../../utils/responseHelper.js';
+import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 
 export class GastoController extends BaseController {
   constructor() {
@@ -28,6 +28,118 @@ export class GastoController extends BaseController {
       tarjeta_id: { model: Tarjeta, name: 'Tarjeta' },
       frecuencia_gasto_id: { model: FrecuenciaGasto, name: 'Frecuencia' }
     };
+  }
+
+  // Override getAll to filter by user
+  async getAll(req, res) {
+    try {
+      const items = await this.model.findAll({
+        where: {
+          usuario_id: req.user.id
+        },
+        include: this.getIncludes()
+      });
+      return sendSuccess(res, items);
+    } catch (error) {
+      logger.error(`Error al obtener ${this.modelName}:`, { error });
+      return sendError(res, 500, `Error al obtener ${this.modelName}`, error.message);
+    }
+  }
+
+  // Override getById to filter by user
+  async getById(req, res) {
+    try {
+      const item = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        },
+        include: this.getIncludes()
+      });
+
+      if (!item) {
+        return sendError(res, 404, `${this.modelName} no encontrado`);
+      }
+
+      return sendSuccess(res, item);
+    } catch (error) {
+      logger.error(`Error al obtener ${this.modelName}:`, { error });
+      return sendError(res, 500, `Error al obtener ${this.modelName}`, error.message);
+    }
+  }
+
+  // Override create to add user context
+  async create(req, res) {
+    try {
+      // Validar IDs existentes
+      const validationErrors = await this.validateExistingIds(req.body, this.getRelationships());
+      if (validationErrors.length > 0) {
+        return sendValidationError(res, validationErrors);
+      }
+
+      const item = await this.model.create({
+        ...req.body,
+        usuario_id: req.user.id
+      });
+      logger.info(`${this.modelName} creado:`, { id: item.id });
+
+      return sendSuccess(res, item, 201);
+    } catch (error) {
+      logger.error(`Error al crear ${this.modelName}:`, { error });
+      return sendError(res, 500, `Error al crear ${this.modelName}`, error.message);
+    }
+  }
+
+  // Override update to filter by user
+  async update(req, res) {
+    try {
+      const item = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
+      if (!item) {
+        return sendError(res, 404, `${this.modelName} no encontrado`);
+      }
+
+      // Validar IDs existentes
+      const validationErrors = await this.validateExistingIds(req.body, this.getRelationships());
+      if (validationErrors.length > 0) {
+        return sendValidationError(res, validationErrors);
+      }
+
+      await item.update(req.body);
+      logger.info(`${this.modelName} actualizado:`, { id: item.id });
+
+      return sendSuccess(res, item);
+    } catch (error) {
+      logger.error(`Error al actualizar ${this.modelName}:`, { error });
+      return sendError(res, 500, `Error al actualizar ${this.modelName}`, error.message);
+    }
+  }
+
+  // Override delete to filter by user
+  async delete(req, res) {
+    try {
+      const item = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        }
+      });
+      if (!item) {
+        return sendError(res, 404, `${this.modelName} no encontrado`);
+      }
+
+      await item.destroy();
+      logger.info(`${this.modelName} eliminado:`, { id: req.params.id });
+
+      return sendSuccess(res, { message: `${this.modelName} eliminado correctamente` });
+    } catch (error) {
+      logger.error(`Error al eliminar ${this.modelName}:`, { error });
+      return sendError(res, 500, `Error al eliminar ${this.modelName}`, error.message);
+    }
   }
 
   // Método para generar todos los gastos pendientes (endpoint manual)
@@ -86,7 +198,10 @@ export class GastoController extends BaseController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
@@ -129,7 +244,7 @@ export class GastoController extends BaseController {
       if (limit) {
         queryOptions.limit = parseInt(limit);
         queryOptions.offset = parseInt(offset);
-        
+
         const gastos = await this.model.findAndCountAll(queryOptions);
         const pagination = {
           total: gastos.count,
@@ -138,7 +253,7 @@ export class GastoController extends BaseController {
           hasNext: parseInt(offset) + parseInt(limit) < gastos.count,
           hasPrev: parseInt(offset) > 0
         };
-        
+
         return sendPaginatedSuccess(res, gastos.rows, pagination);
       } else {
         const gastos = await this.model.findAll(queryOptions);
@@ -173,7 +288,10 @@ export class GastoController extends BaseController {
         orderDirection = 'DESC'
       } = req.body;
 
-      const where = {};
+      // SIEMPRE filtrar por usuario autenticado
+      const where = {
+        usuario_id: req.user.id
+      };
 
       // Filtros por IDs
       if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
@@ -236,11 +354,14 @@ export class GastoController extends BaseController {
       const { fecha_desde, fecha_hasta } = req.query;
 
       // Si no se proporcionan fechas, usar el mes actual
-      let whereClause = {};
+      let whereClause = {
+        usuario_id: req.user.id
+      };
       let firstDay, lastDay;
-      
+
       if (fecha_desde && fecha_hasta) {
         whereClause = {
+          usuario_id: req.user.id,
           fecha: {
             [Op.between]: [fecha_desde, fecha_hasta]
           }
@@ -250,8 +371,9 @@ export class GastoController extends BaseController {
         const now = new Date();
         firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        
+
         whereClause = {
+          usuario_id: req.user.id,
           fecha: {
             [Op.between]: [firstDay.toISOString().split('T')[0], lastDay.toISOString().split('T')[0]]
           }
@@ -281,7 +403,7 @@ export class GastoController extends BaseController {
       gastos.forEach(gasto => {
         const montoArs = parseFloat(gasto.monto_ars) || 0;
         const montoUsd = parseFloat(gasto.monto_usd) || 0;
-        
+
         // Acumular totales generales
         resumen.total_ars += montoArs;
         resumen.total_usd += montoUsd;
@@ -334,4 +456,4 @@ export const eliminarGasto = gastoController.delete.bind(gastoController);
 export const obtenerGastosConFiltros = gastoController.getWithFilters.bind(gastoController);
 export const obtenerResumenGastos = gastoController.getSummary.bind(gastoController);
 export const generarGastosPendientes = gastoController.generatePendingGastos.bind(gastoController);
-export const buscarGastos = gastoController.searchGastos.bind(gastoController); 
+export const buscarGastos = gastoController.searchGastos.bind(gastoController);

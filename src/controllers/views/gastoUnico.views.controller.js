@@ -20,19 +20,19 @@ function createMockResponse() {
 // Helper para limpiar datos del formulario antes de enviar al API
 function cleanFormData(body) {
   const cleaned = { ...body };
-  
+
   // Convertir strings vacíos a null para campos opcionales
   if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
     cleaned.tarjeta_id = null;
   }
-  
+
   // Asegurar tipos numéricos correctos
   if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
   if (cleaned.categoria_gasto_id) cleaned.categoria_gasto_id = parseInt(cleaned.categoria_gasto_id);
   if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
   if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
   if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-  
+
   return cleaned;
 }
 
@@ -44,14 +44,14 @@ async function getReferenceData() {
     TipoPago.findAll(),
     Tarjeta.findAll()
   ]);
-  
+
   logger.debug('Datos de referencia disponibles:', {
     categorias: categorias.map(c => ({ id: c.id, nombre: c.nombre_categoria })),
     importancias: importancias.map(i => ({ id: i.id, nombre: i.nombre_importancia })),
     tiposPago: tiposPago.map(t => ({ id: t.id, nombre: t.nombre })),
     tarjetas: tarjetas.map(t => ({ id: t.id, nombre: t.nombre }))
   });
-  
+
   return {
     categorias: categorias.map(c => c.get({ plain: true })),
     importancias: importancias.map(i => i.get({ plain: true })),
@@ -147,7 +147,7 @@ export const handleFormNuevoGastoUnico = async (req, res) => {
     const result = mockRes.getResult();
 
     if (result.status === 201) {
-      logger.info('Gasto único creado exitosamente desde vista:', { 
+      logger.info('Gasto único creado exitosamente desde vista:', {
         gastoUnico_id: result.data.gastoUnico?.id,
         gasto_id: result.data.gasto?.id
       });
@@ -188,7 +188,7 @@ export const handleFormEditarGastoUnico = async (req, res) => {
     const result = mockRes.getResult();
 
     if (result.status === 200) {
-      logger.info('Gasto único actualizado exitosamente desde vista:', { 
+      logger.info('Gasto único actualizado exitosamente desde vista:', {
         gastoUnico_id: req.params.id
       });
       return res.redirect('/gastos-unicos');
@@ -224,7 +224,7 @@ export const handleDeleteGastoUnico = async (req, res) => {
     const result = mockRes.getResult();
 
     if (result.status === 200) {
-      logger.info('Gasto único eliminado exitosamente desde vista:', { 
+      logger.info('Gasto único eliminado exitosamente desde vista:', {
         gastoUnico_id: req.params.id,
         gastos_eliminados: result.data.gastos_eliminados
       });
@@ -238,4 +238,4 @@ export const handleDeleteGastoUnico = async (req, res) => {
     logger.error('Error en handleDeleteGastoUnico:', { error });
     res.status(500).send('Error interno del servidor');
   }
-}; 
+};

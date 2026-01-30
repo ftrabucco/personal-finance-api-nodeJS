@@ -14,4 +14,4 @@ router.use('/debitos-automaticos', debitoAutomaticoViewRoutes);
 router.use('/gastos-recurrentes', gastoRecurrenteViewRoutes);
 router.use('/gastos-unicos', gastoUnicoViewRoutes);
 
-export default router; 
+export default router;

@@ -20,7 +20,7 @@ function createMockResponse() {
 // Helper para limpiar datos del formulario antes de enviar al API
 function cleanFormData(body) {
   const cleaned = { ...body };
-  
+
   // Convertir strings vacíos a null para campos opcionales
   if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
     cleaned.tarjeta_id = null;
@@ -28,7 +28,7 @@ function cleanFormData(body) {
   if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
     cleaned.mes_de_pago = null;
   }
-  
+
   // Asegurar tipos numéricos correctos
   if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
   if (cleaned.dia_de_pago) cleaned.dia_de_pago = parseInt(cleaned.dia_de_pago);
@@ -38,11 +38,11 @@ function cleanFormData(body) {
   if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
   if (cleaned.frecuencia_gasto_id) cleaned.frecuencia_gasto_id = parseInt(cleaned.frecuencia_gasto_id);
   if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-  
+
   // Manejar checkbox de activo
   if (cleaned.activo === 'on') cleaned.activo = true;
   if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
-  
+
   return cleaned;
 }
 
@@ -55,7 +55,7 @@ async function getReferenceData() {
     Tarjeta.findAll(),
     FrecuenciaGasto.findAll()
   ]);
-  
+
   logger.debug('Datos de referencia disponibles:', {
     categorias: categorias.map(c => ({ id: c.id, nombre: c.nombre_categoria })),
     importancias: importancias.map(i => ({ id: i.id, nombre: i.nombre_importancia })),
@@ -63,7 +63,7 @@ async function getReferenceData() {
     tarjetas: tarjetas.map(t => ({ id: t.id, nombre: t.nombre })),
     frecuencias: frecuencias.map(f => ({ id: f.id, nombre: f.nombre_frecuencia }))
   });
-  
+
   return {
     categorias: categorias.map(c => c.get({ plain: true })),
     importancias: importancias.map(i => i.get({ plain: true })),
@@ -162,7 +162,7 @@ export const handleFormNuevoGastoRecurrente = async (req, res) => {
     const result = mockRes.getResult();
 
     if (result.status === 201) {
-      logger.info('Gasto recurrente creado exitosamente desde vista:', { 
+      logger.info('Gasto recurrente creado exitosamente desde vista:', {
         gastoRecurrente_id: result.data.gastoRecurrente?.id,
         gasto_id: result.data.gasto?.id
       });
@@ -203,7 +203,7 @@ export const handleFormEditarGastoRecurrente = async (req, res) => {
     const result = mockRes.getResult();
 
     if (result.status === 200) {
-      logger.info('Gasto recurrente actualizado exitosamente desde vista:', { 
+      logger.info('Gasto recurrente actualizado exitosamente desde vista:', {
         gastoRecurrente_id: req.params.id
       });
       return res.redirect('/gastos-recurrentes');
@@ -239,7 +239,7 @@ export const handleDeleteGastoRecurrente = async (req, res) => {
     const result = mockRes.getResult();
 
     if (result.status === 200) {
-      logger.info('Gasto recurrente eliminado exitosamente desde vista:', { 
+      logger.info('Gasto recurrente eliminado exitosamente desde vista:', {
         gastoRecurrente_id: req.params.id
       });
       return res.redirect('/gastos-recurrentes');
@@ -252,4 +252,4 @@ export const handleDeleteGastoRecurrente = async (req, res) => {
     logger.error('Error en handleDeleteGastoRecurrente:', { error });
     res.status(500).send('Error interno del servidor');
   }
-}; 
+};

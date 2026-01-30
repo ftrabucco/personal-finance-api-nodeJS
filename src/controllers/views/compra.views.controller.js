@@ -20,12 +20,12 @@ function createMockResponse() {
 // Helper para limpiar datos del formulario antes de enviar al API
 function cleanFormData(body) {
   const cleaned = { ...body };
-  
+
   // Convertir strings vacíos a null para campos opcionales
   if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
     cleaned.tarjeta_id = null;
   }
-  
+
   // Asegurar tipos numéricos correctos
   if (cleaned.monto_total) cleaned.monto_total = parseFloat(cleaned.monto_total);
   if (cleaned.cantidad_cuotas) cleaned.cantidad_cuotas = parseInt(cleaned.cantidad_cuotas) || 1;
@@ -33,11 +33,11 @@ function cleanFormData(body) {
   if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
   if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
   if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-  
+
   // Manejar checkbox de pendiente_cuotas
   if (cleaned.pendiente_cuotas === 'on') cleaned.pendiente_cuotas = true;
   if (cleaned.pendiente_cuotas === '' || cleaned.pendiente_cuotas === undefined || cleaned.pendiente_cuotas === 'off') cleaned.pendiente_cuotas = false;
-  
+
   return cleaned;
 }
 
@@ -49,7 +49,7 @@ async function getReferenceData() {
     TipoPago.findAll(),
     Tarjeta.findAll()
   ]);
-  
+
   return {
     categorias: categorias.map(c => c.get({ plain: true })),
     importancias: importancias.map(i => i.get({ plain: true })),
@@ -121,7 +121,7 @@ export const renderFormEditarCompra = async (req, res) => {
       return res.status(404).send('Compra no encontrada');
     }
 
-    res.render('compras/editar', { 
+    res.render('compras/editar', {
       compra: compra.get({ plain: true }),
       ...refData
     });
@@ -135,16 +135,16 @@ export const handleFormNuevaCompra = async (req, res) => {
   try {
     // Limpiar datos del formulario
     const cleanData = cleanFormData(req.body);
-    
+
     // Usar el API controller para crear la compra
     const mockRes = createMockResponse();
     await apiController.create({ body: cleanData }, mockRes);
     const result = mockRes.getResult();
-    
+
     if (result.status !== 201) {
       throw new Error(result.data.message || 'Error al crear compra');
     }
-    
+
     logger.info('Compra creada desde vista:', { id: result.data.compra.id });
     res.redirect('/compras');
   } catch (error) {
@@ -162,16 +162,16 @@ export const handleFormEditarCompra = async (req, res) => {
   try {
     // Limpiar datos del formulario
     const cleanData = cleanFormData(req.body);
-    
+
     // Usar el API controller para actualizar la compra
     const mockRes = createMockResponse();
     await apiController.update({ params: req.params, body: cleanData }, mockRes);
     const result = mockRes.getResult();
-    
+
     if (result.status >= 400) {
       throw new Error(result.data.message || 'Error al actualizar compra');
     }
-    
+
     logger.info('Compra actualizada desde vista:', { id: req.params.id });
     res.redirect('/compras');
   } catch (error) {
@@ -191,11 +191,11 @@ export const handleDeleteCompra = async (req, res) => {
     const mockRes = createMockResponse();
     await apiController.delete({ params: req.params }, mockRes);
     const result = mockRes.getResult();
-    
+
     if (result.status >= 400) {
       throw new Error(result.data.message || 'Error al eliminar compra');
     }
-    
+
     logger.info('Compra eliminada desde vista:', { id: req.params.id });
     res.redirect('/compras');
   } catch (error) {
