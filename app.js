@@ -17,6 +17,7 @@ import security from './src/middlewares/security.middleware.js';
 import ExpenseScheduler from './src/schedulers/expenseScheduler.js';
 import ExchangeRateScheduler from './src/schedulers/exchangeRateScheduler.js';
 import { initializeExchangeRate } from './src/bootstrap/exchangeRate.bootstrap.js';
+import { runMigrations } from './src/db/migrate.js';
 
 // Middlewares de seguridad (antes que todo)
 app.use(security.cors);
@@ -80,6 +81,9 @@ async function startServer() {
   try {
     // Conectar a PostgreSQL
     await connectDatabase();
+
+    // Ejecutar migraciones pendientes
+    await runMigrations();
 
     // Bootstrap: Asegurar que exista tipo de cambio
     await initializeExchangeRate();
