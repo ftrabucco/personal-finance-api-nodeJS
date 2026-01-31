@@ -8,14 +8,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function runMigrations(externalSequelize) {
-  // Use provided sequelize instance or the default one
-  const sequelize = externalSequelize || sequelizeInstance;
-  const isStandalone = !externalSequelize;
+async function runMigrations({ standalone = false } = {}) {
+  const sequelize = sequelizeInstance;
 
   try {
     // If running standalone (CLI), connect first
-    if (isStandalone) {
+    if (standalone) {
       await connectDatabase();
     }
 
@@ -105,7 +103,7 @@ async function runMigrations(externalSequelize) {
     throw error;
   } finally {
     // Only close if running standalone (CLI mode)
-    if (isStandalone) {
+    if (standalone) {
       await closeDatabase();
     }
   }
@@ -113,7 +111,7 @@ async function runMigrations(externalSequelize) {
 
 // Ejecutar si se llama directamente
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runMigrations()
+  runMigrations({ standalone: true })
     .then(() => {
       logger.info('Migraciones completadas exitosamente');
       process.exit(0);

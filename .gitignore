@@ -18,6 +18,7 @@ logs/
 *.sqlite3
 *.db
 *.sql
+!migrations/*.sql
 
 # OS generated files
 .DS_Store
