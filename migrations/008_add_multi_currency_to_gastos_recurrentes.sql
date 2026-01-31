@@ -16,18 +16,16 @@ COMMENT ON COLUMN finanzas.gastos_recurrentes.monto_ars IS 'Monto en pesos argen
 COMMENT ON COLUMN finanzas.gastos_recurrentes.monto_usd IS 'Monto en dólares estadounidenses';
 COMMENT ON COLUMN finanzas.gastos_recurrentes.tipo_cambio_referencia IS 'Tipo de cambio de referencia inicial (cada gasto generado usará el TC del día)';
 
--- Migrar datos existentes
+-- Migrar datos existentes (solo si hay tipo de cambio disponible)
 UPDATE finanzas.gastos_recurrentes
 SET
   moneda_origen = 'ARS',
   monto_ars = monto,
-  monto_usd = ROUND(monto / (
-    SELECT valor_venta_usd_ars
-    FROM finanzas.tipos_cambio
-    WHERE activo = true
-    ORDER BY fecha DESC
-    LIMIT 1
-  ), 2),
+  monto_usd = CASE
+    WHEN (SELECT valor_venta_usd_ars FROM finanzas.tipos_cambio WHERE activo = true ORDER BY fecha DESC LIMIT 1) IS NOT NULL
+    THEN ROUND(monto / (SELECT valor_venta_usd_ars FROM finanzas.tipos_cambio WHERE activo = true ORDER BY fecha DESC LIMIT 1), 2)
+    ELSE NULL
+  END,
   tipo_cambio_referencia = (
     SELECT valor_venta_usd_ars
     FROM finanzas.tipos_cambio
@@ -36,12 +34,6 @@ SET
     LIMIT 1
   )
 WHERE monto_ars IS NULL;
-
--- Add NOT NULL constraints
-ALTER TABLE finanzas.gastos_recurrentes
-  ALTER COLUMN moneda_origen SET NOT NULL,
-  ALTER COLUMN monto_ars SET NOT NULL,
-  ALTER COLUMN monto_usd SET NOT NULL;
 
 -- Success message
 SELECT 'Migration 008: Multi-currency support added to gastos_recurrentes' AS status;
