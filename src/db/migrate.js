@@ -77,17 +77,18 @@ async function runMigrations({ standalone = false } = {}) {
         logger.info(`Migracion ${file} ejecutada exitosamente`);
         executed++;
       } catch (error) {
-        // If error is "column already exists" or "table already exists", skip and register
-        if (error.original?.code === '42701' || error.original?.code === '42P07') {
-          logger.warn(`${file}: Columnas/tablas ya existen, registrando como ejecutada...`);
+        const pgCode = error.original?.code;
+        // Known safe errors: column/table/constraint already exists, duplicate object
+        if (['42701', '42P07', '42710'].includes(pgCode)) {
+          logger.warn(`${file}: Objeto ya existe (${pgCode}), registrando como ejecutada...`);
           await sequelize.query(
             'INSERT INTO finanzas.migrations (filename) VALUES (?) ON CONFLICT (filename) DO NOTHING',
             { replacements: [file] }
           );
           executed++;
         } else {
-          logger.error(`Error ejecutando ${file}:`, error.message);
-          throw error;
+          // Log but don't crash - skip this migration and continue with the rest
+          logger.error(`Error ejecutando ${file} (code: ${pgCode}):`, error.message);
         }
       }
     }
@@ -99,8 +100,8 @@ async function runMigrations({ standalone = false } = {}) {
     }
 
   } catch (error) {
-    logger.error('Error durante las migraciones:', error);
-    throw error;
+    // Log but don't crash the app - migrations are best-effort on startup
+    logger.error('Error durante las migraciones:', error.message);
   } finally {
     // Only close if running standalone (CLI mode)
     if (standalone) {
