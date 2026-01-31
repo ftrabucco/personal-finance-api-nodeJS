@@ -52,9 +52,9 @@ export async function connectDatabase() {
       await sequelize.sync({ alter: true });
       logger.info('Modelos sincronizados con PostgreSQL (development)');
     } else if (process.env.NODE_ENV !== 'test') {
-      // En producción: solo sync sin alter (crea tablas faltantes, no modifica existentes)
-      await sequelize.sync();
-      logger.info('Modelos sincronizados con PostgreSQL (production - sin alter)');
+      // En producción: alter:true para agregar columnas nuevas sin perder datos
+      await sequelize.sync({ alter: true });
+      logger.info('Modelos sincronizados con PostgreSQL (production - con alter)');
     }
 
     return sequelize;
