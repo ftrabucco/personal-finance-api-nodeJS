@@ -3,10 +3,11 @@
 -- Description: Safety net migration to add any missing columns that may have
 -- failed in previous migrations (002, 003, 009) due to partial execution
 
--- Columns from migration 002/003
+-- Columns from migration 002/003 + missing fecha_fin
 ALTER TABLE finanzas.debitos_automaticos
   ADD COLUMN IF NOT EXISTS mes_de_pago INTEGER,
-  ADD COLUMN IF NOT EXISTS ultima_fecha_generado DATE;
+  ADD COLUMN IF NOT EXISTS ultima_fecha_generado DATE,
+  ADD COLUMN IF NOT EXISTS fecha_fin DATE;
 
 -- Constraint (ignore if exists)
 DO $$
