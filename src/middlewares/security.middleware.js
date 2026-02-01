@@ -134,6 +134,12 @@ export const securityLoggerMiddleware = (req, res, next) => {
 export const validateContentTypeMiddleware = (req, res, next) => {
   if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
     const contentType = req.get('Content-Type');
+    const contentLength = parseInt(req.get('Content-Length') || '0', 10);
+
+    // Skip validation for requests with no body (e.g., POST /auth/logout)
+    if (!contentType && contentLength === 0 && (!req.body || Object.keys(req.body).length === 0)) {
+      return next();
+    }
 
     if (!contentType) {
       return res.status(400).json({
