@@ -92,6 +92,10 @@ export class TarjetaService extends BaseService {
     if (normalized.banco) {
       normalized.banco = normalized.banco.trim();
     }
+    // Normalizar ultimos_4_digitos: empty string -> null
+    if (!normalized.ultimos_4_digitos) {
+      normalized.ultimos_4_digitos = null;
+    }
 
     return normalized;
   }

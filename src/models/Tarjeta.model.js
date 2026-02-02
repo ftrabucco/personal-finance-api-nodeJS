@@ -12,8 +12,13 @@ export function defineTarjeta(sequelize) {
       type: DataTypes.STRING(4),
       allowNull: true,
       validate: {
-        len: [4, 4],
-        isNumeric: true
+        validFormat(value) {
+          if (value !== null && value !== '') {
+            if (value.length !== 4 || !/^\d{4}$/.test(value)) {
+              throw new Error('Debe ingresar exactamente 4 dígitos numéricos');
+            }
+          }
+        }
       },
       comment: 'Últimos 4 dígitos de la tarjeta para identificación'
     },
