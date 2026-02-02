@@ -181,7 +181,8 @@ describe('TarjetaService', () => {
         tipo: 'debito',
         permite_cuotas: false,
         dia_mes_cierre: null,
-        dia_mes_vencimiento: null
+        dia_mes_vencimiento: null,
+        ultimos_4_digitos: null
       });
     });
 
@@ -217,7 +218,8 @@ describe('TarjetaService', () => {
         tipo: 'credito',
         permite_cuotas: true,
         dia_mes_cierre: 15,
-        dia_mes_vencimiento: 10
+        dia_mes_vencimiento: 10,
+        ultimos_4_digitos: null
       });
     });
 
@@ -234,7 +236,8 @@ describe('TarjetaService', () => {
         nombre: 'Virtual Card',
         banco: 'Online Bank',
         tipo: 'virtual',
-        permite_cuotas: false
+        permite_cuotas: false,
+        ultimos_4_digitos: null
       });
     });
 
