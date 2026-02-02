@@ -1,0 +1,4 @@
+user_alias,nombre,email,password,token,cards,notes
+Fran,Francisco,fran@test.com,Test123,,"",Cambia nombre a ""Fran Trabucco"" en AUTH-015
+María,María López,maria@test.com,Maria456,,""
+Carlos,Carlos García,carlos@test.com,Carlos789,,"",Cambia password a ""Carlos999"" en AUTH-016. Usar nuevo password desde AUTH-017

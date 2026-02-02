@@ -1,0 +1,201 @@
+test_id,depends_on,dependency_type,notes
+AUTH-004,AUTH-001,data,Needs fran@test.com to already exist for duplicate check
+AUTH-008,AUTH-001,data,Login requires Fran to be registered
+AUTH-009,AUTH-002,data,Login requires Maria to be registered
+AUTH-010,AUTH-003,data,Login requires Carlos to be registered
+AUTH-011,AUTH-001,data,Wrong password test needs fran@test.com to exist
+AUTH-013,AUTH-008,data,Profile view requires Fran JWT token
+AUTH-014,AUTH-009,data,Profile view requires Maria JWT token
+AUTH-015,AUTH-008,data,Profile update requires Fran JWT token
+AUTH-016,AUTH-010,data,Password change requires Carlos JWT token
+AUTH-017,AUTH-016,state,Login with new password requires password to have been changed
+AUTH-017,AUTH-003,data,Needs Carlos to be registered
+CAT-001,AUTH-008,data,Requires Fran JWT token
+CAT-002,AUTH-008,data,Requires Fran JWT token
+CAT-003,AUTH-008,data,Requires Fran JWT token
+CAT-004,AUTH-008,data,Requires Fran JWT token
+CAT-005,AUTH-008,data,Requires Fran JWT token
+CARD-001,AUTH-008,data,Requires Fran JWT token
+CARD-002,AUTH-008,data,Requires Fran JWT token
+CARD-003,AUTH-009,data,Requires Maria JWT token
+CARD-004,AUTH-009,data,Requires Maria JWT token
+CARD-005,AUTH-010,data,Requires Carlos JWT token
+CARD-006,AUTH-008,data,Requires Fran JWT token
+CARD-007,CARD-001,data,Needs Fran debit card to exist for listing
+CARD-007,CARD-002,data,Needs Fran credit card to exist for listing
+CARD-008,CARD-003,data,Needs Maria debit card to exist for listing
+CARD-008,CARD-004,data,Needs Maria credit card to exist for listing
+CARD-009,CARD-005,data,Needs Carlos credit card to exist for listing
+CARD-010,CARD-007,data,Stats depend on card listing verification
+CARD-011,CARD-002,data,Needs Fran Visa Gold card ID to attempt access
+CARD-011,AUTH-009,data,Requires Maria JWT token to attempt cross-user access
+CARD-012,CARD-002,data,Needs Fran Visa Gold card to check usage
+CARD-012,ONE-004,data,Needs USD expense associated with Visa Gold
+CARD-013,CARD-012,data,Card deletion blocked by associated expenses verified in CARD-012
+CARD-014,AUTH-008,data,Requires Fran JWT token to create and delete card
+FX-001,AUTH-008,data,Requires Fran JWT token
+FX-002,FX-001,data,Needs exchange rate to have been set
+FX-002,AUTH-009,data,Requires Maria JWT token
+FX-003,AUTH-008,data,Requires Fran JWT token
+FX-004,FX-001,data,Needs exchange rate for ARS to USD conversion
+FX-005,FX-001,data,Needs exchange rate for USD to ARS conversion
+FX-005,AUTH-009,data,Requires Maria JWT token
+FX-006,FX-001,data,Needs at least one exchange rate record in history
+FX-007,FX-001,data,Needs exchange rate to exist for validation test context
+FX-008,FX-001,data,Needs exchange rate to exist for validation test context
+ONE-001,AUTH-008,data,Requires Fran JWT token
+ONE-001,FX-001,data,Needs exchange rate for dual-currency calculation
+ONE-002,AUTH-009,data,Requires Maria JWT token
+ONE-002,FX-001,data,Needs exchange rate for dual-currency calculation
+ONE-003,AUTH-010,data,Requires Carlos JWT token
+ONE-003,FX-001,data,Needs exchange rate for dual-currency calculation
+ONE-004,AUTH-008,data,Requires Fran JWT token
+ONE-004,FX-001,data,Needs exchange rate for USD to ARS conversion
+ONE-004,CARD-002,data,Needs Fran Visa Gold card for credit card expense
+ONE-005,AUTH-008,data,Requires Fran JWT token
+ONE-006,AUTH-008,data,Requires Fran JWT token
+ONE-007,AUTH-008,data,Requires Fran JWT token
+ONE-008,AUTH-008,data,Requires Fran JWT token
+ONE-009,AUTH-008,data,Requires Fran JWT token
+ONE-010,ONE-001,data,Needs supermarket gasto to verify associated records
+ONE-010,ONE-004,data,Needs Amazon gasto to verify associated records
+ONE-011,ONE-002,data,Needs Maria pharmacy gasto to verify associated records
+ONE-012,ONE-003,data,Needs Carlos Uber gasto to verify associated records
+ONE-013,ONE-001,data,Needs supermarket gasto ID to update
+ONE-014,ONE-013,sequential,Must verify after update completes
+ONE-015,AUTH-008,data,Requires Fran JWT token to create and delete expense
+ONE-016,ONE-015,data,Needs the deleted expense ID to verify cascade
+REC-001,AUTH-008,data,Requires Fran JWT token
+REC-002,AUTH-009,data,Requires Maria JWT token
+REC-003,AUTH-010,data,Requires Carlos JWT token
+REC-004,AUTH-008,data,Requires Fran JWT token
+REC-004,FX-001,data,Needs exchange rate for USD recurring expense
+REC-005,AUTH-010,data,Requires Carlos JWT token
+REC-006,REC-001,data,Needs rent recurring to verify it has not generated gasto yet
+REC-006,REC-004,data,Needs OSDE recurring to verify it has not generated gasto yet
+REC-007,REC-006,sequential,Must run after verifying no gastos exist yet
+REC-007,REC-001,data,Needs rent recurring expense to generate from
+REC-007,REC-004,data,Needs OSDE recurring expense to generate from
+REC-008,REC-002,data,Needs gym recurring expense to generate from
+REC-009,REC-003,data,Needs car insurance recurring expense to generate from
+REC-010,REC-007,data,Needs generated gastos to verify they appear in list
+REC-011,REC-007,data,Needs rent to have been generated before updating amount
+REC-011,REC-001,data,Needs rent recurring expense ID to update
+REC-012,REC-011,sequential,Must verify after amount update to check history preserved
+REC-013,REC-008,data,Needs gym to have been generated before deactivating
+REC-013,REC-002,data,Needs gym recurring expense ID to deactivate
+REC-014,REC-013,state,Needs gym to be deactivated to verify no generation
+REC-015,REC-001,data,Needs Fran rent recurring expense ID to attempt access
+REC-015,AUTH-009,data,Requires Maria JWT token for cross-user access attempt
+DEB-001,AUTH-008,data,Requires Fran JWT token
+DEB-001,CARD-002,data,Needs Fran Visa Gold card for automatic debit
+DEB-002,AUTH-009,data,Requires Maria JWT token
+DEB-002,CARD-004,data,Needs Maria Mastercard BBVA for automatic debit
+DEB-003,AUTH-010,data,Requires Carlos JWT token
+DEB-003,CARD-005,data,Needs Carlos Amex card for automatic debit
+DEB-003,FX-001,data,Needs exchange rate for USD automatic debit
+DEB-004,AUTH-008,data,Requires Fran JWT token
+DEB-004,CARD-002,data,Needs Fran Visa Gold card for automatic debit
+DEB-005,DEB-001,data,Needs Netflix debit to generate from
+DEB-005,DEB-004,data,Needs Disney+ debit to generate from
+DEB-006,DEB-003,data,Needs ChatGPT debit to generate from
+DEB-007,DEB-005,data,Needs generated debit gastos to verify card association
+INST-001,AUTH-008,data,Requires Fran JWT token
+INST-001,CARD-002,data,Needs Fran Visa Gold card for installment purchase
+INST-002,AUTH-009,data,Requires Maria JWT token
+INST-002,CARD-004,data,Needs Maria Mastercard BBVA for installment purchase
+INST-002,FX-001,data,Needs exchange rate for USD installment purchase
+INST-003,AUTH-010,data,Requires Carlos JWT token
+INST-003,CARD-005,data,Needs Carlos Amex card for installment purchase
+INST-004,AUTH-008,data,Requires Fran JWT token
+INST-004,CARD-002,data,Needs Fran Visa Gold card for single installment purchase
+INST-005,INST-001,data,Needs TV purchase to generate installments from
+INST-006,INST-002,data,Needs MacBook purchase to generate installments from
+INST-007,INST-004,data,Needs single installment purchase to verify immediate gasto
+INST-008,INST-005,data,Needs generated installment gastos to verify cuota fields
+INST-009,AUTH-008,data,Requires Fran JWT token
+INST-009,CARD-002,data,Needs Fran Visa Gold card ID in request body
+INST-010,AUTH-008,data,Requires Fran JWT token
+INST-010,CARD-002,data,Needs Fran Visa Gold card ID in request body
+FILT-001,DEB-005,data,Needs streaming gastos generated to filter by category
+FILT-001,AUTH-008,data,Requires Fran JWT token
+FILT-002,AUTH-008,data,Requires Fran JWT token
+FILT-003,AUTH-008,data,Requires Fran JWT token
+FILT-004,AUTH-009,data,Requires Maria JWT token
+FILT-005,CARD-002,data,Needs Fran Visa Gold card ID and associated gastos to filter
+FILT-005,AUTH-008,data,Requires Fran JWT token
+FILT-006,AUTH-008,data,Requires Fran JWT token
+FILT-007,FILT-006,sequential,Must run after first page to verify pagination continuity
+FILT-008,AUTH-008,data,Requires Fran JWT token
+FILT-009,AUTH-008,data,Requires Fran JWT token
+FILT-010,AUTH-009,data,Requires Maria JWT token
+FILT-011,AUTH-010,data,Requires Carlos JWT token
+FILT-012,AUTH-008,data,Requires Fran JWT token
+FILT-013,REC-001,data,Needs active recurring expense to filter
+FILT-014,REC-013,state,Needs gym to be deactivated to filter inactive
+FILT-015,INST-001,data,Needs installment purchase to filter pending cuotas
+FILT-016,ONE-001,data,Needs processed one-time expense to filter
+FILT-017,DEB-001,data,Needs streaming automatic debit to filter by category
+SEC-001,ONE-001,data,Needs Fran gasto ID to attempt cross-user access
+SEC-001,AUTH-009,data,Requires Maria JWT token for cross-user access attempt
+SEC-002,INST-002,data,Needs Maria purchase ID to attempt cross-user access
+SEC-002,AUTH-010,data,Requires Carlos JWT token for cross-user access attempt
+SEC-003,REC-003,data,Needs Carlos recurring expense ID to attempt cross-user edit
+SEC-003,AUTH-008,data,Requires Fran JWT token for cross-user access attempt
+SEC-004,DEB-001,data,Needs Fran automatic debit ID to attempt cross-user delete
+SEC-004,AUTH-009,data,Requires Maria JWT token for cross-user access attempt
+SEC-005,ONE-002,data,Needs Maria one-time expense ID to attempt cross-user access
+SEC-005,AUTH-010,data,Requires Carlos JWT token for cross-user access attempt
+SEC-006,CARD-005,data,Needs Carlos card ID to attempt cross-user delete
+SEC-006,AUTH-008,data,Requires Fran JWT token for cross-user access attempt
+MCU-001,AUTH-008,data,Requires Fran JWT token
+MCU-001,FX-001,data,Needs exchange rate for USD expense creation
+MCU-001,CARD-002,data,Needs Fran Visa Gold card for USD expense
+MCU-002,AUTH-008,data,Requires Fran JWT token
+MCU-002,FX-001,data,Needs exchange rate for ARS to USD conversion
+MCU-003,MCU-001,data,Needs USD gasto to verify exchange rate snapshot
+MCU-004,AUTH-008,data,Requires Fran JWT token
+MCU-004,FX-001,data,Needs initial exchange rate to compare against new rate
+MCU-005,REC-004,data,Needs OSDE USD recurring expense to update currency
+MCU-006,MCU-005,sequential,Must run after currency change to verify amount-only update
+GEN-001,REC-007,sequential,Must run after first generation cycle
+GEN-001,DEB-005,sequential,Must run after first debit generation cycle
+GEN-001,INST-005,sequential,Must run after first installment generation cycle
+GEN-002,REC-008,sequential,Must run after Maria first generation cycle
+GEN-002,DEB-002,data,Needs Spotify debit to generate from
+GEN-002,REC-013,state,Needs gym deactivated to verify it does not generate
+GEN-002,INST-002,data,Needs MacBook purchase for installment generation
+GEN-003,REC-009,sequential,Must run after Carlos first generation cycle
+GEN-003,DEB-006,sequential,Must run after Carlos first debit generation cycle
+GEN-003,REC-003,data,Needs car insurance recurring for generation
+GEN-003,DEB-003,data,Needs ChatGPT debit for generation
+GEN-003,INST-003,data,Needs Nike purchase for installment generation
+GEN-004,GEN-001,data,Needs second cycle gastos to count rent entries
+GEN-005,GEN-004,sequential,Must verify after counting rent gastos
+GEN-005,REC-011,data,Needs updated rent amount to verify 380000 vs 350000
+GEN-006,GEN-004,sequential,Must verify after counting rent gastos
+GEN-007,GEN-002,data,Needs Maria second cycle to verify gym did not generate
+GEN-007,REC-013,state,Gym must be deactivated for this verification
+GEN-008,GEN-001,data,Needs Fran second cycle OSDE gasto to verify USD recalculation
+GEN-009,GEN-001,data,Needs Fran second cycle Netflix gastos to verify count
+GEN-010,GEN-001,data,Needs Fran second cycle Disney+ gasto to verify active status
+GEN-011,GEN-003,data,Needs Carlos second cycle ChatGPT gasto to verify USD
+GEN-012,GEN-002,data,Needs Maria second cycle Spotify gasto to verify
+GEN-013,GEN-001,data,Needs Fran second cycle TV installment gastos
+GEN-013,INST-001,data,Needs TV purchase for installment tracking
+GEN-014,GEN-013,data,Needs TV installment gastos to verify amount
+GEN-015,GEN-002,data,Needs Maria second cycle MacBook installment gastos
+GEN-015,INST-002,data,Needs MacBook purchase for installment tracking
+GEN-016,GEN-003,data,Needs Carlos second cycle Nike installment gastos
+GEN-016,INST-003,data,Needs Nike purchase for installment tracking
+GEN-017,GEN-001,data,Needs second generation to verify no extra cargador gasto
+GEN-017,INST-004,data,Needs single installment purchase to verify completion
+GEN-018,GEN-001,sequential,Must run immediately after GEN-001 to test idempotency
+GEN-019,GEN-018,sequential,Must verify count after duplicate generation attempt
+GEN-020,GEN-001,data,Needs second cycle gastos to calculate January summary
+GEN-021,GEN-001,data,Needs second cycle gastos to calculate February summary
+GEN-022,GEN-001,data,Needs second cycle gastos to calculate combined summary
+LOUT-001,AUTH-008,data,Requires Fran JWT token to logout
+LOUT-002,LOUT-001,state,Needs Fran to be logged out to test token after logout
+LOUT-003,AUTH-009,data,Requires Maria JWT token to logout
+LOUT-004,AUTH-010,data,Requires Carlos JWT token to logout
