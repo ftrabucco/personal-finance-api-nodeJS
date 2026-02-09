@@ -26,6 +26,11 @@
           <dt class="col-sm-4">Día de pago:</dt>
           <dd class="col-sm-8">{{formatDayOfMonth gasto.dia_de_pago}}</dd>
 
+          {{#if gasto.fecha_inicio}}
+          <dt class="col-sm-4">Genera gastos desde:</dt>
+          <dd class="col-sm-8">{{gasto.fecha_inicio}}</dd>
+          {{/if}}
+
           <dt class="col-sm-4">Frecuencia:</dt>
           <dd class="col-sm-8">{{gasto.frecuencia.nombre_frecuencia}}</dd>
 

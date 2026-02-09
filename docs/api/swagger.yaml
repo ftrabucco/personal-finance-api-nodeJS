@@ -420,7 +420,7 @@ components:
           type: string
           format: date
           nullable: true
-          description: Fecha de inicio opcional
+          description: Fecha a partir de la cual se generan gastos. Si no se envía al crear, se usa la fecha actual como default.
         categoria_gasto_id:
           type: integer
         importancia_gasto_id:
@@ -503,6 +503,11 @@ components:
           format: date
           nullable: true
           description: Última fecha que se generó un gasto
+        fecha_inicio:
+          type: string
+          format: date
+          nullable: true
+          description: Fecha a partir de la cual se generan débitos. Si no se envía al crear, se usa la fecha actual como default.
         categoria_gasto_id:
           type: integer
         importancia_gasto_id:
@@ -2723,6 +2728,10 @@ paths:
                   type: string
                   format: date
                   nullable: true
+                  description: Fecha a partir de la cual se generan gastos. Si no se envía, se usa la fecha actual.
+                generar_mes_actual:
+                  type: boolean
+                  description: Si es true y no se envía fecha_inicio, se setea al día de pago del mes actual para que el scheduler genere también el gasto del período actual.
       responses:
         '201':
           description: Gasto recurrente creado exitosamente
@@ -2796,6 +2805,11 @@ paths:
                   type: integer
                   minimum: 1
                   nullable: true
+                fecha_inicio:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Fecha a partir de la cual se generan gastos.
       responses:
         '200':
           description: Gasto recurrente actualizado exitosamente
@@ -2947,6 +2961,14 @@ paths:
                   type: integer
                   minimum: 1
                   nullable: true
+                fecha_inicio:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Fecha a partir de la cual se generan débitos. Si no se envía, se usa la fecha actual.
+                generar_mes_actual:
+                  type: boolean
+                  description: Si es true y no se envía fecha_inicio, se setea al día de pago del mes actual para que el scheduler genere también el débito del período actual.
       responses:
         '201':
           description: Débito automático creado exitosamente
@@ -3015,6 +3037,11 @@ paths:
                   type: integer
                   minimum: 1
                   nullable: true
+                fecha_inicio:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Fecha a partir de la cual se generan débitos.
       responses:
         '200':
           description: Débito automático actualizado exitosamente

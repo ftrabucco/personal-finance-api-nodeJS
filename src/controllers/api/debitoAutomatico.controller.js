@@ -5,6 +5,7 @@ import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
+import { getDefaultFechaInicio, getFechaInicioForCurrentMonth } from '../../utils/dateHelper.js';
 
 export class DebitoAutomaticoController extends BaseController {
   constructor() {
@@ -60,6 +61,23 @@ export class DebitoAutomaticoController extends BaseController {
         ultima_fecha_generado: null,
         moneda_origen: monedaOrigen
       };
+
+      // Calcular fecha_inicio por defecto si no se proporcionó
+      if (!debitoData.fecha_inicio) {
+        if (debitoData.generar_mes_actual) {
+          // Si pidió generar el mes actual, setear al dia_de_pago de este mes para catch-up
+          debitoData.fecha_inicio = getFechaInicioForCurrentMonth(parseInt(debitoData.dia_de_pago));
+        } else {
+          debitoData.fecha_inicio = getDefaultFechaInicio();
+        }
+        logger.debug('Default fecha_inicio calculada para DebitoAutomatico', {
+          dia_de_pago: debitoData.dia_de_pago,
+          fecha_inicio: debitoData.fecha_inicio,
+          generar_mes_actual: !!debitoData.generar_mes_actual
+        });
+      }
+      // Limpiar campo auxiliar que no va a la DB
+      delete debitoData.generar_mes_actual;
 
       // Calculate monto_ars, monto_usd, tipo_cambio_referencia
       try {
@@ -246,6 +264,9 @@ export class DebitoAutomaticoController extends BaseController {
     }
     if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
       cleaned.mes_de_pago = null;
+    }
+    if (cleaned.fecha_inicio === '' || cleaned.fecha_inicio === undefined) {
+      cleaned.fecha_inicio = null;
     }
 
     // Asegurar tipos numéricos correctos

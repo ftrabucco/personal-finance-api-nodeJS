@@ -4,6 +4,7 @@ import { GastoUnicoService } from '../../services/gastoUnico.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
+import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import logger from '../../utils/logger.js';
 
 export class GastoUnicoController extends BaseController {
@@ -98,13 +99,23 @@ export class GastoUnicoController extends BaseController {
         updateData.fecha = new Date(updateData.fecha).toISOString().split('T')[0];
       }
 
+      // Recalculate currency amounts if monto changes
+      if (updateData.monto) {
+        const monedaOrigen = updateData.moneda_origen || gastoUnico.moneda_origen || 'ARS';
+        const currencies = await ExchangeRateService.calculateBothCurrencies(updateData.monto, monedaOrigen);
+        updateData.monto_ars = currencies.monto_ars;
+        updateData.monto_usd = currencies.monto_usd;
+        updateData.tipo_cambio_usado = currencies.tipo_cambio_usado;
+      }
+
       // 1. Actualizar gasto único
       await gastoUnico.update(updateData, { transaction });
 
       // 2. Actualizar gasto asociado (business rule: actualizar AMBAS tablas)
       const gastoUpdateData = {};
       if (updateData.fecha) gastoUpdateData.fecha = updateData.fecha;
-      if (updateData.monto) gastoUpdateData.monto_ars = updateData.monto;
+      if (updateData.monto_ars) gastoUpdateData.monto_ars = updateData.monto_ars;
+      if (updateData.monto_usd) gastoUpdateData.monto_usd = updateData.monto_usd;
       if (updateData.descripcion) gastoUpdateData.descripcion = updateData.descripcion;
       if (updateData.categoria_gasto_id) gastoUpdateData.categoria_gasto_id = updateData.categoria_gasto_id;
       if (updateData.importancia_gasto_id) gastoUpdateData.importancia_gasto_id = updateData.importancia_gasto_id;

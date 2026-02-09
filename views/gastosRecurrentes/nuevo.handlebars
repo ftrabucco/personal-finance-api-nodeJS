@@ -27,6 +27,18 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label">Comenzar a generar gastos desde:</label>
+        <input type="date" name="fecha_inicio" class="form-control" value="{{formData.fecha_inicio}}" />
+        <div class="form-text">Los gastos se generarán a partir de esta fecha inclusive. Si no se completa, se usa la fecha de hoy.</div>
+      </div>
+
+      <div class="mb-3 form-check">
+        <input type="checkbox" name="generar_mes_actual" class="form-check-input" id="generar_mes_actual" {{#if formData.generar_mes_actual}}checked{{/if}} />
+        <label class="form-check-label" for="generar_mes_actual">Generar también el gasto del mes actual</label>
+        <div class="form-text">Si se marca, se incluirá el gasto correspondiente al período actual aunque el día de pago ya haya pasado.</div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label">Frecuencia:</label>
         <select name="frecuencia_gasto_id" class="form-select" required id="frecuencia_select">
           <option value="">Seleccione una frecuencia</option>

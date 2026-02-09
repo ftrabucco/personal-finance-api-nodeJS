@@ -28,6 +28,9 @@ function cleanFormData(body) {
   if (cleaned.mes_de_pago === '' || cleaned.mes_de_pago === undefined) {
     cleaned.mes_de_pago = null;
   }
+  if (cleaned.fecha_inicio === '' || cleaned.fecha_inicio === undefined) {
+    cleaned.fecha_inicio = null;
+  }
 
   // Asegurar tipos numéricos correctos
   if (cleaned.monto) cleaned.monto = parseFloat(cleaned.monto);
@@ -42,6 +45,10 @@ function cleanFormData(body) {
   // Manejar checkbox de activo
   if (cleaned.activo === 'on') cleaned.activo = true;
   if (cleaned.activo === '' || cleaned.activo === undefined || cleaned.activo === 'off') cleaned.activo = false;
+
+  // Manejar checkbox de generar_mes_actual
+  if (cleaned.generar_mes_actual === 'on') cleaned.generar_mes_actual = true;
+  if (cleaned.generar_mes_actual === '' || cleaned.generar_mes_actual === undefined) cleaned.generar_mes_actual = false;
 
   return cleaned;
 }

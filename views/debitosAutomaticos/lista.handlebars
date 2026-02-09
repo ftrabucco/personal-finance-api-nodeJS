@@ -103,6 +103,9 @@
                   {{else}}
                     <small class="badge bg-secondary">Inactivo</small>
                   {{/if}}
+                  {{#if this.fecha_inicio}}
+                    <small class="text-muted d-block">Desde: {{this.fecha_inicio}}</small>
+                  {{/if}}
                 </td>
                 <td class="text-end">
                   <span class="fw-bold text-{{#if (gte this.monto 5000)}}danger{{else if (gte this.monto 2000)}}warning{{else}}success{{/if}}">

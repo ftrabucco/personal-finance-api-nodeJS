@@ -26,6 +26,16 @@
           <dt class="col-sm-4">Día de pago:</dt>
           <dd class="col-sm-8">{{formatDayOfMonth debito.dia_de_pago}}</dd>
 
+          {{#if debito.fecha_inicio}}
+          <dt class="col-sm-4">Genera débitos desde:</dt>
+          <dd class="col-sm-8">{{debito.fecha_inicio}}</dd>
+          {{/if}}
+
+          {{#if debito.fecha_fin}}
+          <dt class="col-sm-4">Fecha de fin:</dt>
+          <dd class="col-sm-8">{{debito.fecha_fin}}</dd>
+          {{/if}}
+
           <dt class="col-sm-4">Frecuencia:</dt>
           <dd class="col-sm-8">{{debito.frecuencia.nombre}}</dd>
 

@@ -21,6 +21,11 @@ export function defineDebitoAutomatico(sequelize) {
       allowNull: true,
       comment: 'Fecha hasta la cual el débito automático estará activo'
     },
+    fecha_inicio: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Fecha a partir de la cual se empezará a generar el débito automático'
+    },
     categoria_gasto_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
