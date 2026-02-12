@@ -1,5 +1,6 @@
 import { BaseController } from './base.controller.js';
 import { DebitoAutomatico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, FrecuenciaGasto } from '../../models/index.js';
+import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
@@ -390,6 +391,93 @@ export class DebitoAutomaticoController extends BaseController {
       return sendError(res, 500, 'Error al obtener débitos automáticos', error.message);
     }
   }
+
+  // Método para procesar un débito automático individual para el mes actual
+  // Útil cuando se crea un débito después del día de pago del mes
+  async procesarMesActual(req, res) {
+    const transaction = await sequelize.transaction();
+    try {
+      const debitoAutomatico = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        },
+        include: this.getIncludes()
+      });
+
+      if (!debitoAutomatico) {
+        await transaction.rollback();
+        return sendError(res, 404, 'Débito automático no encontrado');
+      }
+
+      if (!debitoAutomatico.activo) {
+        await transaction.rollback();
+        return sendError(res, 400, 'El débito automático está inactivo');
+      }
+
+      // Verificar si ya se generó este mes
+      const today = new Date();
+      const primerDiaMes = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      if (debitoAutomatico.ultima_fecha_generado) {
+        const ultimaFecha = new Date(debitoAutomatico.ultima_fecha_generado);
+        if (ultimaFecha >= primerDiaMes) {
+          await transaction.rollback();
+          return sendSuccess(res, {
+            summary: {
+              total_generated: 0,
+              total_errors: 0,
+              type: 'debito_automatico_individual'
+            },
+            details: {
+              success: [],
+              errors: []
+            },
+            message: 'El débito ya fue procesado para este mes'
+          });
+        }
+      }
+
+      // Generar el gasto para el mes actual
+      const gasto = await GastoGeneratorService.generateFromDebitoAutomatico(debitoAutomatico);
+
+      await transaction.commit();
+
+      logger.info('Débito automático procesado manualmente para mes actual:', {
+        debitoAutomatico_id: debitoAutomatico.id,
+        gasto_id: gasto?.id,
+        descripcion: debitoAutomatico.descripcion
+      });
+
+      return sendSuccess(res, {
+        summary: {
+          total_generated: gasto ? 1 : 0,
+          total_errors: 0,
+          type: 'debito_automatico_individual',
+          breakdown: {
+            debitos_automaticos: {
+              generated: gasto ? 1 : 0,
+              errors: 0
+            }
+          }
+        },
+        details: {
+          success: gasto ? [{
+            type: 'debito_automatico',
+            id: debitoAutomatico.id,
+            descripcion: debitoAutomatico.descripcion,
+            gasto_id: gasto.id,
+            timestamp: new Date().toISOString()
+          }] : [],
+          errors: []
+        }
+      });
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Error al procesar débito automático para mes actual:', { error });
+      return sendError(res, 500, 'Error al procesar débito automático', error.message);
+    }
+  }
 }
 
 // Crear instancia del controlador
@@ -401,3 +489,4 @@ export const obtenerDebitosAutomaticosConFiltros = debitoAutomaticoController.ge
 export const crearDebitoAutomatico = debitoAutomaticoController.create.bind(debitoAutomaticoController);
 export const actualizarDebitoAutomatico = debitoAutomaticoController.update.bind(debitoAutomaticoController);
 export const eliminarDebitoAutomatico = debitoAutomaticoController.delete.bind(debitoAutomaticoController);
+export const procesarDebitoAutomaticoMesActual = debitoAutomaticoController.procesarMesActual.bind(debitoAutomaticoController);

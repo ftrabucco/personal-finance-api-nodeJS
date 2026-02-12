@@ -24,7 +24,8 @@ import {
   obtenerGastosRecurrentesConFiltros,
   crearGastoRecurrente,
   actualizarGastoRecurrente,
-  eliminarGastoRecurrente
+  eliminarGastoRecurrente,
+  procesarGastoRecurrenteMesActual
 } from '../../controllers/api/gastoRecurrente.controller.js';
 
 import {
@@ -32,7 +33,8 @@ import {
   obtenerDebitosAutomaticosConFiltros,
   crearDebitoAutomatico,
   actualizarDebitoAutomatico,
-  eliminarDebitoAutomatico
+  eliminarDebitoAutomatico,
+  procesarDebitoAutomaticoMesActual
 } from '../../controllers/api/debitoAutomatico.controller.js';
 
 import {
@@ -119,6 +121,7 @@ router.delete('/compras/:id', authenticateToken, validateIdParam, eliminarCompra
 router.get('/gastos-recurrentes', authenticateToken, validateGastoRecurrenteFilters, obtenerGastosRecurrentesConFiltros); // Con filtros opcionales y paginación inteligente
 router.get('/gastos-recurrentes/:id', authenticateToken, validateIdParam, obtenerGastoRecurrentePorId);
 router.post('/gastos-recurrentes', authenticateToken, validateCreateGastoRecurrente, crearGastoRecurrente);
+router.post('/gastos-recurrentes/:id/procesar', authenticateToken, validateIdParam, procesarGastoRecurrenteMesActual); // Procesar para mes actual
 router.put('/gastos-recurrentes/:id', authenticateToken, validateIdParam, validateUpdateGastoRecurrente, actualizarGastoRecurrente);
 router.delete('/gastos-recurrentes/:id', authenticateToken, validateIdParam, eliminarGastoRecurrente);
 
@@ -126,6 +129,7 @@ router.delete('/gastos-recurrentes/:id', authenticateToken, validateIdParam, eli
 router.get('/debitos-automaticos', authenticateToken, validateDebitoAutomaticoFilters, obtenerDebitosAutomaticosConFiltros); // Con filtros opcionales y paginación inteligente
 router.get('/debitos-automaticos/:id', authenticateToken, validateIdParam, obtenerDebitoAutomaticoPorId);
 router.post('/debitos-automaticos', authenticateToken, validateCreateDebitoAutomatico, crearDebitoAutomatico);
+router.post('/debitos-automaticos/:id/procesar', authenticateToken, validateIdParam, procesarDebitoAutomaticoMesActual); // Procesar para mes actual
 router.put('/debitos-automaticos/:id', authenticateToken, validateIdParam, validateUpdateDebitoAutomatico, actualizarDebitoAutomatico);
 router.delete('/debitos-automaticos/:id', authenticateToken, validateIdParam, eliminarDebitoAutomatico);
 
