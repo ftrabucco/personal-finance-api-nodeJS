@@ -91,16 +91,14 @@ async function seedInitialData() {
       ON CONFLICT (nombre_frecuencia) DO NOTHING;
     `);
 
-    // 4. ⭐ IMPORTANCIAS DE GASTO
+    // 4. ⭐ IMPORTANCIAS DE GASTO (3 niveles simples)
     logger.info('⭐ Insertando importancias de gasto...');
     await sequelize.query(`
-      INSERT INTO finanzas.importancias_gasto (nombre_importancia) VALUES
-        ('Esencial'),
-        ('Importante'),
-        ('Nice to have'),
-        ('Prescindible'),
-        ('No debería')
-      ON CONFLICT (nombre_importancia) DO NOTHING;
+      INSERT INTO finanzas.importancias_gasto (id, nombre_importancia) VALUES
+        (1, 'Necesario'),
+        (2, 'Deseado'),
+        (3, 'Prescindible')
+      ON CONFLICT (id) DO UPDATE SET nombre_importancia = EXCLUDED.nombre_importancia;
     `);
 
     // 5. 👤 USUARIO EJEMPLO - Con password hasheado
@@ -132,36 +130,36 @@ async function seedInitialData() {
 
     // Obtener IDs para referencias
     const [categorias] = await sequelize.query('SELECT id, nombre_categoria FROM finanzas.categorias_gasto WHERE nombre_categoria IN (\'Supermercado\', \'Alquiler\', \'Netflix\', \'Streaming / Suscripciones\', \'Transporte público\');');
-    const [importancias] = await sequelize.query('SELECT id, nombre_importancia FROM finanzas.importancias_gasto WHERE nombre_importancia IN (\'Esencial\', \'Important\', \'Nice to have\');');
+    const [importancias] = await sequelize.query('SELECT id, nombre_importancia FROM finanzas.importancias_gasto WHERE nombre_importancia IN (\'Necesario\', \'Deseado\', \'Prescindible\');');
     const [tiposPago] = await sequelize.query('SELECT id, nombre FROM finanzas.tipos_pago WHERE nombre IN (\'Efectivo\', \'Débito\', \'Crédito\');');
 
     const supermercadoId = categorias.find(c => c.nombre_categoria === 'Supermercado')?.id || 1;
     const alquilerId = categorias.find(c => c.nombre_categoria === 'Alquiler')?.id || 2;
     const streamingId = categorias.find(c => c.nombre_categoria === 'Streaming / Suscripciones')?.id || 3;
-    const esencialId = importancias.find(i => i.nombre_importancia === 'Esencial')?.id || 1;
-    const niceToHaveId = importancias.find(i => i.nombre_importancia === 'Nice to have')?.id || 3;
+    const necesarioId = importancias.find(i => i.nombre_importancia === 'Necesario')?.id || 1;
+    const deseadoId = importancias.find(i => i.nombre_importancia === 'Deseado')?.id || 2;
     const debitoId = tiposPago.find(t => t.nombre === 'Débito')?.id || 1;
     const creditoId = tiposPago.find(t => t.nombre === 'Crédito')?.id || 3;
 
     // Gasto Único de ejemplo
     await sequelize.query(`
       INSERT INTO finanzas.gastos_unico (descripcion, monto, fecha, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, usuario_id, procesado) VALUES
-        ('Supermercado Coto - compra semanal', 15000, '2025-01-15', ${supermercadoId}, ${esencialId}, ${debitoId}, ${userId}, true),
-        ('Farmacia - medicamentos', 8500, '2025-01-14', ${supermercadoId}, ${esencialId}, ${debitoId}, ${userId}, true)
+        ('Supermercado Coto - compra semanal', 15000, '2025-01-15', ${supermercadoId}, ${necesarioId}, ${debitoId}, ${userId}, true),
+        ('Farmacia - medicamentos', 8500, '2025-01-14', ${supermercadoId}, ${necesarioId}, ${debitoId}, ${userId}, true)
       ON CONFLICT DO NOTHING;
     `);
 
     // Gasto Recurrente de ejemplo
     await sequelize.query(`
       INSERT INTO finanzas.gastos_recurrentes (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo, created_at, updated_at) VALUES
-        ('Alquiler departamento', 180000, 5, ${alquilerId}, ${esencialId}, ${debitoId}, 4, ${userId}, true, NOW(), NOW())
+        ('Alquiler departamento', 180000, 5, ${alquilerId}, ${necesarioId}, ${debitoId}, 4, ${userId}, true, NOW(), NOW())
       ON CONFLICT DO NOTHING;
     `);
 
     // Débito Automático de ejemplo
     await sequelize.query(`
       INSERT INTO finanzas.debitos_automaticos (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo, created_at, updated_at) VALUES
-        ('Netflix Premium', 5990, 12, ${streamingId}, ${niceToHaveId}, ${creditoId}, 4, ${userId}, true, NOW(), NOW())
+        ('Netflix Premium', 5990, 12, ${streamingId}, ${deseadoId}, ${creditoId}, 4, ${userId}, true, NOW(), NOW())
       ON CONFLICT DO NOTHING;
     `);
 

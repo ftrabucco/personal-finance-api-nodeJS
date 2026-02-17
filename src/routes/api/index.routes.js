@@ -90,8 +90,13 @@ import {
   validateDebitoAutomaticoFilters,
   validateCreateTarjeta,
   validateUpdateTarjeta,
-  validateTarjetaFilters
+  validateTarjetaFilters,
+  validateProyeccionFilters,
+  validateSaludFinancieraFilters
 } from '../../middlewares/validation.middleware.js';
+
+import { obtenerProyeccion } from '../../controllers/api/proyeccion.controller.js';
+import { obtenerSaludFinanciera } from '../../controllers/api/saludFinanciera.controller.js';
 
 import { authenticateToken } from '../../middlewares/auth.middleware.js';
 
@@ -162,5 +167,11 @@ router.get('/catalogos/categorias', authenticateToken, obtenerCategorias);
 router.get('/catalogos/importancias', authenticateToken, obtenerImportancias);
 router.get('/catalogos/tipos-pago', authenticateToken, obtenerTiposPago);
 router.get('/catalogos/frecuencias', authenticateToken, obtenerFrecuencias);
+
+// 📊 Rutas para Proyección de Gastos - Requieren autenticación
+router.get('/proyeccion', authenticateToken, validateProyeccionFilters, obtenerProyeccion);
+
+// 💚 Rutas para Salud Financiera - Requieren autenticación
+router.get('/salud-financiera', authenticateToken, validateSaludFinancieraFilters, obtenerSaludFinanciera);
 
 export default router;

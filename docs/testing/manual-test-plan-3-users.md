@@ -56,13 +56,13 @@ TOKEN_CARLOS=...
 |---|--------|------|---------|-------------------|
 | 20 | Obtener todos los catálogos | Fran | `GET /api/catalogos` | 200, objeto con categorias, importancias, tiposPago, frecuencias |
 | 21 | Verificar categorías | Fran | `GET /api/catalogos/categorias` | Lista con Alquiler, Supermercado, Streaming, etc. |
-| 22 | Verificar importancias | Fran | `GET /api/catalogos/importancias` | Esencial, Importante, Nice to have, Prescindible, No debería |
+| 22 | Verificar importancias | Fran | `GET /api/catalogos/importancias` | Necesario, Deseado, Prescindible |
 | 23 | Verificar tipos de pago | Fran | `GET /api/catalogos/tipos-pago` | Efectivo, Débito, Crédito, Transferencia, MercadoPago, Cheque |
 | 24 | Verificar frecuencias | Fran | `GET /api/catalogos/frecuencias` | Único, Diario, Semanal, Mensual, Bimestral, Trimestral, Semestral, Anual |
 
 > **Anotar los IDs** de cada catálogo para usarlos en las pruebas siguientes. Ejemplo:
 > - Categorías: Alquiler=1, Supermercado=6, Streaming=21, Transporte público=10
-> - Importancias: Esencial=1, Nice to have=3, Prescindible=4
+> - Importancias: Necesario=1, Deseado=2, Prescindible=3
 > - Tipos de pago: Efectivo=1, Débito=2, Crédito=3, Transferencia=4
 > - Frecuencias: Mensual=4, Anual=8
 

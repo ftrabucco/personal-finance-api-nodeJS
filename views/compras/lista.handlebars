@@ -109,7 +109,7 @@
                   <span class="badge bg-primary">{{this.categoria.nombre_categoria}}</span>
                 </td>
                 <td class="text-center">
-                  <span class="badge bg-{{#if (eq this.importancia.nombre_importancia 'Esencial')}}danger{{else if (eq this.importancia.nombre_importancia 'Deseable')}}warning{{else}}secondary{{/if}}">
+                  <span class="badge bg-{{#if (eq this.importancia.nombre_importancia 'Necesario')}}danger{{else if (eq this.importancia.nombre_importancia 'Deseado')}}warning{{else}}secondary{{/if}}">
                     {{this.importancia.nombre_importancia}}
                   </span>
                 </td>

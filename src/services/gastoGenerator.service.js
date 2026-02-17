@@ -189,8 +189,9 @@ export class GastoGeneratorService {
    * Genera gastos pendientes programados (NO incluye gastos únicos)
    * Los gastos únicos se procesan inmediatamente al crearlos
    * Usado por el scheduler automático con procesamiento optimizado
+   * @param {number|null} userId - ID del usuario para filtrar gastos (null = todos los usuarios, para scheduler)
    */
-  static async generateScheduledExpenses() {
+  static async generateScheduledExpenses(userId = null) {
     const startTime = Date.now();
     const results = {
       success: [],
@@ -207,10 +208,10 @@ export class GastoGeneratorService {
     };
 
     try {
-      logger.info('Starting scheduled expense generation process');
+      logger.info('Starting scheduled expense generation process', { userId: userId || 'all' });
 
       // Process recurring expenses with improved logging
-      const gastosRecurrentes = await this.gastoRecurrenteService.findReadyForGeneration();
+      const gastosRecurrentes = await this.gastoRecurrenteService.findReadyForGeneration(userId);
       results.summary.breakdown.recurrentes.processed = gastosRecurrentes.length;
 
       logger.debug('Processing recurring expenses', {
@@ -231,7 +232,7 @@ export class GastoGeneratorService {
       );
 
       // Process automatic debits with improved logging
-      const debitosAutomaticos = await this.debitoAutomaticoService.findReadyForGeneration();
+      const debitosAutomaticos = await this.debitoAutomaticoService.findReadyForGeneration(userId);
       results.summary.breakdown.debitos.processed = debitosAutomaticos.length;
 
       logger.debug('Processing automatic debits', {
@@ -246,7 +247,7 @@ export class GastoGeneratorService {
       );
 
       // Process installment purchases with improved logging
-      const compras = await this.comprasService.findReadyForGeneration();
+      const compras = await this.comprasService.findReadyForGeneration(userId);
       results.summary.breakdown.compras.processed = compras.length;
 
       logger.debug('Processing installment purchases', {
@@ -382,8 +383,9 @@ export class GastoGeneratorService {
   /**
    * Método legacy para compatibilidad con endpoint manual
    * Incluye gastos únicos para procesamiento manual
+   * @param {number} userId - ID del usuario para filtrar gastos (requerido para endpoint manual)
    */
-  static async generatePendingExpenses() {
+  static async generatePendingExpenses(userId) {
     const results = {
       success: [],
       errors: []
@@ -391,13 +393,18 @@ export class GastoGeneratorService {
 
     try {
       // Generar gastos programados (recurrentes, débitos, compras)
-      const scheduledResults = await this.generateScheduledExpenses();
+      const scheduledResults = await this.generateScheduledExpenses(userId);
       results.success.push(...scheduledResults.success);
       results.errors.push(...scheduledResults.errors);
 
       // Procesar gastos únicos pendientes (para endpoint manual únicamente)
+      const whereClause = { procesado: false };
+      if (userId) {
+        whereClause.usuario_id = userId;
+      }
+
       const gastosUnicos = await GastoUnico.findAll({
-        where: { procesado: false },
+        where: whereClause,
         include: [
           { model: CategoriaGasto, as: 'categoria' },
           { model: ImportanciaGasto, as: 'importancia' },

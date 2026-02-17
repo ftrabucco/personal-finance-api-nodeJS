@@ -197,9 +197,16 @@ export class ComprasService extends BaseService {
   /**
    * Find purchases that should generate installments today
    * Used by the scheduler service
+   * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
    */
-  async findReadyForGeneration() {
-    const pendingPurchases = await this.findPendingInstallments();
+  async findReadyForGeneration(userId = null) {
+    // Build where clause with optional user filter
+    const whereClause = { pendiente_cuotas: true };
+    if (userId) {
+      whereClause.usuario_id = userId;
+    }
+
+    const pendingPurchases = await this.findAll({ where: whereClause });
     const readyPurchases = [];
 
     for (const purchase of pendingPurchases) {

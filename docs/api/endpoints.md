@@ -169,7 +169,7 @@ GET /api/gastos?monto_min_ars=100&monto_max_ars=1000&orderBy=fecha
       }
     },
     "por_importancia": {
-      "Esencial": {
+      "Necesario": {
         "total_ars": 101700,
         "total_usd": 0,
         "cantidad": 6

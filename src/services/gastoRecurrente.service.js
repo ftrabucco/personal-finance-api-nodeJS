@@ -178,8 +178,9 @@ export class GastoRecurrenteService extends BaseService {
   /**
    * Find recurring expenses ready for generation today with advanced logic
    * Handles different frequencies, edge cases, and provides tolerance for missed dates
+   * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
    */
-  async findReadyForGeneration() {
+  async findReadyForGeneration(userId = null) {
     const today = moment().tz('America/Argentina/Buenos_Aires');
     const diaActual = today.date();
     const mesActual = today.month() + 1;
@@ -189,12 +190,19 @@ export class GastoRecurrenteService extends BaseService {
       today: today.format('YYYY-MM-DD'),
       dia: diaActual,
       mes: mesActual,
-      ano: anoActual
+      ano: anoActual,
+      userId: userId || 'all'
     });
+
+    // Build where clause with optional user filter
+    const whereClause = { activo: true };
+    if (userId) {
+      whereClause.usuario_id = userId;
+    }
 
     // Optimized query: get active expenses with frequency data
     const activeExpenses = await this.model.findAll({
-      where: { activo: true },
+      where: whereClause,
       include: [
         { model: CategoriaGasto, as: 'categoria' },
         { model: ImportanciaGasto, as: 'importancia' },

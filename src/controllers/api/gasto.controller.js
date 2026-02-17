@@ -145,9 +145,11 @@ export class GastoController extends BaseController {
   // Método para generar todos los gastos pendientes (endpoint manual)
   async generatePendingGastos(req, res) {
     try {
-      logger.info('Iniciando generación manual de gastos pendientes...');
+      const userId = req.user.id;
+      logger.info('Iniciando generación manual de gastos pendientes...', { userId });
       // Usar el método completo que incluye gastos únicos para procesamiento manual
-      const results = await GastoGeneratorService.generatePendingExpenses();
+      // Filtrar solo por el usuario autenticado
+      const results = await GastoGeneratorService.generatePendingExpenses(userId);
 
       const summary = {
         total_generated: results.success.length,

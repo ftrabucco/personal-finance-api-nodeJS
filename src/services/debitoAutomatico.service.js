@@ -187,16 +187,24 @@ export class DebitoAutomaticoService extends BaseService {
   /**
    * Find automatic debits that should generate today
    * Used by the scheduler service - Enhanced with advanced frequency logic
+   * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
    */
-  async findReadyForGeneration() {
+  async findReadyForGeneration(userId = null) {
     const today = moment().tz('America/Argentina/Buenos_Aires');
 
     logger.debug('Finding automatic debits ready for generation', {
       date: today.format('YYYY-MM-DD'),
-      day: today.format('dddd')
+      day: today.format('dddd'),
+      userId: userId || 'all'
     });
 
-    const activeDebits = await this.findActive();
+    // Build where clause with optional user filter
+    const whereClause = { activo: true };
+    if (userId) {
+      whereClause.usuario_id = userId;
+    }
+
+    const activeDebits = await this.findAll({ where: whereClause });
     const readyDebits = [];
 
     for (const debit of activeDebits) {
