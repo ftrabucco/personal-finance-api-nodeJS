@@ -240,6 +240,164 @@ export class GastoRecurrenteService extends BaseService {
   }
 
   /**
+   * Find recurring expenses ready for MANUAL generation (no tolerance restriction)
+   * Used by manual "Procesar Pendientes" button - generates all pending for current month
+   * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
+   */
+  async findReadyForManualGeneration(userId = null) {
+    const today = moment().tz('America/Argentina/Buenos_Aires');
+
+    logger.debug('Finding recurring expenses for MANUAL generation (no tolerance)', {
+      date: today.format('YYYY-MM-DD'),
+      day: today.date(),
+      userId: userId || 'all'
+    });
+
+    // Build where clause with optional user filter
+    const whereClause = { activo: true };
+    if (userId) {
+      whereClause.usuario_id = userId;
+    }
+
+    const activeExpenses = await this.model.findAll({
+      where: whereClause,
+      include: [
+        { model: CategoriaGasto, as: 'categoria' },
+        { model: ImportanciaGasto, as: 'importancia' },
+        { model: TipoPago, as: 'tipoPago' },
+        { model: Tarjeta, as: 'tarjeta' },
+        { model: FrecuenciaGasto, as: 'frecuencia' }
+      ]
+    });
+
+    const readyExpenses = [];
+
+    for (const expense of activeExpenses) {
+      try {
+        const shouldGenerate = await this.shouldGenerateForManual(expense, today);
+        if (shouldGenerate.canGenerate) {
+          expense.generationReason = shouldGenerate.reason;
+          expense.adjustedDate = shouldGenerate.adjustedDate;
+          readyExpenses.push(expense);
+
+          logger.debug('Recurring expense ready for MANUAL generation', {
+            expense_id: expense.id,
+            descripcion: expense.descripcion,
+            reason: shouldGenerate.reason,
+            dia_de_pago: expense.dia_de_pago
+          });
+        }
+      } catch (error) {
+        logger.error('Error checking recurring expense for manual generation', {
+          expense_id: expense.id,
+          error: error.message
+        });
+      }
+    }
+
+    logger.info('Recurring expenses ready for MANUAL generation', {
+      total_active: activeExpenses.length,
+      ready_count: readyExpenses.length,
+      ready_expenses: readyExpenses.map(e => ({
+        id: e.id,
+        descripcion: e.descripcion,
+        dia_de_pago: e.dia_de_pago,
+        reason: e.generationReason
+      }))
+    });
+
+    return readyExpenses;
+  }
+
+  /**
+   * Check if expense should generate for MANUAL processing
+   * No tolerance - generates if dia_de_pago <= today and not yet generated this month
+   * @param {Object} expense - The recurring expense
+   * @param {moment.Moment} today - Current date
+   * @returns {Object} Generation decision with reason
+   */
+  async shouldGenerateForManual(expense, today) {
+    const result = {
+      canGenerate: false,
+      reason: '',
+      adjustedDate: null
+    };
+
+    const frecuencia = expense.frecuencia;
+    if (!frecuencia) {
+      result.reason = 'No frequency defined';
+      return result;
+    }
+
+    const frecuenciaNombre = frecuencia.nombre_frecuencia?.toLowerCase() || 'mensual';
+
+    // Check if already generated this period
+    if (expense.ultima_fecha_generado) {
+      const ultimaFecha = moment(expense.ultima_fecha_generado);
+
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this month';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this week';
+          return result;
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        if (ultimaFecha.isSame(today, 'day')) {
+          result.reason = 'Already generated today';
+          return result;
+        }
+      }
+    }
+
+    // Check start date
+    if (expense.fecha_inicio) {
+      const fechaInicio = moment(expense.fecha_inicio);
+      if (today.isBefore(fechaInicio, 'day')) {
+        result.reason = 'Start date not reached';
+        return result;
+      }
+    }
+
+    // For manual processing of monthly frequency: check if dia_de_pago has passed
+    if (frecuenciaNombre === 'mensual') {
+      const targetDay = expense.dia_de_pago;
+      const todayDay = today.date();
+      const adjustedDate = this.getValidMonthlyDate(today, targetDay);
+
+      if (targetDay <= todayDay) {
+        // Check if the adjusted date is on or after fecha_inicio
+        if (expense.fecha_inicio) {
+          const fechaInicio = moment(expense.fecha_inicio);
+          if (adjustedDate.isBefore(fechaInicio, 'day')) {
+            result.reason = `Manual: target day ${targetDay} this month is before fecha_inicio`;
+            return result;
+          }
+        }
+
+        result.canGenerate = true;
+        result.reason = `Manual: payment day ${targetDay} <= today ${todayDay}`;
+        result.adjustedDate = adjustedDate.format('YYYY-MM-DD');
+        return result;
+      }
+
+      result.reason = `Payment day ${targetDay} > today ${todayDay}`;
+      return result;
+    }
+
+    // For other frequencies, use the regular check
+    const frequencyCheck = this.checkFrequencyMatch(expense, today, frecuencia);
+    result.canGenerate = frequencyCheck.matches;
+    result.reason = frequencyCheck.reason;
+    result.adjustedDate = frequencyCheck.adjustedDate;
+
+    return result;
+  }
+
+  /**
    * Advanced logic to determine if an expense should be generated
    * Handles multiple frequencies and edge cases
    */

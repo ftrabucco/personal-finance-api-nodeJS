@@ -381,8 +381,124 @@ export class GastoGeneratorService {
   }
 
   /**
-   * Método legacy para compatibilidad con endpoint manual
-   * Incluye gastos únicos para procesamiento manual
+   * Genera gastos con lógica MANUAL (sin restricción de tolerancia)
+   * Genera todos los gastos del mes actual que aún no fueron generados
+   * @param {number} userId - ID del usuario para filtrar gastos
+   */
+  static async generateManualExpenses(userId) {
+    const startTime = Date.now();
+    const results = {
+      success: [],
+      errors: [],
+      summary: {
+        totalProcessed: 0,
+        processing_time_ms: 0,
+        breakdown: {
+          recurrentes: { processed: 0, generated: 0, skipped: 0, errors: 0 },
+          debitos: { processed: 0, generated: 0, skipped: 0, errors: 0 },
+          compras: { processed: 0, generated: 0, skipped: 0, errors: 0 }
+        }
+      }
+    };
+
+    try {
+      logger.info('Starting MANUAL expense generation process (no tolerance)', { userId });
+
+      // Process recurring expenses with MANUAL method (no tolerance)
+      const gastosRecurrentes = await this.gastoRecurrenteService.findReadyForManualGeneration(userId);
+      results.summary.breakdown.recurrentes.processed = gastosRecurrentes.length;
+
+      logger.debug('Processing recurring expenses (MANUAL)', {
+        count: gastosRecurrentes.length,
+        expenses: gastosRecurrentes.map(g => ({
+          id: g.id,
+          descripcion: g.descripcion,
+          dia_de_pago: g.dia_de_pago,
+          reason: g.generationReason
+        }))
+      });
+
+      await this.processExpensesBatch(
+        gastosRecurrentes,
+        'recurrente',
+        this.generateFromGastoRecurrente,
+        results
+      );
+
+      // Process automatic debits with MANUAL method (no tolerance)
+      const debitosAutomaticos = await this.debitoAutomaticoService.findReadyForManualGeneration(userId);
+      results.summary.breakdown.debitos.processed = debitosAutomaticos.length;
+
+      logger.debug('Processing automatic debits (MANUAL)', {
+        count: debitosAutomaticos.length,
+        debits: debitosAutomaticos.map(d => ({
+          id: d.id,
+          descripcion: d.descripcion,
+          dia_de_pago: d.dia_de_pago,
+          reason: d.generationReason
+        }))
+      });
+
+      await this.processExpensesBatch(
+        debitosAutomaticos,
+        'debito',
+        this.generateFromDebitoAutomatico,
+        results
+      );
+
+      // Process installment purchases (same logic for manual)
+      const compras = await this.comprasService.findReadyForGeneration(userId);
+      results.summary.breakdown.compras.processed = compras.length;
+
+      logger.debug('Processing installment purchases (MANUAL)', {
+        count: compras.length
+      });
+
+      await this.processExpensesBatch(
+        compras,
+        'compra',
+        this.generateFromCompra,
+        results
+      );
+
+      // Calculate final metrics
+      const endTime = Date.now();
+      results.summary.processing_time_ms = endTime - startTime;
+      results.summary.totalProcessed = results.success.length + results.errors.length;
+
+      // Update breakdown totals
+      for (const type of ['recurrentes', 'debitos', 'compras']) {
+        const breakdown = results.summary.breakdown[type];
+        breakdown.generated = results.success.filter(r => r.type === type.slice(0, -1)).length;
+        breakdown.errors = results.errors.filter(r => r.type === type.slice(0, -1)).length;
+        breakdown.skipped = breakdown.processed - breakdown.generated - breakdown.errors;
+      }
+
+      logger.info('MANUAL expense generation completed successfully', {
+        total_success: results.success.length,
+        total_errors: results.errors.length,
+        processing_time_ms: results.summary.processing_time_ms,
+        breakdown: results.summary.breakdown
+      });
+
+      return results;
+    } catch (error) {
+      const endTime = Date.now();
+      results.summary.processing_time_ms = endTime - startTime;
+
+      logger.error('Fatal error in MANUAL expense generation', {
+        error: error.message,
+        stack: error.stack,
+        processing_time_ms: results.summary.processing_time_ms
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Método para procesamiento MANUAL desde el botón "Procesar Pendientes"
+   * Usa lógica sin restricción de tolerancia - genera todos los gastos del mes actual
+   * que aún no fueron generados, incluyendo gastos únicos pendientes
    * @param {number} userId - ID del usuario para filtrar gastos (requerido para endpoint manual)
    */
   static async generatePendingExpenses(userId) {
@@ -392,8 +508,8 @@ export class GastoGeneratorService {
     };
 
     try {
-      // Generar gastos programados (recurrentes, débitos, compras)
-      const scheduledResults = await this.generateScheduledExpenses(userId);
+      // Generar gastos programados con lógica MANUAL (sin tolerancia)
+      const scheduledResults = await this.generateManualExpenses(userId);
       results.success.push(...scheduledResults.success);
       results.errors.push(...scheduledResults.errors);
 

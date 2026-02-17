@@ -245,6 +245,128 @@ export class DebitoAutomaticoService extends BaseService {
   }
 
   /**
+   * Find automatic debits ready for MANUAL generation (no tolerance restriction)
+   * Used by manual "Procesar Pendientes" button - generates all pending for current month
+   * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
+   */
+  async findReadyForManualGeneration(userId = null) {
+    const today = moment().tz('America/Argentina/Buenos_Aires');
+
+    logger.debug('Finding automatic debits for MANUAL generation (no tolerance)', {
+      date: today.format('YYYY-MM-DD'),
+      day: today.date(),
+      userId: userId || 'all'
+    });
+
+    // Build where clause with optional user filter
+    const whereClause = { activo: true };
+    if (userId) {
+      whereClause.usuario_id = userId;
+    }
+
+    const activeDebits = await this.findAll({ where: whereClause });
+    const readyDebits = [];
+
+    for (const debit of activeDebits) {
+      try {
+        const shouldGenerate = await this.shouldGenerateForManual(debit, today);
+        if (shouldGenerate.should) {
+          debit.generationReason = shouldGenerate.reason;
+          debit.adjustedDate = shouldGenerate.adjustedDate;
+          readyDebits.push(debit);
+
+          logger.debug('Automatic debit ready for MANUAL generation', {
+            debit_id: debit.id,
+            descripcion: debit.descripcion,
+            reason: shouldGenerate.reason,
+            dia_de_pago: debit.dia_de_pago
+          });
+        }
+      } catch (error) {
+        logger.error('Error checking automatic debit for manual generation', {
+          debit_id: debit.id,
+          error: error.message
+        });
+      }
+    }
+
+    logger.info('Automatic debits ready for MANUAL generation', {
+      total_active: activeDebits.length,
+      ready_count: readyDebits.length,
+      ready_debits: readyDebits.map(d => ({
+        id: d.id,
+        descripcion: d.descripcion,
+        dia_de_pago: d.dia_de_pago,
+        reason: d.generationReason
+      }))
+    });
+
+    return readyDebits;
+  }
+
+  /**
+   * Check if debit should generate for MANUAL processing
+   * No tolerance - generates if dia_de_pago <= today and not yet generated this month
+   * @param {Object} debit - The automatic debit
+   * @param {moment.Moment} today - Current date
+   * @returns {Object} Generation decision with reason
+   */
+  async shouldGenerateForManual(debit, today) {
+    const frecuencia = debit.frecuencia;
+    const frecuenciaNombre = frecuencia?.nombre_frecuencia?.toLowerCase() || 'mensual';
+
+    // Check if already generated this period
+    if (debit.ultima_fecha_generado && frecuencia) {
+      const ultimaFecha = moment(debit.ultima_fecha_generado).tz('America/Argentina/Buenos_Aires');
+
+      if (frecuenciaNombre === 'mensual' || frecuenciaNombre === 'quincenal') {
+        if (ultimaFecha.isSame(today, 'month') && ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this month' };
+        }
+      } else if (frecuenciaNombre === 'semanal') {
+        if (ultimaFecha.isSame(today, 'week') && ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this week' };
+        }
+      } else if (frecuenciaNombre === 'diaria') {
+        if (ultimaFecha.isSame(today, 'day')) {
+          return { should: false, reason: 'Already generated today' };
+        }
+      }
+    }
+
+    // Check date boundaries
+    if (!this.validateDateBoundaries(debit, today)) {
+      return { should: false, reason: 'Outside valid date range' };
+    }
+
+    // For manual processing: check if dia_de_pago has passed or is today
+    const diaConfigurido = debit.dia_de_pago;
+    const todayDay = today.date();
+
+    // For monthly frequency: generate if payment day has passed in current month
+    if (frecuenciaNombre === 'mensual') {
+      if (diaConfigurido <= todayDay) {
+        // Calculate the actual date for this expense
+        const expenseDate = today.clone().date(Math.min(diaConfigurido, today.daysInMonth()));
+        return {
+          should: true,
+          reason: `Manual: payment day ${diaConfigurido} <= today ${todayDay}`,
+          adjustedDate: expenseDate.format('YYYY-MM-DD')
+        };
+      }
+      return { should: false, reason: `Payment day ${diaConfigurido} > today ${todayDay}` };
+    }
+
+    // For other frequencies, use the regular check
+    const frequencyCheck = await this.checkFrequencyMatch(debit, today);
+    return {
+      should: frequencyCheck.matches,
+      reason: frequencyCheck.reason,
+      adjustedDate: frequencyCheck.adjustedDate
+    };
+  }
+
+  /**
    * Intelligent debit generation logic with advanced frequency handling
    * @param {Object} debit - The automatic debit
    * @param {moment.Moment} today - Current date
