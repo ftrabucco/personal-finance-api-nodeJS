@@ -28,6 +28,10 @@ tags:
     description: Gestión de tarjetas de débito y crédito del usuario
   - name: tipo-cambio
     description: Sistema multi-moneda - Gestión de tipos de cambio USD/ARS
+  - name: proyeccion
+    description: Proyección de gastos futuros basada en gastos recurrentes, débitos y cuotas
+  - name: salud-financiera
+    description: Análisis de salud financiera con scoring y recomendaciones
 
 components:
   securitySchemes:
@@ -1985,7 +1989,7 @@ paths:
                       total_usd: 0
                       cantidad: 7
                   por_importancia:
-                    "Esencial":
+                    "Necesario":
                       total_ars: 101700
                       total_usd: 0
                       cantidad: 6
@@ -4154,6 +4158,311 @@ paths:
                 success: false
                 error: "Tipo de cambio no disponible"
                 details: "No hay tipo de cambio configurado"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ============================================================================
+  # PROYECCION ENDPOINTS
+  # ============================================================================
+  /proyeccion:
+    get:
+      tags:
+        - proyeccion
+      summary: Obtener proyección de gastos futuros
+      description: |
+        Proyecta gastos futuros basándose en:
+        - Gastos recurrentes activos
+        - Débitos automáticos activos
+        - Cuotas pendientes de compras
+
+        La proyección considera las frecuencias configuradas y calcula
+        las fechas exactas de cada gasto proyectado.
+      operationId: obtenerProyeccion
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: meses
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+            default: 3
+          description: Cantidad de meses a proyectar hacia el futuro (1-12)
+      responses:
+        '200':
+          description: Proyección generada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      proyeccion:
+                        type: array
+                        description: Proyección mes a mes
+                        items:
+                          type: object
+                          properties:
+                            mes:
+                              type: string
+                              example: "2026-03"
+                            total_ars:
+                              type: number
+                              example: 150000
+                            total_usd:
+                              type: number
+                              example: 200
+                            cantidad_gastos:
+                              type: integer
+                              example: 15
+                            gastos:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  tipo:
+                                    type: string
+                                    enum: [recurrente, debito_automatico, compra]
+                                  id_origen:
+                                    type: integer
+                                  descripcion:
+                                    type: string
+                                  monto_ars:
+                                    type: number
+                                  monto_usd:
+                                    type: number
+                                  fecha_proyectada:
+                                    type: string
+                                    format: date
+                                  categoria:
+                                    type: string
+                                  importancia:
+                                    type: string
+                      resumen:
+                        type: object
+                        properties:
+                          total_ars:
+                            type: number
+                            description: Total en ARS de todos los meses
+                          total_usd:
+                            type: number
+                            description: Total en USD de todos los meses
+                          meses_proyectados:
+                            type: integer
+                          promedio_mensual_ars:
+                            type: number
+                          promedio_mensual_usd:
+                            type: number
+              example:
+                success: true
+                data:
+                  proyeccion:
+                    - mes: "2026-03"
+                      total_ars: 150000
+                      total_usd: 200
+                      cantidad_gastos: 8
+                      gastos:
+                        - tipo: "recurrente"
+                          id_origen: 1
+                          descripcion: "Alquiler"
+                          monto_ars: 80000
+                          monto_usd: 0
+                          fecha_proyectada: "2026-03-10"
+                          categoria: "Alquiler"
+                          importancia: "Necesario"
+                        - tipo: "debito_automatico"
+                          id_origen: 2
+                          descripcion: "Netflix"
+                          monto_ars: 5000
+                          monto_usd: 0
+                          fecha_proyectada: "2026-03-15"
+                          categoria: "Streaming / Suscripciones"
+                          importancia: "Deseado"
+                  resumen:
+                    total_ars: 450000
+                    total_usd: 600
+                    meses_proyectados: 3
+                    promedio_mensual_ars: 150000
+                    promedio_mensual_usd: 200
+        '400':
+          description: Parámetros de validación inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ============================================================================
+  # SALUD FINANCIERA ENDPOINTS
+  # ============================================================================
+  /salud-financiera:
+    get:
+      tags:
+        - salud-financiera
+      summary: Obtener análisis de salud financiera
+      description: |
+        Calcula un puntaje de salud financiera (0-100) basado en:
+        - **Ratio de gastos necesarios** (40%): Porcentaje de gastos marcados como "Necesario"
+        - **Gastos prescindibles** (30%): Penalización por gastos "Prescindible"
+        - **Tendencia** (20%): Comparación con el período anterior
+        - **Diversificación** (10%): Distribución entre categorías
+
+        Incluye recomendaciones personalizadas basadas en los patrones de gasto.
+      operationId: obtenerSaludFinanciera
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: periodo
+          in: query
+          schema:
+            type: string
+            enum: [semana, mes, trimestre, anio]
+            default: mes
+          description: Período de análisis
+      responses:
+        '200':
+          description: Análisis de salud financiera generado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      score:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                        description: Puntaje de salud financiera
+                      calificacion:
+                        type: string
+                        enum: [Excelente, Muy Buena, Buena, Regular, Mejorable, Crítica]
+                      periodo:
+                        type: object
+                        properties:
+                          tipo:
+                            type: string
+                          desde:
+                            type: string
+                            format: date
+                          hasta:
+                            type: string
+                            format: date
+                      totales:
+                        type: object
+                        properties:
+                          total_ars:
+                            type: number
+                          cantidad_gastos:
+                            type: integer
+                      desglose:
+                        type: object
+                        properties:
+                          ratio_esenciales:
+                            type: object
+                            properties:
+                              valor:
+                                type: number
+                              descripcion:
+                                type: string
+                              peso:
+                                type: integer
+                              puntos:
+                                type: number
+                          gastos_evitables:
+                            type: object
+                          tendencia:
+                            type: object
+                          diversificacion:
+                            type: object
+                      distribucion:
+                        type: object
+                        properties:
+                          por_importancia:
+                            type: object
+                          por_categoria:
+                            type: object
+                          por_tipo_pago:
+                            type: object
+                      recomendaciones:
+                        type: array
+                        items:
+                          type: string
+              example:
+                success: true
+                data:
+                  score: 72
+                  calificacion: "Buena"
+                  periodo:
+                    tipo: "mes"
+                    desde: "2026-02-01"
+                    hasta: "2026-02-28"
+                  totales:
+                    total_ars: 180000
+                    cantidad_gastos: 25
+                  desglose:
+                    ratio_esenciales:
+                      valor: 65
+                      descripcion: "65% de gastos son necesarios"
+                      peso: 40
+                      puntos: 26
+                    gastos_evitables:
+                      valor: 5
+                      descripcion: "5% de gastos son prescindibles"
+                      peso: 30
+                      puntos: 25.5
+                    tendencia:
+                      valor: -3
+                      descripcion: "Gastos disminuyeron 3%"
+                      peso: 20
+                      puntos: 14
+                    diversificacion:
+                      valor: 35
+                      descripcion: "Gastos moderadamente diversificados"
+                      peso: 10
+                      puntos: 6.5
+                  distribucion:
+                    por_importancia:
+                      Necesario:
+                        total_ars: 100000
+                        cantidad: 10
+                      Deseado:
+                        total_ars: 45000
+                        cantidad: 8
+                      Prescindible:
+                        total_ars: 9000
+                        cantidad: 2
+                    por_categoria:
+                      Alquiler:
+                        total_ars: 80000
+                        cantidad: 1
+                      Supermercado:
+                        total_ars: 35000
+                        cantidad: 8
+                  recomendaciones:
+                    - "Los gastos disminuyeron respecto al mes anterior - seguí así"
+                    - "Considerá reducir gastos prescindibles"
+        '400':
+          description: Parámetros de validación inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':

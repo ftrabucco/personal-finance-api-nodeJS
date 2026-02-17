@@ -528,3 +528,34 @@ const tarjetaFiltersSchema = Joi.object({
 export const validateCreateTarjeta = createValidationMiddleware(tarjetaSchema, 'body');
 export const validateUpdateTarjeta = createValidationMiddleware(tarjetaSchema, 'body');
 export const validateTarjetaFilters = createValidationMiddleware(tarjetaFiltersSchema, 'query');
+
+// =============================================================================
+// PROYECCION VALIDATIONS
+// =============================================================================
+
+const proyeccionFiltersSchema = Joi.object({
+  meses: Joi.number().integer().min(1).max(12).default(3)
+    .messages({
+      'number.base': 'Los meses deben ser un número',
+      'number.integer': 'Los meses deben ser un número entero',
+      'number.min': 'Los meses deben ser al menos 1',
+      'number.max': 'Los meses no pueden exceder 12'
+    })
+}).unknown(false);
+
+// Exportar validación de proyección
+export const validateProyeccionFilters = createValidationMiddleware(proyeccionFiltersSchema, 'query');
+
+// =============================================================================
+// SALUD FINANCIERA VALIDATIONS
+// =============================================================================
+
+const saludFinancieraFiltersSchema = Joi.object({
+  periodo: Joi.string().valid('semana', 'mes', 'trimestre', 'anio').default('mes')
+    .messages({
+      'any.only': 'El período debe ser: semana, mes, trimestre o anio'
+    })
+}).unknown(false);
+
+// Exportar validación de salud financiera
+export const validateSaludFinancieraFilters = createValidationMiddleware(saludFinancieraFiltersSchema, 'query');
