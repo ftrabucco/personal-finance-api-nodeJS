@@ -10,7 +10,10 @@ export function setupAssociations(models) {
     GastoRecurrente,
     GastoUnico,
     Tarjeta,
-    Usuario
+    Usuario,
+    FuenteIngreso,
+    IngresoUnico,
+    IngresoRecurrente
   } = models;
 
   // Gasto
@@ -105,5 +108,22 @@ export function setupAssociations(models) {
   // Tarjeta
   Tarjeta.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(Tarjeta, { foreignKey: 'usuario_id', as: 'tarjetas' });
+
+  // Ingreso Único
+  IngresoUnico.belongsTo(FuenteIngreso, { foreignKey: 'fuente_ingreso_id', as: 'fuenteIngreso' });
+  FuenteIngreso.hasMany(IngresoUnico, { foreignKey: 'fuente_ingreso_id', as: 'ingresosUnicos' });
+
+  IngresoUnico.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(IngresoUnico, { foreignKey: 'usuario_id', as: 'ingresosUnicos' });
+
+  // Ingreso Recurrente
+  IngresoRecurrente.belongsTo(FuenteIngreso, { foreignKey: 'fuente_ingreso_id', as: 'fuenteIngreso' });
+  FuenteIngreso.hasMany(IngresoRecurrente, { foreignKey: 'fuente_ingreso_id', as: 'ingresosRecurrentes' });
+
+  IngresoRecurrente.belongsTo(FrecuenciaGasto, { foreignKey: 'frecuencia_gasto_id', as: 'frecuencia' });
+  FrecuenciaGasto.hasMany(IngresoRecurrente, { foreignKey: 'frecuencia_gasto_id', as: 'ingresosRecurrentes' });
+
+  IngresoRecurrente.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(IngresoRecurrente, { foreignKey: 'usuario_id', as: 'ingresosRecurrentes' });
 
 }
