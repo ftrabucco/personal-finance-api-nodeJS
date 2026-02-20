@@ -559,3 +559,130 @@ const saludFinancieraFiltersSchema = Joi.object({
 
 // Exportar validación de salud financiera
 export const validateSaludFinancieraFilters = createValidationMiddleware(saludFinancieraFiltersSchema, 'query');
+
+// =============================================================================
+// INGRESOS VALIDATIONS
+// =============================================================================
+
+// Esquema base para ingresos
+const baseIngresoSchema = {
+  monto: Joi.number().positive().required()
+    .messages({
+      'number.base': 'El monto debe ser un número',
+      'number.positive': 'El monto debe ser positivo',
+      'any.required': 'El monto es requerido'
+    }),
+
+  descripcion: Joi.string().trim().min(3).max(255).required()
+    .messages({
+      'string.min': 'La descripción debe tener al menos 3 caracteres',
+      'string.max': 'La descripción no puede exceder 255 caracteres',
+      'any.required': 'La descripción es requerida'
+    }),
+
+  fuente_ingreso_id: Joi.number().integer().positive().required()
+    .messages({
+      'number.base': 'La fuente de ingreso debe ser un número',
+      'number.integer': 'La fuente de ingreso debe ser un número entero',
+      'number.positive': 'La fuente de ingreso debe ser un ID válido',
+      'any.required': 'La fuente de ingreso es requerida'
+    })
+};
+
+// Ingreso Único
+const ingresoUnicoSchema = Joi.object({
+  descripcion: baseIngresoSchema.descripcion,
+  monto: baseIngresoSchema.monto,
+  fuente_ingreso_id: baseIngresoSchema.fuente_ingreso_id,
+  fecha: Joi.date().iso().max('now').required()
+    .messages({
+      'date.base': 'La fecha debe ser una fecha válida',
+      'date.format': 'La fecha debe estar en formato ISO',
+      'date.max': 'La fecha no puede ser futura',
+      'any.required': 'La fecha es requerida'
+    }),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_usado: Joi.forbidden()
+}).unknown(false);
+
+const ingresoUnicoFiltersSchema = Joi.object({
+  fuente_ingreso_id: Joi.number().integer().positive().optional(),
+  fecha_desde: Joi.date().iso().optional(),
+  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  monto_min: Joi.number().positive().optional(),
+  monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('fecha', 'monto', 'descripcion', 'created_at', 'updated_at').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
+}).unknown(false);
+
+// Ingreso Recurrente
+const ingresoRecurrenteSchema = Joi.object({
+  descripcion: baseIngresoSchema.descripcion,
+  monto: baseIngresoSchema.monto,
+  fuente_ingreso_id: baseIngresoSchema.fuente_ingreso_id,
+  dia_de_pago: Joi.number().integer().min(1).max(31).required()
+    .messages({
+      'number.base': 'El día de pago debe ser un número',
+      'number.integer': 'El día de pago debe ser un número entero',
+      'number.min': 'El día de pago debe ser al menos 1',
+      'number.max': 'El día de pago no puede exceder 31',
+      'any.required': 'El día de pago es requerido'
+    }),
+  mes_de_pago: Joi.number().integer().min(1).max(12).optional().allow(null)
+    .messages({
+      'number.base': 'El mes de pago debe ser un número',
+      'number.integer': 'El mes de pago debe ser un número entero',
+      'number.min': 'El mes de pago debe ser al menos 1',
+      'number.max': 'El mes de pago no puede exceder 12'
+    }),
+  frecuencia_gasto_id: Joi.number().integer().positive().required()
+    .messages({
+      'number.base': 'La frecuencia debe ser un número',
+      'number.integer': 'La frecuencia debe ser un número entero',
+      'number.positive': 'La frecuencia debe ser un ID válido',
+      'any.required': 'La frecuencia es requerida'
+    }),
+  fecha_inicio: Joi.date().iso().optional().allow(null)
+    .messages({
+      'date.base': 'La fecha de inicio debe ser una fecha válida',
+      'date.format': 'La fecha de inicio debe estar en formato ISO'
+    }),
+  fecha_fin: Joi.date().iso().optional().allow(null)
+    .messages({
+      'date.base': 'La fecha de fin debe ser una fecha válida',
+      'date.format': 'La fecha de fin debe estar en formato ISO'
+    }),
+  activo: Joi.boolean().default(true),
+  // 💱 Multi-currency fields
+  moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
+  monto_ars: Joi.forbidden(),
+  monto_usd: Joi.forbidden(),
+  tipo_cambio_referencia: Joi.forbidden()
+}).unknown(false);
+
+const ingresoRecurrenteFiltersSchema = Joi.object({
+  fuente_ingreso_id: Joi.number().integer().positive().optional(),
+  frecuencia_gasto_id: Joi.number().integer().positive().optional(),
+  monto_min: Joi.number().positive().optional(),
+  monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
+  activo: Joi.boolean().optional(),
+  dia_de_pago: Joi.number().integer().min(1).max(31).optional(),
+  mes_de_pago: Joi.number().integer().min(1).max(12).optional(),
+  limit: Joi.number().integer().min(1).max(1000).optional(),
+  offset: Joi.number().integer().min(0).optional(),
+  orderBy: Joi.string().valid('monto', 'descripcion', 'dia_de_pago', 'mes_de_pago', 'activo', 'created_at', 'updated_at').optional(),
+  orderDirection: Joi.string().valid('ASC', 'DESC').default('DESC').optional()
+}).unknown(false);
+
+// Exportar validaciones de ingresos
+export const validateCreateIngresoUnico = createValidationMiddleware(ingresoUnicoSchema, 'body');
+export const validateUpdateIngresoUnico = createValidationMiddleware(ingresoUnicoSchema, 'body');
+export const validateIngresoUnicoFilters = createValidationMiddleware(ingresoUnicoFiltersSchema, 'query');
+export const validateCreateIngresoRecurrente = createValidationMiddleware(ingresoRecurrenteSchema, 'body');
+export const validateUpdateIngresoRecurrente = createValidationMiddleware(ingresoRecurrenteSchema, 'body');
+export const validateIngresoRecurrenteFilters = createValidationMiddleware(ingresoRecurrenteFiltersSchema, 'query');

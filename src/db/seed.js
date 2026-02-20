@@ -101,6 +101,22 @@ async function seedInitialData() {
       ON CONFLICT (id) DO UPDATE SET nombre_importancia = EXCLUDED.nombre_importancia;
     `);
 
+    // 4.5. 💰 FUENTES DE INGRESO
+    logger.info('💰 Insertando fuentes de ingreso...');
+    await sequelize.query(`
+      INSERT INTO finanzas.fuentes_ingreso (nombre) VALUES
+        ('Salario'),
+        ('Freelance'),
+        ('Alquiler'),
+        ('Inversiones'),
+        ('Venta'),
+        ('Regalo'),
+        ('Reembolso'),
+        ('Bono'),
+        ('Otro')
+      ON CONFLICT (nombre) DO NOTHING;
+    `);
+
     // 5. 👤 USUARIO EJEMPLO - Con password hasheado
     logger.info('👤 Creando usuario ejemplo...');
     const hashedPassword = await bcrypt.hash('password123', 10);
