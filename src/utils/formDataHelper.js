@@ -71,8 +71,8 @@ export const FORM_CONFIGS = {
   debitoAutomatico: {
     numericFields: ['monto'],
     integerFields: ['dia_de_pago', 'mes_de_pago', 'categoria_gasto_id', 'importancia_gasto_id', 'tipo_pago_id', 'frecuencia_gasto_id', 'tarjeta_id'],
-    nullableFields: ['tarjeta_id', 'mes_de_pago', 'fecha_inicio', 'fecha_fin'],
-    booleanFields: ['activo']
+    nullableFields: ['tarjeta_id', 'mes_de_pago', 'fecha_inicio', 'fecha_fin', 'dia_de_pago'],
+    booleanFields: ['activo', 'usa_vencimiento_tarjeta']
   },
 
   gastoRecurrente: {

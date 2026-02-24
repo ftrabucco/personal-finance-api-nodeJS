@@ -133,14 +133,16 @@ const debitoAutomaticoSchema = Joi.object({
   importancia_gasto_id: baseGastoSchema.importancia_gasto_id,
   tipo_pago_id: baseGastoSchema.tipo_pago_id,
   tarjeta_id: baseGastoSchema.tarjeta_id,
-  dia_de_pago: Joi.number().integer().min(1).max(31).required()
+  // dia_de_pago is optional when using credit card (uses card's due date)
+  dia_de_pago: Joi.number().integer().min(1).max(31).allow(null)
     .messages({
       'number.base': 'El día de pago debe ser un número',
       'number.integer': 'El día de pago debe ser un número entero',
       'number.min': 'El día de pago debe ser al menos 1',
-      'number.max': 'El día de pago no puede exceder 31',
-      'any.required': 'El día de pago es requerido'
+      'number.max': 'El día de pago no puede exceder 31'
     }),
+  // usa_vencimiento_tarjeta: when true, ignores dia_de_pago and uses credit card due date
+  usa_vencimiento_tarjeta: Joi.boolean().default(false),
   frecuencia_gasto_id: Joi.number().integer().positive().required()
     .messages({
       'number.base': 'La frecuencia debe ser un número',

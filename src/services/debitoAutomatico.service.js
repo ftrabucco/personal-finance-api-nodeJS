@@ -333,13 +333,32 @@ export class DebitoAutomaticoService extends BaseService {
     }
 
     const frecuenciaNombre = debit.frecuencia.nombre_frecuencia.toLowerCase();
-    const diaConfigurido = debit.dia_de_pago;
     const mesConfigurado = debit.mes_de_pago;
+
+    // Determine the effective payment day:
+    // - If usa_vencimiento_tarjeta is true and has a credit card, use the card's due date
+    // - Otherwise, use dia_de_pago
+    let diaConfigurido = debit.dia_de_pago;
+
+    if (debit.usa_vencimiento_tarjeta && debit.tarjeta && debit.tarjeta.tipo === 'credito') {
+      diaConfigurido = debit.tarjeta.dia_mes_vencimiento;
+      logger.debug('Using credit card due date for automatic debit', {
+        debit_id: debit.id,
+        dia_vencimiento_tarjeta: diaConfigurido,
+        tarjeta_nombre: debit.tarjeta.nombre
+      });
+    }
+
+    // If no day configured at all, cannot generate
+    if (!diaConfigurido) {
+      return { matches: false, reason: 'No payment day configured (dia_de_pago or tarjeta.dia_vencimiento)' };
+    }
 
     logger.debug('Checking frequency for automatic debit', {
       debit_id: debit.id,
       frecuencia: frecuenciaNombre,
       dia_configurado: diaConfigurido,
+      usa_vencimiento_tarjeta: debit.usa_vencimiento_tarjeta,
       mes_configurado: mesConfigurado,
       fecha_hoy: today.format('YYYY-MM-DD')
     });

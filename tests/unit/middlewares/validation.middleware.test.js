@@ -287,6 +287,28 @@ describe('Validation Middleware', () => {
       expect(mockNext).toHaveBeenCalled();
       expect(mockReq.body.moneda_origen).toBe('USD');
     });
+
+    it('should allow dia_de_pago to be null when using credit card due date', () => {
+      mockReq.body = {
+        ...validDebito,
+        dia_de_pago: null,
+        tarjeta_id: 1,
+        usa_vencimiento_tarjeta: true
+      };
+
+      validateCreateDebitoAutomatico(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockReq.body.usa_vencimiento_tarjeta).toBe(true);
+    });
+
+    it('should set usa_vencimiento_tarjeta to false by default', () => {
+      mockReq.body = { ...validDebito };
+
+      validateCreateDebitoAutomatico(mockReq, mockRes, mockNext);
+
+      expect(mockReq.body.usa_vencimiento_tarjeta).toBe(false);
+    });
   });
 
   describe('validateCreateGastoUnico', () => {
