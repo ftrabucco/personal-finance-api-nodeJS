@@ -229,7 +229,7 @@ export class ExchangeRateService {
       }
 
       // Upsert (crear o actualizar)
-      const [tipoCambio, created] = await TipoCambio.upsert({
+      const result = await TipoCambio.upsert({
         fecha: fechaStr,
         valor_compra_usd_ars: parseFloat(parseFloat(valorCompra).toFixed(2)),
         valor_venta_usd_ars: parseFloat(parseFloat(valorVenta).toFixed(2)),
@@ -239,6 +239,21 @@ export class ExchangeRateService {
       }, {
         returning: true
       });
+
+      // Manejar diferentes formatos de retorno de upsert
+      // Sequelize puede retornar [instance, created] o solo instance dependiendo de la versión/config
+      let tipoCambio, created;
+      if (Array.isArray(result)) {
+        [tipoCambio, created] = result;
+      } else {
+        tipoCambio = result;
+        created = false;
+      }
+
+      // Si upsert no retorna el registro, buscarlo
+      if (!tipoCambio) {
+        tipoCambio = await TipoCambio.findOne({ where: { fecha: fechaStr } });
+      }
 
       // Invalidar cache
       this.invalidateCache();
