@@ -180,11 +180,22 @@ export class TipoCambioController {
           'No se pudo obtener el tipo de cambio de ninguna fuente externa');
       }
 
+      // Verificar que tipoCambio sea un objeto válido con los campos esperados
+      if (typeof tipoCambio !== 'object' || !tipoCambio.fecha) {
+        logger.error('tipoCambio no es un objeto válido:', {
+          tipo: typeof tipoCambio,
+          valor: JSON.stringify(tipoCambio),
+          user_id: req.user?.id
+        });
+        return sendError(res, 500, 'Error al actualizar tipo de cambio',
+          'El tipo de cambio retornado no es válido');
+      }
+
       logger.info('Tipo de cambio actualizado desde API:', {
         fecha: tipoCambio.fecha,
         valor_compra: tipoCambio.valor_compra_usd_ars,
         valor_venta: tipoCambio.valor_venta_usd_ars,
-        fuente: tipoCambio.fuente,
+        fuente: tipoCambio.fuente || 'no definida',
         user_id: req.user?.id
       });
 
@@ -192,10 +203,10 @@ export class TipoCambioController {
         mensaje: 'Tipo de cambio actualizado exitosamente',
         tipo_cambio: {
           fecha: tipoCambio.fecha,
-          valor_compra_usd_ars: parseFloat(tipoCambio.valor_compra_usd_ars),
-          valor_venta_usd_ars: parseFloat(tipoCambio.valor_venta_usd_ars),
-          fuente: tipoCambio.fuente,
-          activo: tipoCambio.activo
+          valor_compra_usd_ars: parseFloat(tipoCambio.valor_compra_usd_ars) || 0,
+          valor_venta_usd_ars: parseFloat(tipoCambio.valor_venta_usd_ars) || 0,
+          fuente: tipoCambio.fuente || 'desconocida',
+          activo: tipoCambio.activo !== false
         }
       });
     } catch (error) {
