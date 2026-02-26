@@ -229,6 +229,12 @@ export class ExchangeRateService {
       }
 
       // Upsert (crear o actualizar)
+      logger.debug('Ejecutando upsert de tipo de cambio', {
+        fecha: fechaStr,
+        valorCompra,
+        valorVenta
+      });
+
       const result = await TipoCambio.upsert({
         fecha: fechaStr,
         valor_compra_usd_ars: parseFloat(parseFloat(valorCompra).toFixed(2)),
@@ -240,19 +246,37 @@ export class ExchangeRateService {
         returning: true
       });
 
+      logger.debug('Resultado de upsert:', {
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+        resultLength: Array.isArray(result) ? result.length : 'N/A',
+        result: JSON.stringify(result)
+      });
+
       // Manejar diferentes formatos de retorno de upsert
       // Sequelize puede retornar [instance, created] o solo instance dependiendo de la versión/config
       let tipoCambio, created;
       if (Array.isArray(result)) {
         [tipoCambio, created] = result;
+        logger.debug('Upsert retornó array:', {
+          tipoCambioExists: !!tipoCambio,
+          created
+        });
       } else {
         tipoCambio = result;
         created = false;
+        logger.debug('Upsert retornó objeto directo:', {
+          tipoCambioExists: !!tipoCambio
+        });
       }
 
       // Si upsert no retorna el registro, buscarlo
       if (!tipoCambio) {
+        logger.warn('Upsert no retornó registro, buscando manualmente...');
         tipoCambio = await TipoCambio.findOne({ where: { fecha: fechaStr } });
+        logger.debug('Búsqueda manual:', {
+          encontrado: !!tipoCambio
+        });
       }
 
       // Invalidar cache
@@ -310,32 +334,54 @@ export class ExchangeRateService {
       // Tomar el valor más reciente
       const latestRate = response.data[response.data.length - 1];
       const valor = parseFloat(latestRate.v);
+      const valorCompra = valor * 0.995; // Compra: 0.5% menos
 
-      // Crear registro (usar mismo valor para compra/venta si API no los diferencia)
-      const tipoCambio = await this.setManualRate(
-        today,
-        valor * 0.995, // Compra: 0.5% menos
-        valor,
-        'Actualizado automáticamente desde API BCRA'
-      );
+      logger.debug('Datos recibidos de BCRA:', { valor, valorCompra, fecha: today });
 
-      // Verificar que se creó correctamente antes de actualizar la fuente
-      if (!tipoCambio) {
-        throw new Error('No se pudo crear/actualizar el tipo de cambio');
+      // Crear registro directamente con la fuente correcta (sin pasar por setManualRate)
+      const result = await TipoCambio.upsert({
+        fecha: today,
+        valor_compra_usd_ars: parseFloat(valorCompra.toFixed(2)),
+        valor_venta_usd_ars: parseFloat(valor.toFixed(2)),
+        fuente: 'api_bcra',
+        observaciones: 'Actualizado automáticamente desde API BCRA',
+        activo: true
+      }, {
+        returning: true
+      });
+
+      // Manejar diferentes formatos de retorno de upsert
+      let tipoCambio;
+      if (Array.isArray(result)) {
+        [tipoCambio] = result;
+      } else {
+        tipoCambio = result;
       }
 
-      // Cambiar fuente a api_bcra
-      await tipoCambio.update({ fuente: 'api_bcra' });
+      // Si upsert no retorna el registro, buscarlo
+      if (!tipoCambio) {
+        logger.warn('Upsert no retornó registro para BCRA, buscando manualmente...');
+        tipoCambio = await TipoCambio.findOne({ where: { fecha: today } });
+      }
+
+      if (!tipoCambio) {
+        throw new Error('No se pudo crear/actualizar el tipo de cambio desde BCRA');
+      }
+
+      // Invalidar cache
+      this.invalidateCache();
 
       logger.info('Tipo de cambio actualizado desde API BCRA', {
         fecha: today,
-        valor
+        valor,
+        fuente: tipoCambio.fuente
       });
 
       return tipoCambio;
     } catch (error) {
       logger.error('Error al actualizar desde API BCRA', {
         error: error.message,
+        stack: error.stack,
         response: error.response?.data
       });
 
@@ -373,32 +419,53 @@ export class ExchangeRateService {
 
       const { compra, venta } = response.data;
 
-      // Crear registro
-      const tipoCambio = await this.setManualRate(
-        today,
-        parseFloat(compra),
-        parseFloat(venta),
-        'Actualizado automáticamente desde DolarAPI'
-      );
+      logger.debug('Datos recibidos de DolarAPI:', { compra, venta, fecha: today });
 
-      // Verificar que se creó correctamente antes de actualizar la fuente
-      if (!tipoCambio) {
-        throw new Error('No se pudo crear/actualizar el tipo de cambio');
+      // Crear registro directamente con la fuente correcta (sin pasar por setManualRate)
+      const result = await TipoCambio.upsert({
+        fecha: today,
+        valor_compra_usd_ars: parseFloat(parseFloat(compra).toFixed(2)),
+        valor_venta_usd_ars: parseFloat(parseFloat(venta).toFixed(2)),
+        fuente: 'api_dolar_api',
+        observaciones: 'Actualizado automáticamente desde DolarAPI',
+        activo: true
+      }, {
+        returning: true
+      });
+
+      // Manejar diferentes formatos de retorno de upsert
+      let tipoCambio;
+      if (Array.isArray(result)) {
+        [tipoCambio] = result;
+      } else {
+        tipoCambio = result;
       }
 
-      // Cambiar fuente a api_dolar_api
-      await tipoCambio.update({ fuente: 'api_dolar_api' });
+      // Si upsert no retorna el registro, buscarlo
+      if (!tipoCambio) {
+        logger.warn('Upsert no retornó registro para DolarAPI, buscando manualmente...');
+        tipoCambio = await TipoCambio.findOne({ where: { fecha: today } });
+      }
+
+      if (!tipoCambio) {
+        throw new Error('No se pudo crear/actualizar el tipo de cambio desde DolarAPI');
+      }
+
+      // Invalidar cache
+      this.invalidateCache();
 
       logger.info('Tipo de cambio actualizado desde DolarAPI', {
         fecha: today,
         compra,
-        venta
+        venta,
+        fuente: tipoCambio.fuente
       });
 
       return tipoCambio;
     } catch (error) {
       logger.error('Error al actualizar desde DolarAPI', {
         error: error.message,
+        stack: error.stack,
         response: error.response?.data
       });
 
