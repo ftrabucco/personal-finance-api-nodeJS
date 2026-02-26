@@ -25,6 +25,7 @@ jobs:
             cd /opt/finanzas/api
             git pull origin master
             cd /opt/finanzas
-            docker-compose down api
+            docker-compose stop api
+            docker-compose rm -f api
             docker-compose up -d api
             echo "Deploy completed at $(date)"
