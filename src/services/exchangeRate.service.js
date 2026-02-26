@@ -396,19 +396,26 @@ export class ExchangeRateService {
    */
   static async updateFromDolarAPI() {
     try {
+      logger.info('🔄 [DolarAPI] Iniciando actualización...');
       const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
+      logger.debug('[DolarAPI] Fecha:', { today });
 
       // Verificar si ya existe para hoy
       const existing = await TipoCambio.findOne({
         where: { fecha: today }
       });
+      logger.debug('[DolarAPI] Existing:', {
+        found: !!existing,
+        fuente: existing?.fuente
+      });
 
       if (existing && existing.fuente !== 'manual') {
-        logger.info('Tipo de cambio ya actualizado hoy desde API');
+        logger.info('[DolarAPI] Ya existe para hoy, retornando existing');
         return existing;
       }
 
       // Llamar a DolarAPI (gratuita, no requiere token) - Dólar Blue
+      logger.info('[DolarAPI] Llamando a API externa...');
       const response = await axios.get('https://dolarapi.com/v1/dolares/blue', {
         timeout: 10000
       });
@@ -419,9 +426,10 @@ export class ExchangeRateService {
 
       const { compra, venta } = response.data;
 
-      logger.debug('Datos recibidos de DolarAPI:', { compra, venta, fecha: today });
+      logger.info('[DolarAPI] Datos recibidos:', { compra, venta, fecha: today });
 
       // Crear registro directamente con la fuente correcta (sin pasar por setManualRate)
+      logger.info('[DolarAPI] Ejecutando upsert...');
       const result = await TipoCambio.upsert({
         fecha: today,
         valor_compra_usd_ars: parseFloat(parseFloat(compra).toFixed(2)),
@@ -433,18 +441,27 @@ export class ExchangeRateService {
         returning: true
       });
 
+      logger.debug('[DolarAPI] Resultado upsert:', {
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+        result: JSON.stringify(result)
+      });
+
       // Manejar diferentes formatos de retorno de upsert
       let tipoCambio;
       if (Array.isArray(result)) {
         [tipoCambio] = result;
+        logger.debug('[DolarAPI] Extraído de array:', { tipoCambio: !!tipoCambio });
       } else {
         tipoCambio = result;
+        logger.debug('[DolarAPI] Resultado directo:', { tipoCambio: !!tipoCambio });
       }
 
       // Si upsert no retorna el registro, buscarlo
       if (!tipoCambio) {
-        logger.warn('Upsert no retornó registro para DolarAPI, buscando manualmente...');
+        logger.warn('[DolarAPI] Upsert no retornó registro, buscando manualmente...');
         tipoCambio = await TipoCambio.findOne({ where: { fecha: today } });
+        logger.debug('[DolarAPI] Búsqueda manual:', { encontrado: !!tipoCambio });
       }
 
       if (!tipoCambio) {
@@ -454,11 +471,11 @@ export class ExchangeRateService {
       // Invalidar cache
       this.invalidateCache();
 
-      logger.info('Tipo de cambio actualizado desde DolarAPI', {
+      logger.info('[DolarAPI] ✅ Actualizado exitosamente:', {
         fecha: today,
         compra,
         venta,
-        fuente: tipoCambio.fuente
+        fuente: tipoCambio?.fuente || 'N/A'
       });
 
       return tipoCambio;

@@ -157,32 +157,43 @@ export class TipoCambioController {
    */
   async updateFromAPI(req, res) {
     try {
-      const { fuente = 'auto' } = req.body;
+      logger.info('🔄 [Controller] Iniciando updateFromAPI...');
+      const { fuente = 'auto' } = req.body || {};
+      logger.debug('[Controller] Fuente solicitada:', { fuente });
 
       let tipoCambio;
 
       if (fuente === 'bcra') {
+        logger.info('[Controller] Usando BCRA...');
         tipoCambio = await ExchangeRateService.updateFromBCRAAPI();
       } else if (fuente === 'dolarapi') {
+        logger.info('[Controller] Usando DolarAPI...');
         tipoCambio = await ExchangeRateService.updateFromDolarAPI();
       } else {
         // Auto: Intentar primero con DolarAPI, luego BCRA
+        logger.info('[Controller] Modo auto: intentando DolarAPI primero...');
         tipoCambio = await ExchangeRateService.updateFromDolarAPI();
 
         if (!tipoCambio) {
-          logger.warn('DolarAPI falló, intentando con BCRA...');
+          logger.warn('[Controller] DolarAPI falló, intentando con BCRA...');
           tipoCambio = await ExchangeRateService.updateFromBCRAAPI();
         }
       }
 
+      logger.debug('[Controller] Resultado del servicio:', {
+        tipoCambioExists: !!tipoCambio,
+        tipoCambioType: typeof tipoCambio
+      });
+
       if (!tipoCambio) {
+        logger.error('[Controller] No se obtuvo tipo de cambio de ninguna fuente');
         return sendError(res, 503, 'Error al actualizar tipo de cambio',
           'No se pudo obtener el tipo de cambio de ninguna fuente externa');
       }
 
       // Verificar que tipoCambio sea un objeto válido con los campos esperados
       if (typeof tipoCambio !== 'object' || !tipoCambio.fecha) {
-        logger.error('tipoCambio no es un objeto válido:', {
+        logger.error('[Controller] tipoCambio no es un objeto válido:', {
           tipo: typeof tipoCambio,
           valor: JSON.stringify(tipoCambio),
           user_id: req.user?.id
@@ -191,7 +202,7 @@ export class TipoCambioController {
           'El tipo de cambio retornado no es válido');
       }
 
-      logger.info('Tipo de cambio actualizado desde API:', {
+      logger.info('[Controller] ✅ Tipo de cambio obtenido exitosamente:', {
         fecha: tipoCambio.fecha,
         valor_compra: tipoCambio.valor_compra_usd_ars,
         valor_venta: tipoCambio.valor_venta_usd_ars,
@@ -210,8 +221,9 @@ export class TipoCambioController {
         }
       });
     } catch (error) {
-      logger.error('Error al actualizar tipo de cambio desde API:', {
+      logger.error('[Controller] ❌ Error al actualizar tipo de cambio desde API:', {
         error: error.message,
+        stack: error.stack,
         user_id: req.user?.id
       });
       return sendError(res, 500, 'Error al actualizar tipo de cambio', error.message);
