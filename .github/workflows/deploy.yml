@@ -24,10 +24,13 @@ jobs:
             git config --global --add safe.directory /opt/finanzas/api
             cd /opt/finanzas/api
             git pull origin master
+
+            # Build image directly from Dockerfile
+            docker build --no-cache -t finanzas-api:latest .
+
             cd /opt/finanzas
             docker-compose stop api
             docker-compose rm -f api
-            docker-compose build --no-cache api
             docker-compose up -d api
             docker system prune -f
             echo "Deploy completed at $(date)"
