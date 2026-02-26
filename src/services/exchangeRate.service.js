@@ -319,6 +319,11 @@ export class ExchangeRateService {
         'Actualizado automáticamente desde API BCRA'
       );
 
+      // Verificar que se creó correctamente antes de actualizar la fuente
+      if (!tipoCambio) {
+        throw new Error('No se pudo crear/actualizar el tipo de cambio');
+      }
+
       // Cambiar fuente a api_bcra
       await tipoCambio.update({ fuente: 'api_bcra' });
 
@@ -375,6 +380,11 @@ export class ExchangeRateService {
         parseFloat(venta),
         'Actualizado automáticamente desde DolarAPI'
       );
+
+      // Verificar que se creó correctamente antes de actualizar la fuente
+      if (!tipoCambio) {
+        throw new Error('No se pudo crear/actualizar el tipo de cambio');
+      }
 
       // Cambiar fuente a api_dolar_api
       await tipoCambio.update({ fuente: 'api_dolar_api' });
