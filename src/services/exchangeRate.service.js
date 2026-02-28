@@ -400,20 +400,6 @@ export class ExchangeRateService {
       const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
       logger.debug('[DolarAPI] Fecha:', { today });
 
-      // Verificar si ya existe para hoy
-      const existing = await TipoCambio.findOne({
-        where: { fecha: today }
-      });
-      logger.debug('[DolarAPI] Existing:', {
-        found: !!existing,
-        fuente: existing?.fuente
-      });
-
-      if (existing && existing.fuente !== 'manual') {
-        logger.info('[DolarAPI] Ya existe para hoy, retornando existing');
-        return existing;
-      }
-
       // Llamar a DolarAPI (gratuita, no requiere token) - Dólar Blue
       logger.info('[DolarAPI] Llamando a API externa...');
       const response = await axios.get('https://dolarapi.com/v1/dolares/blue', {
