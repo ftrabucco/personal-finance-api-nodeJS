@@ -20,7 +20,7 @@ export function createMockDependencies(overrides = {}) {
         update: jest.fn(),
         destroy: jest.fn(),
         findByPk: jest.fn(),
-        findAndCountAll: jest.fn(),
+        findAndCountAll: jest.fn()
       },
       GastoUnico: {
         create: jest.fn(),
@@ -30,7 +30,7 @@ export function createMockDependencies(overrides = {}) {
         destroy: jest.fn(),
         findByPk: jest.fn(),
         findAndCountAll: jest.fn(),
-        name: 'GastoUnico',
+        name: 'GastoUnico'
       },
       GastoRecurrente: {
         create: jest.fn(),
@@ -40,7 +40,7 @@ export function createMockDependencies(overrides = {}) {
         destroy: jest.fn(),
         findByPk: jest.fn(),
         findAndCountAll: jest.fn(),
-        name: 'GastoRecurrente',
+        name: 'GastoRecurrente'
       },
       DebitoAutomatico: {
         create: jest.fn(),
@@ -50,7 +50,7 @@ export function createMockDependencies(overrides = {}) {
         destroy: jest.fn(),
         findByPk: jest.fn(),
         findAndCountAll: jest.fn(),
-        name: 'DebitoAutomatico',
+        name: 'DebitoAutomatico'
       },
       Compra: {
         create: jest.fn(),
@@ -60,7 +60,7 @@ export function createMockDependencies(overrides = {}) {
         destroy: jest.fn(),
         findByPk: jest.fn(),
         findAndCountAll: jest.fn(),
-        name: 'Compra',
+        name: 'Compra'
       },
       CategoriaGasto: { findByPk: jest.fn() },
       ImportanciaGasto: { findByPk: jest.fn() },
@@ -71,11 +71,11 @@ export function createMockDependencies(overrides = {}) {
         findOne: jest.fn(),
         findAll: jest.fn(),
         create: jest.fn(),
-        upsert: jest.fn(),
+        upsert: jest.fn()
       },
       Usuario: { findByPk: jest.fn() },
       IngresoUnico: { create: jest.fn(), findAll: jest.fn() },
-      IngresoRecurrente: { create: jest.fn(), findAll: jest.fn() },
+      IngresoRecurrente: { create: jest.fn(), findAll: jest.fn() }
     },
 
     transactionManager: {
@@ -83,33 +83,33 @@ export function createMockDependencies(overrides = {}) {
         const mockTransaction = { commit: jest.fn(), rollback: jest.fn() };
         return callback(mockTransaction);
       }),
-      withRetry: jest.fn(async (callback) => callback()),
+      withRetry: jest.fn(async (callback) => callback())
     },
 
     logger: {
       info: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
-      warn: jest.fn(),
+      warn: jest.fn()
     },
 
     immediateStrategy: {
-      generate: jest.fn(),
+      generate: jest.fn()
     },
 
     recurringStrategy: {
       generate: jest.fn(),
-      shouldGenerate: jest.fn(),
+      shouldGenerate: jest.fn()
     },
 
     automaticDebitStrategy: {
       generate: jest.fn(),
-      shouldGenerate: jest.fn(),
+      shouldGenerate: jest.fn()
     },
 
     installmentStrategy: {
       generate: jest.fn(),
-      shouldGenerate: jest.fn(),
+      shouldGenerate: jest.fn()
     },
 
     exchangeRateService: {
@@ -118,15 +118,15 @@ export function createMockDependencies(overrides = {}) {
       calculateBothCurrencies: jest.fn().mockResolvedValue({
         monto_ars: 1000,
         monto_usd: 1,
-        tipo_cambio_usado: 1000,
+        tipo_cambio_usado: 1000
       }),
       convertARStoUSD: jest.fn(),
-      convertUSDtoARS: jest.fn(),
+      convertUSDtoARS: jest.fn()
     },
 
     sequelize: {
-      transaction: jest.fn(),
-    },
+      transaction: jest.fn()
+    }
   };
 
   // Deep merge overrides with defaults
@@ -161,17 +161,17 @@ export function createMockRequest(overrides = {}) {
   return {
     container: {
       resolve: jest.fn((name) => mockDeps[name]),
-      cradle: mockDeps,
+      cradle: mockDeps
     },
     scope: {
       resolve: jest.fn((name) => mockDeps[name]),
-      dispose: jest.fn(),
+      dispose: jest.fn()
     },
     user: { id: 1 },
     params: {},
     query: {},
     body: {},
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -183,7 +183,7 @@ export function createMockResponse() {
   const res = {
     status: jest.fn().mockReturnThis(),
     json: jest.fn().mockReturnThis(),
-    send: jest.fn().mockReturnThis(),
+    send: jest.fn().mockReturnThis()
   };
   return res;
 }

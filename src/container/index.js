@@ -8,7 +8,7 @@
  * - Configuración centralizada de servicios
  */
 
-import { createContainer, asClass, asFunction, asValue, InjectionMode } from 'awilix';
+import { createContainer, asClass, asValue, InjectionMode } from 'awilix';
 import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
 
@@ -107,7 +107,7 @@ export function createAppContainer() {
     exchangeRateService: asClass(ExchangeRateServiceInstance).scoped(),
     authService: asClass(AuthService).singleton(),
     ingresoUnicoService: asClass(IngresoUnicoService).scoped(),
-    ingresoRecurrenteService: asClass(IngresoRecurrenteService).scoped(),
+    ingresoRecurrenteService: asClass(IngresoRecurrenteService).scoped()
   });
 
   return container;
