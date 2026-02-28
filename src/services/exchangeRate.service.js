@@ -664,4 +664,73 @@ export class ExchangeRateService {
   }
 }
 
+/**
+ * 🏗️ DI-compatible wrapper for ExchangeRateService
+ * Provides instance methods that delegate to static methods.
+ * This allows DI injection while maintaining backward compatibility.
+ */
+export class ExchangeRateServiceInstance {
+  /**
+   * @param {Object} deps - Injected dependencies (from Awilix container)
+   * @param {Object} deps.models - Sequelize models (includes TipoCambio)
+   * @param {Object} deps.logger - Logger instance
+   */
+  constructor({ models, logger }) {
+    this.TipoCambio = models.TipoCambio;
+    this.logger = logger;
+  }
+
+  async getCurrentRate() {
+    return ExchangeRateService.getCurrentRate();
+  }
+
+  async getRateForDate(fecha) {
+    return ExchangeRateService.getRateForDate(fecha);
+  }
+
+  convertARStoUSD(montoARS, tipoCambio, tipo = 'venta') {
+    return ExchangeRateService.convertARStoUSD(montoARS, tipoCambio, tipo);
+  }
+
+  convertUSDtoARS(montoUSD, tipoCambio, tipo = 'compra') {
+    return ExchangeRateService.convertUSDtoARS(montoUSD, tipoCambio, tipo);
+  }
+
+  async calculateBothCurrencies(monto, monedaOrigen, tipoCambio = null) {
+    return ExchangeRateService.calculateBothCurrencies(monto, monedaOrigen, tipoCambio);
+  }
+
+  async setManualRate(fecha, valorCompra, valorVenta, observaciones = null) {
+    return ExchangeRateService.setManualRate(fecha, valorCompra, valorVenta, observaciones);
+  }
+
+  async updateFromBCRAAPI() {
+    return ExchangeRateService.updateFromBCRAAPI();
+  }
+
+  async updateFromDolarAPI() {
+    return ExchangeRateService.updateFromDolarAPI();
+  }
+
+  async getHistory(fechaDesde = null, fechaHasta = null, limit = 30) {
+    return ExchangeRateService.getHistory(fechaDesde, fechaHasta, limit);
+  }
+
+  async getHistoricalRates(filters = {}) {
+    return ExchangeRateService.getHistoricalRates(filters);
+  }
+
+  async fetchAndSaveFromExternalAPI() {
+    return ExchangeRateService.fetchAndSaveFromExternalAPI();
+  }
+
+  async ensureExchangeRateExists() {
+    return ExchangeRateService.ensureExchangeRateExists();
+  }
+
+  invalidateCache() {
+    return ExchangeRateService.invalidateCache();
+  }
+}
+
 export default ExchangeRateService;

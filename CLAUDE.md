@@ -76,6 +76,23 @@ Business logic is centralized in services:
 - **gastoGenerator.service.js** - Generates pending expenses from recurring/automatic debits
 - Domain-specific services for complex operations
 
+### Dependency Injection (DI)
+The application uses **Awilix** for dependency injection:
+- **Container**: `src/container/index.js` - Registers all services, strategies, and models
+- **Middleware**: `src/middlewares/container.middleware.js` - Creates request-scoped DI
+- **TransactionManager**: `src/container/transactionManager.js` - Clean transaction handling
+
+Services that use DI (like `GastoUnicoService`) receive dependencies via constructor:
+```javascript
+// Example: Getting a service from the container in a controller
+const gastoUnicoService = getService(req, 'gastoUnicoService');
+```
+
+DI benefits:
+- **Testability**: Services can be easily mocked in tests
+- **Separation of concerns**: Controllers coordinate, services handle business logic
+- **Transaction safety**: `TransactionManager` provides consistent commit/rollback
+
 ### Testing Setup
 - Jest with experimental VM modules (ES6 support)
 - Supertest for API integration tests
