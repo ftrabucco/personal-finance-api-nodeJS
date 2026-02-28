@@ -109,6 +109,14 @@ export function setupAssociations(models) {
   Tarjeta.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(Tarjeta, { foreignKey: 'usuario_id', as: 'tarjetas' });
 
+  // CategoriaGasto - Usuario (para categorías personalizadas)
+  CategoriaGasto.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(CategoriaGasto, { foreignKey: 'usuario_id', as: 'categoriasPersonalizadas' });
+
+  // FuenteIngreso - Usuario (para fuentes de ingreso personalizadas)
+  FuenteIngreso.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(FuenteIngreso, { foreignKey: 'usuario_id', as: 'fuentesIngresoPersonalizadas' });
+
   // Ingreso Único
   IngresoUnico.belongsTo(FuenteIngreso, { foreignKey: 'fuente_ingreso_id', as: 'fuenteIngreso' });
   FuenteIngreso.hasMany(IngresoUnico, { foreignKey: 'fuente_ingreso_id', as: 'ingresosUnicos' });

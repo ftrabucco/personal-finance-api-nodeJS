@@ -1,18 +1,32 @@
 import { CategoriaGasto, ImportanciaGasto, TipoPago, FrecuenciaGasto, FuenteIngreso } from '../../models/index.js';
 import { sendSuccess, sendError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
+import { Op } from 'sequelize';
 
 /**
  * Controller for catalog data (categorias, importancias, tipos_pago, frecuencias)
  * These are read-only endpoints that return reference data for forms
+ * Now supports user-specific categories and income sources
  */
 
-// GET /api/catalogos/categorias
+// GET /api/catalogos/categorias - Returns system categories + user's custom categories
 export const obtenerCategorias = async (req, res) => {
   try {
+    const usuarioId = req.user?.id;
+
+    const whereClause = {
+      activo: true,
+      [Op.or]: [
+        { usuario_id: null },        // System categories
+        ...(usuarioId ? [{ usuario_id: usuarioId }] : [])  // User's custom categories
+      ]
+    };
+
     const categorias = await CategoriaGasto.findAll({
-      order: [['id', 'ASC']]
+      where: whereClause,
+      order: [['orden', 'ASC'], ['nombre_categoria', 'ASC']]
     });
+
     return sendSuccess(res, categorias);
   } catch (error) {
     logger.error('Error al obtener categorías:', { error });
@@ -59,12 +73,24 @@ export const obtenerFrecuencias = async (req, res) => {
   }
 };
 
-// GET /api/catalogos/fuentes-ingreso
+// GET /api/catalogos/fuentes-ingreso - Returns system sources + user's custom sources
 export const obtenerFuentesIngreso = async (req, res) => {
   try {
+    const usuarioId = req.user?.id;
+
+    const whereClause = {
+      activo: true,
+      [Op.or]: [
+        { usuario_id: null },        // System sources
+        ...(usuarioId ? [{ usuario_id: usuarioId }] : [])  // User's custom sources
+      ]
+    };
+
     const fuentesIngreso = await FuenteIngreso.findAll({
-      order: [['id', 'ASC']]
+      where: whereClause,
+      order: [['orden', 'ASC'], ['nombre', 'ASC']]
     });
+
     return sendSuccess(res, fuentesIngreso);
   } catch (error) {
     logger.error('Error al obtener fuentes de ingreso:', { error });
@@ -75,12 +101,30 @@ export const obtenerFuentesIngreso = async (req, res) => {
 // GET /api/catalogos - Returns all catalogs in a single request
 export const obtenerTodosCatalogos = async (req, res) => {
   try {
+    const usuarioId = req.user?.id;
+
+    const categoriasWhere = {
+      activo: true,
+      [Op.or]: [
+        { usuario_id: null },
+        ...(usuarioId ? [{ usuario_id: usuarioId }] : [])
+      ]
+    };
+
+    const fuentesWhere = {
+      activo: true,
+      [Op.or]: [
+        { usuario_id: null },
+        ...(usuarioId ? [{ usuario_id: usuarioId }] : [])
+      ]
+    };
+
     const [categorias, importancias, tiposPago, frecuencias, fuentesIngreso] = await Promise.all([
-      CategoriaGasto.findAll({ order: [['id', 'ASC']] }),
+      CategoriaGasto.findAll({ where: categoriasWhere, order: [['orden', 'ASC'], ['nombre_categoria', 'ASC']] }),
       ImportanciaGasto.findAll({ order: [['id', 'ASC']] }),
       TipoPago.findAll({ order: [['id', 'ASC']] }),
       FrecuenciaGasto.findAll({ order: [['id', 'ASC']] }),
-      FuenteIngreso.findAll({ order: [['id', 'ASC']] })
+      FuenteIngreso.findAll({ where: fuentesWhere, order: [['orden', 'ASC'], ['nombre', 'ASC']] })
     ]);
 
     return sendSuccess(res, {
