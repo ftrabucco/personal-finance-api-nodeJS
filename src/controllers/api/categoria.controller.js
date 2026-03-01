@@ -1,4 +1,4 @@
-import { CategoriaGasto, Gasto, GastoUnico, GastoRecurrente, DebitoAutomatico, Compra } from '../../models/index.js';
+import { CategoriaGasto, Gasto, GastoUnico, GastoRecurrente, DebitoAutomatico, Compra, UserCategoriaPreference } from '../../models/index.js';
 import { sendSuccess, sendError, sendValidationError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 import { Op } from 'sequelize';
@@ -16,34 +16,57 @@ export const obtenerCategorias = async (req, res) => {
     const usuarioId = req.user.id;
     const { includeInactive } = req.query;
 
-    const whereClause = {
-      [Op.or]: [
-        { usuario_id: null },          // System categories
-        { usuario_id: usuarioId }      // User's own categories
-      ]
-    };
-
-    // By default, only return active categories unless specifically requested
-    if (includeInactive !== 'true') {
-      whereClause.activo = true;
-    }
-
+    // Get all categories (system + user's own)
     const categorias = await CategoriaGasto.findAll({
-      where: whereClause,
+      where: {
+        [Op.or]: [
+          { usuario_id: null },          // System categories
+          { usuario_id: usuarioId }      // User's own categories
+        ]
+      },
       order: [
         ['orden', 'ASC'],
         ['nombre_categoria', 'ASC']
       ]
     });
 
-    // Add metadata to indicate if category is system or user-owned
-    const categoriasConMetadata = categorias.map(cat => ({
-      ...cat.toJSON(),
-      es_sistema: cat.usuario_id === null,
-      puede_eliminar: cat.usuario_id === usuarioId
-    }));
+    // Get user's preferences for system categories
+    const userPreferences = await UserCategoriaPreference.findAll({
+      where: { usuario_id: usuarioId }
+    });
 
-    return sendSuccess(res, categoriasConMetadata);
+    // Create a map for quick lookup
+    const preferencesMap = new Map(
+      userPreferences.map(pref => [pref.categoria_gasto_id, pref.visible])
+    );
+
+    // Add metadata and apply visibility preferences
+    const categoriasConMetadata = categorias.map(cat => {
+      const esSistema = cat.usuario_id === null;
+
+      // For system categories, check user preference; for user categories, use activo field
+      let visible;
+      if (esSistema) {
+        // If user has a preference, use it; otherwise default to true (visible)
+        visible = preferencesMap.has(cat.id) ? preferencesMap.get(cat.id) : true;
+      } else {
+        visible = cat.activo;
+      }
+
+      return {
+        ...cat.toJSON(),
+        es_sistema: esSistema,
+        puede_eliminar: cat.usuario_id === usuarioId,
+        visible // Add visible field for frontend
+      };
+    });
+
+    // Filter by visibility unless includeInactive is true
+    const resultado = includeInactive === 'true'
+      ? categoriasConMetadata
+      : categoriasConMetadata.filter(cat => cat.visible);
+
+    return sendSuccess(res, resultado);
   } catch (error) {
     logger.error('Error al obtener categorías:', { error });
     return sendError(res, 500, 'Error al obtener categorías', error.message);
@@ -256,37 +279,73 @@ export const eliminarCategoria = async (req, res) => {
 export const toggleActivoCategoria = async (req, res) => {
   try {
     const usuarioId = req.user.id;
-    const categoriaId = req.params.id;
+    const categoriaId = parseInt(req.params.id);
 
-    // For now, we only allow toggling user's own categories
-    // System category preferences would need a separate table
+    // First, find the category
     const categoria = await CategoriaGasto.findOne({
       where: {
         id: categoriaId,
-        usuario_id: usuarioId
+        [Op.or]: [
+          { usuario_id: null },
+          { usuario_id: usuarioId }
+        ]
       }
     });
 
     if (!categoria) {
-      const sistemaCategoria = await CategoriaGasto.findOne({
-        where: { id: categoriaId, usuario_id: null }
-      });
-
-      if (sistemaCategoria) {
-        return sendError(res, 403, 'Las preferencias de categorías del sistema no están disponibles aún');
-      }
-
       return sendError(res, 404, 'Categoría no encontrada');
     }
 
-    await categoria.update({ activo: !categoria.activo });
-    logger.info('Categoría activo toggled:', { id: categoriaId, activo: categoria.activo });
+    const esSistema = categoria.usuario_id === null;
 
-    return sendSuccess(res, {
-      ...categoria.toJSON(),
-      es_sistema: false,
-      puede_eliminar: true
-    });
+    if (esSistema) {
+      // For system categories, use the preferences table
+      const existingPref = await UserCategoriaPreference.findOne({
+        where: {
+          usuario_id: usuarioId,
+          categoria_gasto_id: categoriaId
+        }
+      });
+
+      let newVisible;
+      if (existingPref) {
+        // Toggle existing preference
+        newVisible = !existingPref.visible;
+        await existingPref.update({ visible: newVisible });
+      } else {
+        // Create new preference (default is visible=true, so we set to false to hide)
+        newVisible = false;
+        await UserCategoriaPreference.create({
+          usuario_id: usuarioId,
+          categoria_gasto_id: categoriaId,
+          visible: newVisible
+        });
+      }
+
+      logger.info('Preferencia de categoría sistema toggled:', {
+        categoriaId,
+        usuarioId,
+        visible: newVisible
+      });
+
+      return sendSuccess(res, {
+        ...categoria.toJSON(),
+        es_sistema: true,
+        puede_eliminar: false,
+        visible: newVisible
+      });
+    } else {
+      // For user categories, toggle the activo field directly
+      await categoria.update({ activo: !categoria.activo });
+      logger.info('Categoría usuario activo toggled:', { id: categoriaId, activo: categoria.activo });
+
+      return sendSuccess(res, {
+        ...categoria.toJSON(),
+        es_sistema: false,
+        puede_eliminar: true,
+        visible: categoria.activo
+      });
+    }
   } catch (error) {
     logger.error('Error al cambiar estado de categoría:', { error });
     return sendError(res, 500, 'Error al cambiar estado de categoría', error.message);

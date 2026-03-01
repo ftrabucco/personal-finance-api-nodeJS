@@ -1,4 +1,4 @@
-import { FuenteIngreso, IngresoUnico, IngresoRecurrente } from '../../models/index.js';
+import { FuenteIngreso, IngresoUnico, IngresoRecurrente, UserFuenteIngresoPreference } from '../../models/index.js';
 import { sendSuccess, sendError, sendValidationError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 import { Op } from 'sequelize';
@@ -16,34 +16,57 @@ export const obtenerFuentesIngreso = async (req, res) => {
     const usuarioId = req.user.id;
     const { includeInactive } = req.query;
 
-    const whereClause = {
-      [Op.or]: [
-        { usuario_id: null },          // System sources
-        { usuario_id: usuarioId }      // User's own sources
-      ]
-    };
-
-    // By default, only return active sources unless specifically requested
-    if (includeInactive !== 'true') {
-      whereClause.activo = true;
-    }
-
+    // Get all income sources (system + user's own)
     const fuentes = await FuenteIngreso.findAll({
-      where: whereClause,
+      where: {
+        [Op.or]: [
+          { usuario_id: null },          // System sources
+          { usuario_id: usuarioId }      // User's own sources
+        ]
+      },
       order: [
         ['orden', 'ASC'],
         ['nombre', 'ASC']
       ]
     });
 
-    // Add metadata to indicate if source is system or user-owned
-    const fuentesConMetadata = fuentes.map(fuente => ({
-      ...fuente.toJSON(),
-      es_sistema: fuente.usuario_id === null,
-      puede_eliminar: fuente.usuario_id === usuarioId
-    }));
+    // Get user's preferences for system sources
+    const userPreferences = await UserFuenteIngresoPreference.findAll({
+      where: { usuario_id: usuarioId }
+    });
 
-    return sendSuccess(res, fuentesConMetadata);
+    // Create a map for quick lookup
+    const preferencesMap = new Map(
+      userPreferences.map(pref => [pref.fuente_ingreso_id, pref.visible])
+    );
+
+    // Add metadata and apply visibility preferences
+    const fuentesConMetadata = fuentes.map(fuente => {
+      const esSistema = fuente.usuario_id === null;
+
+      // For system sources, check user preference; for user sources, use activo field
+      let visible;
+      if (esSistema) {
+        // If user has a preference, use it; otherwise default to true (visible)
+        visible = preferencesMap.has(fuente.id) ? preferencesMap.get(fuente.id) : true;
+      } else {
+        visible = fuente.activo;
+      }
+
+      return {
+        ...fuente.toJSON(),
+        es_sistema: esSistema,
+        puede_eliminar: fuente.usuario_id === usuarioId,
+        visible // Add visible field for frontend
+      };
+    });
+
+    // Filter by visibility unless includeInactive is true
+    const resultado = includeInactive === 'true'
+      ? fuentesConMetadata
+      : fuentesConMetadata.filter(fuente => fuente.visible);
+
+    return sendSuccess(res, resultado);
   } catch (error) {
     logger.error('Error al obtener fuentes de ingreso:', { error });
     return sendError(res, 500, 'Error al obtener fuentes de ingreso', error.message);
@@ -245,35 +268,73 @@ export const eliminarFuenteIngreso = async (req, res) => {
 export const toggleActivoFuenteIngreso = async (req, res) => {
   try {
     const usuarioId = req.user.id;
-    const fuenteId = req.params.id;
+    const fuenteId = parseInt(req.params.id);
 
+    // First, find the source
     const fuente = await FuenteIngreso.findOne({
       where: {
         id: fuenteId,
-        usuario_id: usuarioId
+        [Op.or]: [
+          { usuario_id: null },
+          { usuario_id: usuarioId }
+        ]
       }
     });
 
     if (!fuente) {
-      const sistemaFuente = await FuenteIngreso.findOne({
-        where: { id: fuenteId, usuario_id: null }
-      });
-
-      if (sistemaFuente) {
-        return sendError(res, 403, 'Las preferencias de fuentes del sistema no están disponibles aún');
-      }
-
       return sendError(res, 404, 'Fuente de ingreso no encontrada');
     }
 
-    await fuente.update({ activo: !fuente.activo });
-    logger.info('Fuente de ingreso activo toggled:', { id: fuenteId, activo: fuente.activo });
+    const esSistema = fuente.usuario_id === null;
 
-    return sendSuccess(res, {
-      ...fuente.toJSON(),
-      es_sistema: false,
-      puede_eliminar: true
-    });
+    if (esSistema) {
+      // For system sources, use the preferences table
+      const existingPref = await UserFuenteIngresoPreference.findOne({
+        where: {
+          usuario_id: usuarioId,
+          fuente_ingreso_id: fuenteId
+        }
+      });
+
+      let newVisible;
+      if (existingPref) {
+        // Toggle existing preference
+        newVisible = !existingPref.visible;
+        await existingPref.update({ visible: newVisible });
+      } else {
+        // Create new preference (default is visible=true, so we set to false to hide)
+        newVisible = false;
+        await UserFuenteIngresoPreference.create({
+          usuario_id: usuarioId,
+          fuente_ingreso_id: fuenteId,
+          visible: newVisible
+        });
+      }
+
+      logger.info('Preferencia de fuente ingreso sistema toggled:', {
+        fuenteId,
+        usuarioId,
+        visible: newVisible
+      });
+
+      return sendSuccess(res, {
+        ...fuente.toJSON(),
+        es_sistema: true,
+        puede_eliminar: false,
+        visible: newVisible
+      });
+    } else {
+      // For user sources, toggle the activo field directly
+      await fuente.update({ activo: !fuente.activo });
+      logger.info('Fuente ingreso usuario activo toggled:', { id: fuenteId, activo: fuente.activo });
+
+      return sendSuccess(res, {
+        ...fuente.toJSON(),
+        es_sistema: false,
+        puede_eliminar: true,
+        visible: fuente.activo
+      });
+    }
   } catch (error) {
     logger.error('Error al cambiar estado de fuente de ingreso:', { error });
     return sendError(res, 500, 'Error al cambiar estado de fuente de ingreso', error.message);

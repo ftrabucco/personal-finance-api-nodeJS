@@ -15,6 +15,8 @@ import { defineTipoCambio } from './TipoCambio.model.js';
 import { defineFuenteIngreso } from './fuenteIngreso.model.js';
 import { defineIngresoUnico } from './ingresoUnico.model.js';
 import { defineIngresoRecurrente } from './ingresoRecurrente.model.js';
+import { defineUserCategoriaPreference } from './UserCategoriaPreference.model.js';
+import { defineUserFuenteIngresoPreference } from './UserFuenteIngresoPreference.model.js';
 
 // Configuración para PostgreSQL
 const isProduction = process.env.NODE_ENV === 'production';
@@ -60,7 +62,9 @@ const models = {
   TipoCambio: defineTipoCambio(sequelize),
   FuenteIngreso: defineFuenteIngreso(sequelize),
   IngresoUnico: defineIngresoUnico(sequelize),
-  IngresoRecurrente: defineIngresoRecurrente(sequelize)
+  IngresoRecurrente: defineIngresoRecurrente(sequelize),
+  UserCategoriaPreference: defineUserCategoriaPreference(sequelize),
+  UserFuenteIngresoPreference: defineUserFuenteIngresoPreference(sequelize)
 };
 
 // Relacionamos los modelos
@@ -82,5 +86,7 @@ export const {
   TipoCambio,
   FuenteIngreso,
   IngresoUnico,
-  IngresoRecurrente
+  IngresoRecurrente,
+  UserCategoriaPreference,
+  UserFuenteIngresoPreference
 } = models;

@@ -13,7 +13,9 @@ export function setupAssociations(models) {
     Usuario,
     FuenteIngreso,
     IngresoUnico,
-    IngresoRecurrente
+    IngresoRecurrente,
+    UserCategoriaPreference,
+    UserFuenteIngresoPreference
   } = models;
 
   // Gasto
@@ -133,5 +135,19 @@ export function setupAssociations(models) {
 
   IngresoRecurrente.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(IngresoRecurrente, { foreignKey: 'usuario_id', as: 'ingresosRecurrentes' });
+
+  // User Category Preferences
+  UserCategoriaPreference.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(UserCategoriaPreference, { foreignKey: 'usuario_id', as: 'categoriaPreferences' });
+
+  UserCategoriaPreference.belongsTo(CategoriaGasto, { foreignKey: 'categoria_gasto_id', as: 'categoria' });
+  CategoriaGasto.hasMany(UserCategoriaPreference, { foreignKey: 'categoria_gasto_id', as: 'userPreferences' });
+
+  // User Fuente Ingreso Preferences
+  UserFuenteIngresoPreference.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(UserFuenteIngresoPreference, { foreignKey: 'usuario_id', as: 'fuenteIngresoPreferences' });
+
+  UserFuenteIngresoPreference.belongsTo(FuenteIngreso, { foreignKey: 'fuente_ingreso_id', as: 'fuenteIngreso' });
+  FuenteIngreso.hasMany(UserFuenteIngresoPreference, { foreignKey: 'fuente_ingreso_id', as: 'userPreferences' });
 
 }
