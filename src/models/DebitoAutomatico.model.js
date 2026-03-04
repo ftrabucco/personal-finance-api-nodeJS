@@ -9,7 +9,18 @@ export function defineDebitoAutomatico(sequelize) {
     },
     descripcion: { type: DataTypes.STRING, allowNull: false },
     monto: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
-    dia_de_pago: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1, max: 31 } }, // Día del mes que se debita
+    dia_de_pago: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // Null when using credit card (uses card's due date instead)
+      validate: { min: 1, max: 31 },
+      comment: 'Día del mes que se debita. Null si usa tarjeta de crédito (usa dia_vencimiento de la tarjeta)'
+    },
+    usa_vencimiento_tarjeta: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Si true, usa dia_vencimiento de la tarjeta de crédito en lugar de dia_de_pago'
+    },
     mes_de_pago: {
       type: DataTypes.INTEGER,
       allowNull: true,

@@ -1,16 +1,37 @@
 import { BaseController } from './base.controller.js';
-import { GastoUnico, Gasto, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../../models/index.js';
-import { GastoUnicoService } from '../../services/gastoUnico.service.js';
-import sequelize from '../../db/postgres.js';
+import { GastoUnico, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta } from '../../models/index.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { Op } from 'sequelize';
-import { ExchangeRateService } from '../../services/exchangeRate.service.js';
+import { getService } from '../../middlewares/container.middleware.js';
 import logger from '../../utils/logger.js';
 
+/**
+ * 🏗️ GastoUnicoController - Uses DI container for services
+ *
+ * The service is resolved from the container per-request,
+ * ensuring proper scoping and testability.
+ */
 export class GastoUnicoController extends BaseController {
   constructor() {
     super(GastoUnico, 'Gasto Único');
-    this.gastoUnicoService = new GastoUnicoService();
+  }
+
+  /**
+   * Get the GastoUnicoService from the request container
+   * @param {Request} req - Express request with container
+   * @returns {GastoUnicoService} Service instance
+   */
+  getGastoUnicoService(req) {
+    return getService(req, 'gastoUnicoService');
+  }
+
+  /**
+   * Get the ExchangeRateService from the request container
+   * @param {Request} req - Express request with container
+   * @returns {ExchangeRateServiceInstance} Service instance
+   */
+  getExchangeRateService(req) {
+    return getService(req, 'exchangeRateService');
   }
 
   getIncludes() {
@@ -31,65 +52,67 @@ export class GastoUnicoController extends BaseController {
     };
   }
 
-  // Método create mejorado: transaccional y sincronizado según business rules
+  /**
+   * Create gasto único - delegates to service (which handles transactions)
+   * 🏗️ Controller only coordinates, service handles business logic + transactions
+   */
   async create(req, res) {
-    const transaction = await sequelize.transaction();
     try {
       // Validar IDs existentes
       const validationErrors = await this.validateExistingIds(req.body, this.getRelationships());
       if (validationErrors.length > 0) {
-        await transaction.rollback();
         return sendValidationError(res, validationErrors);
       }
 
       // Validar campos específicos de GastoUnico
       if (!this.validateGastoUnicoFields(req.body)) {
-        await transaction.rollback();
         return sendError(res, 400, 'Campos inválidos', 'Los campos monto y fecha son requeridos');
       }
 
       // Normalizar fecha (YYYY-MM-DD)
       const fechaParaBD = new Date(req.body.fecha).toISOString().split('T')[0];
 
-      // Crear gasto único y gasto real de forma transaccional usando el servicio
-      // Agregar usuario_id del usuario autenticado
-      const gastoUnico = await this.gastoUnicoService.createForUser({
+      // Get service from DI container
+      const gastoUnicoService = this.getGastoUnicoService(req);
+
+      // Service handles transaction internally
+      const gastoUnico = await gastoUnicoService.createForUser({
         ...req.body,
         fecha: fechaParaBD
-      }, req.user.id, transaction);
+      }, req.user.id);
 
-      await transaction.commit();
       logger.info('Gasto único creado exitosamente:', { gastoUnico_id: gastoUnico.id });
 
       return sendSuccess(res, gastoUnico, 201);
     } catch (error) {
-      await transaction.rollback();
       logger.error('Error al crear gasto único:', { error });
       return sendError(res, 500, 'Error al crear gasto único', error.message);
     }
   }
 
-  // Método update mejorado: actualiza AMBAS tablas según business rules
+  /**
+   * Update gasto único - delegates to service (which handles transactions)
+   * 🏗️ Controller validates, service handles business logic + transactions
+   */
   async update(req, res) {
-    const transaction = await sequelize.transaction();
     try {
+      // Get service from DI container
+      const gastoUnicoService = this.getGastoUnicoService(req);
+
       // Buscar el gasto único que pertenece al usuario autenticado
-      const gastoUnico = await this.gastoUnicoService.findByIdAndUser(req.params.id, req.user.id);
+      const gastoUnico = await gastoUnicoService.findByIdAndUser(req.params.id, req.user.id);
       if (!gastoUnico) {
-        await transaction.rollback();
         return sendError(res, 404, 'Gasto único no encontrado');
       }
 
       // Validar IDs existentes
       const validationErrors = await this.validateExistingIds(req.body, this.getRelationships());
       if (validationErrors.length > 0) {
-        await transaction.rollback();
         return sendValidationError(res, validationErrors);
       }
 
       // Validar campos específicos si se están actualizando
       if (req.body.fecha && !this.validateGastoUnicoFields(req.body)) {
-        await transaction.rollback();
         return sendError(res, 400, 'Campos inválidos', 'La fecha es requerida y debe ser válida');
       }
 
@@ -101,88 +124,54 @@ export class GastoUnicoController extends BaseController {
 
       // Recalculate currency amounts if monto changes
       if (updateData.monto) {
+        const exchangeRateService = this.getExchangeRateService(req);
         const monedaOrigen = updateData.moneda_origen || gastoUnico.moneda_origen || 'ARS';
-        const currencies = await ExchangeRateService.calculateBothCurrencies(updateData.monto, monedaOrigen);
+        const currencies = await exchangeRateService.calculateBothCurrencies(updateData.monto, monedaOrigen);
         updateData.monto_ars = currencies.monto_ars;
         updateData.monto_usd = currencies.monto_usd;
         updateData.tipo_cambio_usado = currencies.tipo_cambio_usado;
       }
 
-      // 1. Actualizar gasto único
-      await gastoUnico.update(updateData, { transaction });
+      // Service handles transaction internally (updates both GastoUnico and associated Gasto)
+      const updatedGastoUnico = await gastoUnicoService.update(gastoUnico.id, updateData);
 
-      // 2. Actualizar gasto asociado (business rule: actualizar AMBAS tablas)
-      const gastoUpdateData = {};
-      if (updateData.fecha) gastoUpdateData.fecha = updateData.fecha;
-      if (updateData.monto_ars) gastoUpdateData.monto_ars = updateData.monto_ars;
-      if (updateData.monto_usd) gastoUpdateData.monto_usd = updateData.monto_usd;
-      if (updateData.descripcion) gastoUpdateData.descripcion = updateData.descripcion;
-      if (updateData.categoria_gasto_id) gastoUpdateData.categoria_gasto_id = updateData.categoria_gasto_id;
-      if (updateData.importancia_gasto_id) gastoUpdateData.importancia_gasto_id = updateData.importancia_gasto_id;
-      if (updateData.tipo_pago_id) gastoUpdateData.tipo_pago_id = updateData.tipo_pago_id;
-      if (updateData.tarjeta_id !== undefined) gastoUpdateData.tarjeta_id = updateData.tarjeta_id;
-
-      if (Object.keys(gastoUpdateData).length > 0) {
-        await Gasto.update(gastoUpdateData, {
-          where: {
-            tipo_origen: 'unico',
-            id_origen: gastoUnico.id
-          },
-          transaction
-        });
-      }
-
-      await transaction.commit();
       logger.info('Gasto único y gasto asociado actualizados exitosamente:', { id: gastoUnico.id });
-
-      // Recargar datos actualizados
-      const updatedGastoUnico = await this.model.findByPk(gastoUnico.id, {
-        include: this.getIncludes()
-      });
 
       return sendSuccess(res, updatedGastoUnico);
     } catch (error) {
-      await transaction.rollback();
       logger.error('Error al actualizar gasto único:', { error });
       return sendError(res, 500, 'Error al actualizar gasto único', error.message);
     }
   }
 
-  // Método delete mejorado: elimina AMBAS tablas según business rules
+  /**
+   * Delete gasto único - delegates to service (which handles transactions)
+   * 🏗️ Controller validates ownership, service handles cascading deletes
+   */
   async delete(req, res) {
-    const transaction = await sequelize.transaction();
     try {
+      // Get service from DI container
+      const gastoUnicoService = this.getGastoUnicoService(req);
+
       // Buscar el gasto único que pertenece al usuario autenticado
-      const gastoUnico = await this.gastoUnicoService.findByIdAndUser(req.params.id, req.user.id);
+      const gastoUnico = await gastoUnicoService.findByIdAndUser(req.params.id, req.user.id);
       if (!gastoUnico) {
-        await transaction.rollback();
         return sendError(res, 404, 'Gasto único no encontrado');
       }
 
-      // 1. Eliminar gasto asociado primero (business rule: eliminar ambas tablas)
-      const deletedGastos = await Gasto.destroy({
-        where: {
-          tipo_origen: 'unico',
-          id_origen: gastoUnico.id
-        },
-        transaction
-      });
+      // Service handles cascading delete with transaction
+      const result = await gastoUnicoService.deleteWithAssociatedGasto(gastoUnico.id);
 
-      // 2. Eliminar gasto único
-      await gastoUnico.destroy({ transaction });
-
-      await transaction.commit();
       logger.info('Gasto único y gasto asociado eliminados exitosamente:', {
         gastoUnico_id: gastoUnico.id,
-        gastos_eliminados: deletedGastos
+        gastos_eliminados: result.gastosEliminados
       });
 
       return sendSuccess(res, {
         message: 'Gasto único eliminado correctamente',
-        gastos_eliminados: deletedGastos
+        gastos_eliminados: result.gastosEliminados
       });
     } catch (error) {
-      await transaction.rollback();
       logger.error('Error al eliminar gasto único:', { error });
       return sendError(res, 500, 'Error al eliminar gasto único', error.message);
     }

@@ -1,4 +1,4 @@
-import { CategoriaGasto, ImportanciaGasto, TipoPago, FrecuenciaGasto } from '../../models/index.js';
+import { CategoriaGasto, ImportanciaGasto, TipoPago, FrecuenciaGasto, FuenteIngreso } from '../../models/index.js';
 import { sendSuccess, sendError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 
@@ -59,21 +59,36 @@ export const obtenerFrecuencias = async (req, res) => {
   }
 };
 
+// GET /api/catalogos/fuentes-ingreso
+export const obtenerFuentesIngreso = async (req, res) => {
+  try {
+    const fuentesIngreso = await FuenteIngreso.findAll({
+      order: [['id', 'ASC']]
+    });
+    return sendSuccess(res, fuentesIngreso);
+  } catch (error) {
+    logger.error('Error al obtener fuentes de ingreso:', { error });
+    return sendError(res, 500, 'Error al obtener fuentes de ingreso', error.message);
+  }
+};
+
 // GET /api/catalogos - Returns all catalogs in a single request
 export const obtenerTodosCatalogos = async (req, res) => {
   try {
-    const [categorias, importancias, tiposPago, frecuencias] = await Promise.all([
+    const [categorias, importancias, tiposPago, frecuencias, fuentesIngreso] = await Promise.all([
       CategoriaGasto.findAll({ order: [['id', 'ASC']] }),
       ImportanciaGasto.findAll({ order: [['id', 'ASC']] }),
       TipoPago.findAll({ order: [['id', 'ASC']] }),
-      FrecuenciaGasto.findAll({ order: [['id', 'ASC']] })
+      FrecuenciaGasto.findAll({ order: [['id', 'ASC']] }),
+      FuenteIngreso.findAll({ order: [['id', 'ASC']] })
     ]);
 
     return sendSuccess(res, {
       categorias,
       importancias,
       tiposPago,
-      frecuencias
+      frecuencias,
+      fuentesIngreso
     });
   } catch (error) {
     logger.error('Error al obtener catálogos:', { error });

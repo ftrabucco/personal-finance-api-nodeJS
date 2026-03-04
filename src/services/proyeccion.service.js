@@ -259,17 +259,28 @@ export class ProyeccionService {
     }
 
     // Calculate which cuota number this would be
-    // First cuota is in the purchase month or next depending on credit card dates
+    // First cuota is based on credit card billing cycle or purchase date
     let cuotaNumber;
-    if (compra.tarjeta?.tipo === 'credito' && compra.tarjeta?.dia_mes_cierre) {
-      // For credit cards, if purchased after closing date, first cuota is next month
+    if (compra.tarjeta?.tipo === 'credito' && compra.tarjeta?.dia_mes_cierre && compra.tarjeta?.dia_mes_vencimiento) {
+      // For credit cards, calculate based on billing cycle:
+      // - Purchase before/on closing date: pays in the FOLLOWING month (vencimiento is next month)
+      // - Purchase after closing date: pays TWO months later
       const diaCompra = fechaCompra.date();
       const diaCierre = compra.tarjeta.dia_mes_cierre;
-      const firstCuotaMonth = diaCompra > diaCierre ?
-        fechaCompra.clone().add(1, 'month') :
-        fechaCompra.clone();
 
-      cuotaNumber = targetMonth.diff(firstCuotaMonth, 'months') + 1;
+      // The payment (vencimiento) is always in the month AFTER the closing
+      // So if purchase is before closing, it enters current cycle → pays next month
+      // If purchase is after closing, it enters next cycle → pays month after next
+      let firstPaymentMonth;
+      if (diaCompra <= diaCierre) {
+        // Compra antes o en el cierre: paga el mes siguiente
+        firstPaymentMonth = fechaCompra.clone().add(1, 'month');
+      } else {
+        // Compra después del cierre: paga 2 meses después
+        firstPaymentMonth = fechaCompra.clone().add(2, 'months');
+      }
+
+      cuotaNumber = targetMonth.diff(firstPaymentMonth, 'months') + 1;
     } else {
       cuotaNumber = monthsSincePurchase + 1;
     }

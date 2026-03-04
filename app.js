@@ -18,6 +18,7 @@ import ExpenseScheduler from './src/schedulers/expenseScheduler.js';
 import ExchangeRateScheduler from './src/schedulers/exchangeRateScheduler.js';
 import { initializeExchangeRate } from './src/bootstrap/exchangeRate.bootstrap.js';
 import { runMigrations } from './src/db/migrate.js';
+import { containerMiddleware } from './src/middlewares/container.middleware.js';
 
 // Middlewares de seguridad (antes que todo)
 app.use(security.cors);
@@ -69,7 +70,8 @@ const swaggerDocument = YAML.load('./docs/api/swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // API Routes (JSON endpoints)
-app.use('/api', apiRouter);
+// 🏗️ Container middleware creates a DI scope per request
+app.use('/api', containerMiddleware, apiRouter);
 
 // View Routes (HTML pages)
 app.use('/', viewRouter);

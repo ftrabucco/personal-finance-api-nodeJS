@@ -4,8 +4,9 @@ import { GastoGeneratorService } from '../../services/gastoGenerator.service.js'
 import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
-import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
+import { cleanEntityFormData } from '../../utils/formDataHelper.js';
+import { FilterBuilder, buildQueryOptions, buildPagination } from '../../utils/filterBuilder.js';
 
 export class CompraController extends BaseController {
   constructor() {
@@ -157,8 +158,8 @@ export class CompraController extends BaseController {
         }
       }
 
-      // Limpiar datos del formulario (similar a otros controllers)
-      const cleanData = this.cleanFormData(req.body);
+      // Limpiar datos del formulario usando helper centralizado
+      const cleanData = cleanEntityFormData(req.body, 'compra');
 
       // ✅ BUSINESS RULE: Solo actualizar Compra, NO los gastos ya generados
       await compra.update(cleanData, { transaction });
@@ -207,30 +208,6 @@ export class CompraController extends BaseController {
       logger.error('Error al eliminar compra:', { error });
       return sendError(res, 500, 'Error al eliminar compra', error.message);
     }
-  }
-
-  // Helper para limpiar datos del formulario
-  cleanFormData(body) {
-    const cleaned = { ...body };
-
-    // Convertir strings vacíos a null para campos opcionales
-    if (cleaned.tarjeta_id === '' || cleaned.tarjeta_id === undefined) {
-      cleaned.tarjeta_id = null;
-    }
-
-    // Asegurar tipos numéricos correctos
-    if (cleaned.monto_total) cleaned.monto_total = parseFloat(cleaned.monto_total);
-    if (cleaned.cantidad_cuotas) cleaned.cantidad_cuotas = parseInt(cleaned.cantidad_cuotas);
-    if (cleaned.categoria_gasto_id) cleaned.categoria_gasto_id = parseInt(cleaned.categoria_gasto_id);
-    if (cleaned.importancia_gasto_id) cleaned.importancia_gasto_id = parseInt(cleaned.importancia_gasto_id);
-    if (cleaned.tipo_pago_id) cleaned.tipo_pago_id = parseInt(cleaned.tipo_pago_id);
-    if (cleaned.tarjeta_id) cleaned.tarjeta_id = parseInt(cleaned.tarjeta_id);
-
-    // Manejar checkbox de pendiente_cuotas
-    if (cleaned.pendiente_cuotas === 'on') cleaned.pendiente_cuotas = true;
-    if (cleaned.pendiente_cuotas === '' || cleaned.pendiente_cuotas === undefined || cleaned.pendiente_cuotas === 'off') cleaned.pendiente_cuotas = false;
-
-    return cleaned;
   }
 
   // Validaciones específicas de Compra mejoradas
@@ -288,77 +265,30 @@ export class CompraController extends BaseController {
   async getWithFilters(req, res) {
     try {
       const {
-        categoria_gasto_id,
-        importancia_gasto_id,
-        tipo_pago_id,
-        tarjeta_id,
-        fecha_desde,
-        fecha_hasta,
-        monto_min,
-        monto_max,
-        pendiente_cuotas,
-        cuotas_min,
-        cuotas_max,
-        limit,
-        offset = 0,
-        orderBy = 'fecha_compra',
-        orderDirection = 'DESC'
+        categoria_gasto_id, importancia_gasto_id, tipo_pago_id, tarjeta_id,
+        fecha_desde, fecha_hasta, monto_min, monto_max,
+        pendiente_cuotas, cuotas_min, cuotas_max,
+        limit, offset = 0, orderBy = 'fecha_compra', orderDirection = 'DESC'
       } = req.query;
 
-      // SIEMPRE filtrar por usuario autenticado
-      const where = {
-        usuario_id: req.user.id
-      };
+      // Construir filtros usando FilterBuilder
+      const where = new FilterBuilder(req.user.id)
+        .addOptionalIds({ categoria_gasto_id, importancia_gasto_id, tipo_pago_id, tarjeta_id })
+        .addBoolean('pendiente_cuotas', pendiente_cuotas)
+        .addDateRange('fecha_compra', fecha_desde, fecha_hasta)
+        .addNumberRange('monto_total', monto_min, monto_max)
+        .addNumberRange('cantidad_cuotas', cuotas_min, cuotas_max)
+        .build();
 
-      // Filtros por IDs
-      if (categoria_gasto_id) where.categoria_gasto_id = categoria_gasto_id;
-      if (importancia_gasto_id) where.importancia_gasto_id = importancia_gasto_id;
-      if (tipo_pago_id) where.tipo_pago_id = tipo_pago_id;
-      if (tarjeta_id) where.tarjeta_id = tarjeta_id;
-
-      // Filtro por estado pendiente de cuotas
-      if (pendiente_cuotas !== undefined) where.pendiente_cuotas = pendiente_cuotas === 'true';
-
-      // Filtro por rango de fechas de compra
-      if (fecha_desde || fecha_hasta) {
-        where.fecha_compra = {};
-        if (fecha_desde) where.fecha_compra[Op.gte] = fecha_desde;
-        if (fecha_hasta) where.fecha_compra[Op.lte] = fecha_hasta;
-      }
-
-      // Filtro por rango de montos
-      if (monto_min || monto_max) {
-        where.monto_total = {};
-        if (monto_min) where.monto_total[Op.gte] = Number(monto_min);
-        if (monto_max) where.monto_total[Op.lte] = Number(monto_max);
-      }
-
-      // Filtro por rango de cuotas
-      if (cuotas_min || cuotas_max) {
-        where.cantidad_cuotas = {};
-        if (cuotas_min) where.cantidad_cuotas[Op.gte] = Number(cuotas_min);
-        if (cuotas_max) where.cantidad_cuotas[Op.lte] = Number(cuotas_max);
-      }
-
-      const queryOptions = {
+      const queryOptions = buildQueryOptions({
         where,
-        include: this.getIncludes(),
-        order: [[orderBy, orderDirection]]
-      };
+        includes: this.getIncludes(),
+        orderBy, orderDirection, limit, offset
+      });
 
       if (limit) {
-        queryOptions.limit = parseInt(limit);
-        queryOptions.offset = parseInt(offset);
-
         const compras = await this.model.findAndCountAll(queryOptions);
-        const pagination = {
-          total: compras.count,
-          limit: parseInt(limit),
-          offset: parseInt(offset),
-          hasNext: parseInt(offset) + parseInt(limit) < compras.count,
-          hasPrev: parseInt(offset) > 0
-        };
-
+        const pagination = buildPagination(compras.count, limit, offset);
         return sendPaginatedSuccess(res, compras.rows, pagination);
       } else {
         const compras = await this.model.findAll(queryOptions);

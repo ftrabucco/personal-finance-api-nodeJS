@@ -392,6 +392,93 @@ export class GastoRecurrenteController extends BaseController {
       return sendError(res, 500, 'Error al obtener gastos recurrentes', error.message);
     }
   }
+
+  // Método para procesar un gasto recurrente individual para el mes actual
+  // Útil cuando se crea un gasto recurrente después del día de pago del mes
+  async procesarMesActual(req, res) {
+    const transaction = await sequelize.transaction();
+    try {
+      const gastoRecurrente = await this.model.findOne({
+        where: {
+          id: req.params.id,
+          usuario_id: req.user.id
+        },
+        include: this.getIncludes()
+      });
+
+      if (!gastoRecurrente) {
+        await transaction.rollback();
+        return sendError(res, 404, 'Gasto recurrente no encontrado');
+      }
+
+      if (!gastoRecurrente.activo) {
+        await transaction.rollback();
+        return sendError(res, 400, 'El gasto recurrente está inactivo');
+      }
+
+      // Verificar si ya se generó este mes
+      const today = new Date();
+      const primerDiaMes = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      if (gastoRecurrente.ultima_fecha_generado) {
+        const ultimaFecha = new Date(gastoRecurrente.ultima_fecha_generado);
+        if (ultimaFecha >= primerDiaMes) {
+          await transaction.rollback();
+          return sendSuccess(res, {
+            summary: {
+              total_generated: 0,
+              total_errors: 0,
+              type: 'gasto_recurrente_individual'
+            },
+            details: {
+              success: [],
+              errors: []
+            },
+            message: 'El gasto ya fue procesado para este mes'
+          });
+        }
+      }
+
+      // Generar el gasto para el mes actual
+      const gasto = await GastoGeneratorService.generateFromGastoRecurrente(gastoRecurrente);
+
+      await transaction.commit();
+
+      logger.info('Gasto recurrente procesado manualmente para mes actual:', {
+        gastoRecurrente_id: gastoRecurrente.id,
+        gasto_id: gasto?.id,
+        descripcion: gastoRecurrente.descripcion
+      });
+
+      return sendSuccess(res, {
+        summary: {
+          total_generated: gasto ? 1 : 0,
+          total_errors: 0,
+          type: 'gasto_recurrente_individual',
+          breakdown: {
+            gastos_recurrentes: {
+              generated: gasto ? 1 : 0,
+              errors: 0
+            }
+          }
+        },
+        details: {
+          success: gasto ? [{
+            type: 'gasto_recurrente',
+            id: gastoRecurrente.id,
+            descripcion: gastoRecurrente.descripcion,
+            gasto_id: gasto.id,
+            timestamp: new Date().toISOString()
+          }] : [],
+          errors: []
+        }
+      });
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Error al procesar gasto recurrente para mes actual:', { error });
+      return sendError(res, 500, 'Error al procesar gasto recurrente', error.message);
+    }
+  }
 }
 
 // Crear instancia del controlador
@@ -403,3 +490,4 @@ export const obtenerGastosRecurrentesConFiltros = gastoRecurrenteController.getW
 export const crearGastoRecurrente = gastoRecurrenteController.create.bind(gastoRecurrenteController);
 export const actualizarGastoRecurrente = gastoRecurrenteController.update.bind(gastoRecurrenteController);
 export const eliminarGastoRecurrente = gastoRecurrenteController.delete.bind(gastoRecurrenteController);
+export const procesarGastoRecurrenteMesActual = gastoRecurrenteController.procesarMesActual.bind(gastoRecurrenteController);

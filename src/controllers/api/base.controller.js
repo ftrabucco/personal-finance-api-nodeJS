@@ -58,7 +58,7 @@ export class BaseController {
       // Validar IDs existentes
       const validationErrors = await this.validateExistingIds(req.body, this.getRelationships());
       if (validationErrors.length > 0) {
-        return res.status(400).json({ errors: validationErrors });
+        return sendValidationError(res, validationErrors);
       }
 
       const item = await this.model.create(req.body);
@@ -100,9 +100,7 @@ export class BaseController {
     try {
       const item = await this.model.findByPk(req.params.id);
       if (!item) {
-        return res.status(404).json({
-          error: `${this.modelName} no encontrado`
-        });
+        return sendError(res, 404, `${this.modelName} no encontrado`);
       }
 
       await item.destroy();

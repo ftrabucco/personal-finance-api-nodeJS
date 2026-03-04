@@ -496,8 +496,14 @@ components:
           type: integer
           minimum: 1
           maximum: 31
-          description: Día del mes para el débito
+          nullable: true
+          description: Día del mes para el débito. Null si usa_vencimiento_tarjeta es true.
           example: 5
+        usa_vencimiento_tarjeta:
+          type: boolean
+          default: false
+          description: Si es true, usa el día de vencimiento de la tarjeta de crédito en lugar de dia_de_pago
+          example: false
         activo:
           type: boolean
           description: Si el débito está activo
@@ -2928,7 +2934,6 @@ paths:
               required:
                 - descripcion
                 - monto
-                - dia_de_pago
                 - categoria_gasto_id
                 - importancia_gasto_id
                 - tipo_pago_id
@@ -2947,7 +2952,14 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 31
+                  nullable: true
+                  description: Día del mes para el débito. Null si usa_vencimiento_tarjeta es true.
                   example: 5
+                usa_vencimiento_tarjeta:
+                  type: boolean
+                  default: false
+                  description: Si es true, usa el día de vencimiento de la tarjeta de crédito en lugar de dia_de_pago
+                  example: false
                 categoria_gasto_id:
                   type: integer
                   minimum: 1
@@ -3022,6 +3034,11 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 31
+                  nullable: true
+                  description: Día del mes para el débito. Null si usa_vencimiento_tarjeta es true.
+                usa_vencimiento_tarjeta:
+                  type: boolean
+                  description: Si es true, usa el día de vencimiento de la tarjeta de crédito en lugar de dia_de_pago
                 activo:
                   type: boolean
                   description: Activar/desactivar el débito automático

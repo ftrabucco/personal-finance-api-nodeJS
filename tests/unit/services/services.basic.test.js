@@ -3,6 +3,8 @@ import { jest } from '@jest/globals';
 /**
  * Basic unit tests for all migrated services
  * Tests that services can be instantiated and have correct methods
+ *
+ * Note: GastoUnicoService now uses DI and requires mock dependencies
  */
 
 // Mock dependencies
@@ -17,6 +19,44 @@ const mockLogger = {
   warn: jest.fn()
 };
 
+// Mock models for DI-enabled services
+const mockModels = {
+  GastoRecurrente: { name: 'GastoRecurrente' },
+  DebitoAutomatico: { name: 'DebitoAutomatico' },
+  GastoUnico: { name: 'GastoUnico', findByPk: jest.fn(), update: jest.fn() },
+  Compra: { name: 'Compra' },
+  Gasto: { create: jest.fn(), findOne: jest.fn(), update: jest.fn(), destroy: jest.fn() },
+  CategoriaGasto: {},
+  ImportanciaGasto: {},
+  TipoPago: {},
+  Tarjeta: {},
+  FrecuenciaGasto: {},
+  TipoCambio: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn() }
+};
+
+// Mock transaction manager for DI services
+const mockTransactionManager = {
+  withTransaction: jest.fn(async (callback) => {
+    const mockTransaction = { commit: jest.fn(), rollback: jest.fn() };
+    return callback(mockTransaction);
+  }),
+  withRetry: jest.fn(async (callback) => callback())
+};
+
+// Mock immediate strategy
+const mockImmediateStrategy = {
+  generate: jest.fn()
+};
+
+// Mock exchange rate service
+const mockExchangeRateService = {
+  calculateBothCurrencies: jest.fn().mockResolvedValue({
+    monto_ars: 1000,
+    monto_usd: 1,
+    tipo_cambio_usado: 1000
+  })
+};
+
 // Mock core dependencies
 jest.unstable_mockModule('../../../src/db/postgres.js', () => ({
   default: mockSequelize
@@ -26,19 +66,7 @@ jest.unstable_mockModule('../../../src/utils/logger.js', () => ({
   default: mockLogger
 }));
 
-jest.unstable_mockModule('../../../src/models/index.js', () => ({
-  GastoRecurrente: { name: 'GastoRecurrente' },
-  DebitoAutomatico: { name: 'DebitoAutomatico' },
-  GastoUnico: { name: 'GastoUnico' },
-  Compra: { name: 'Compra' },
-  Gasto: { create: jest.fn(), findOne: jest.fn(), update: jest.fn() },
-  CategoriaGasto: {},
-  ImportanciaGasto: {},
-  TipoPago: {},
-  Tarjeta: {},
-  FrecuenciaGasto: {},
-  TipoCambio: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn() }
-}));
+jest.unstable_mockModule('../../../src/models/index.js', () => mockModels);
 
 // Import services after mocking
 const { GastoRecurrenteService } = await import('../../../src/services/gastoRecurrente.service.js');
@@ -46,6 +74,19 @@ const { DebitoAutomaticoService } = await import('../../../src/services/debitoAu
 const { GastoUnicoService } = await import('../../../src/services/gastoUnico.service.js');
 const { ComprasService } = await import('../../../src/services/compras.service.js');
 const { BaseService } = await import('../../../src/services/base.service.js');
+
+/**
+ * Creates mock dependencies for GastoUnicoService (DI-enabled)
+ */
+function createGastoUnicoServiceDeps() {
+  return {
+    models: mockModels,
+    transactionManager: mockTransactionManager,
+    immediateStrategy: mockImmediateStrategy,
+    exchangeRateService: mockExchangeRateService,
+    logger: mockLogger
+  };
+}
 
 describe('Services Basic Tests', () => {
   beforeEach(() => {
@@ -113,15 +154,18 @@ describe('Services Basic Tests', () => {
   });
 
   describe('GastoUnicoService', () => {
-    test('should be instantiable and extend BaseService', () => {
-      const service = new GastoUnicoService();
+    // GastoUnicoService now uses DI - requires mock dependencies
+    test('should be instantiable with DI dependencies and extend BaseService', () => {
+      const deps = createGastoUnicoServiceDeps();
+      const service = new GastoUnicoService(deps);
 
       expect(service).toBeInstanceOf(BaseService);
       expect(service.modelName).toBe('GastoUnico');
     });
 
     test('should have immediate strategy integration', () => {
-      const service = new GastoUnicoService();
+      const deps = createGastoUnicoServiceDeps();
+      const service = new GastoUnicoService(deps);
 
       expect(service.immediateStrategy).toBeDefined();
       expect(typeof service.createWithGastoReal).toBe('function');
@@ -130,11 +174,23 @@ describe('Services Basic Tests', () => {
     });
 
     test('should have business methods', () => {
-      const service = new GastoUnicoService();
+      const deps = createGastoUnicoServiceDeps();
+      const service = new GastoUnicoService(deps);
 
       expect(typeof service.findUnprocessed).toBe('function');
       expect(typeof service.findProcessed).toBe('function');
       expect(typeof service.updateAssociatedGasto).toBe('function');
+    });
+
+    test('should have DI dependencies properly injected', () => {
+      const deps = createGastoUnicoServiceDeps();
+      const service = new GastoUnicoService(deps);
+
+      expect(service.models).toBe(mockModels);
+      expect(service.transactionManager).toBe(mockTransactionManager);
+      expect(service.immediateStrategy).toBe(mockImmediateStrategy);
+      expect(service.exchangeRateService).toBe(mockExchangeRateService);
+      expect(service.logger).toBe(mockLogger);
     });
   });
 

@@ -24,7 +24,8 @@ import {
   obtenerGastosRecurrentesConFiltros,
   crearGastoRecurrente,
   actualizarGastoRecurrente,
-  eliminarGastoRecurrente
+  eliminarGastoRecurrente,
+  procesarGastoRecurrenteMesActual
 } from '../../controllers/api/gastoRecurrente.controller.js';
 
 import {
@@ -32,7 +33,8 @@ import {
   obtenerDebitosAutomaticosConFiltros,
   crearDebitoAutomatico,
   actualizarDebitoAutomatico,
-  eliminarDebitoAutomatico
+  eliminarDebitoAutomatico,
+  procesarDebitoAutomaticoMesActual
 } from '../../controllers/api/debitoAutomatico.controller.js';
 
 import {
@@ -42,6 +44,23 @@ import {
   actualizarGastoUnico,
   eliminarGastoUnico
 } from '../../controllers/api/gastoUnico.controller.js';
+
+import {
+  obtenerIngresoUnicoPorId,
+  obtenerIngresosUnicosConFiltros,
+  crearIngresoUnico,
+  actualizarIngresoUnico,
+  eliminarIngresoUnico
+} from '../../controllers/api/ingresoUnico.controller.js';
+
+import {
+  obtenerIngresoRecurrentePorId,
+  obtenerIngresosRecurrentesConFiltros,
+  crearIngresoRecurrente,
+  actualizarIngresoRecurrente,
+  eliminarIngresoRecurrente,
+  toggleActivoIngresoRecurrente
+} from '../../controllers/api/ingresoRecurrente.controller.js';
 
 import {
   obtenerTarjetas,
@@ -66,6 +85,7 @@ import {
   obtenerImportancias,
   obtenerTiposPago,
   obtenerFrecuencias,
+  obtenerFuentesIngreso,
   obtenerTodosCatalogos
 } from '../../controllers/api/catalogo.controller.js';
 
@@ -90,7 +110,13 @@ import {
   validateUpdateTarjeta,
   validateTarjetaFilters,
   validateProyeccionFilters,
-  validateSaludFinancieraFilters
+  validateSaludFinancieraFilters,
+  validateCreateIngresoUnico,
+  validateUpdateIngresoUnico,
+  validateIngresoUnicoFilters,
+  validateCreateIngresoRecurrente,
+  validateUpdateIngresoRecurrente,
+  validateIngresoRecurrenteFilters
 } from '../../middlewares/validation.middleware.js';
 
 import { obtenerProyeccion } from '../../controllers/api/proyeccion.controller.js';
@@ -124,6 +150,7 @@ router.delete('/compras/:id', authenticateToken, validateIdParam, eliminarCompra
 router.get('/gastos-recurrentes', authenticateToken, validateGastoRecurrenteFilters, obtenerGastosRecurrentesConFiltros); // Con filtros opcionales y paginación inteligente
 router.get('/gastos-recurrentes/:id', authenticateToken, validateIdParam, obtenerGastoRecurrentePorId);
 router.post('/gastos-recurrentes', authenticateToken, validateCreateGastoRecurrente, crearGastoRecurrente);
+router.post('/gastos-recurrentes/:id/procesar', authenticateToken, validateIdParam, procesarGastoRecurrenteMesActual); // Procesar para mes actual
 router.put('/gastos-recurrentes/:id', authenticateToken, validateIdParam, validateUpdateGastoRecurrente, actualizarGastoRecurrente);
 router.delete('/gastos-recurrentes/:id', authenticateToken, validateIdParam, eliminarGastoRecurrente);
 
@@ -131,6 +158,7 @@ router.delete('/gastos-recurrentes/:id', authenticateToken, validateIdParam, eli
 router.get('/debitos-automaticos', authenticateToken, validateDebitoAutomaticoFilters, obtenerDebitosAutomaticosConFiltros); // Con filtros opcionales y paginación inteligente
 router.get('/debitos-automaticos/:id', authenticateToken, validateIdParam, obtenerDebitoAutomaticoPorId);
 router.post('/debitos-automaticos', authenticateToken, validateCreateDebitoAutomatico, crearDebitoAutomatico);
+router.post('/debitos-automaticos/:id/procesar', authenticateToken, validateIdParam, procesarDebitoAutomaticoMesActual); // Procesar para mes actual
 router.put('/debitos-automaticos/:id', authenticateToken, validateIdParam, validateUpdateDebitoAutomatico, actualizarDebitoAutomatico);
 router.delete('/debitos-automaticos/:id', authenticateToken, validateIdParam, eliminarDebitoAutomatico);
 
@@ -140,6 +168,21 @@ router.get('/gastos-unicos/:id', authenticateToken, validateIdParam, obtenerGast
 router.post('/gastos-unicos', authenticateToken, validateCreateGastoUnico, crearGastoUnico);
 router.put('/gastos-unicos/:id', authenticateToken, validateIdParam, validateUpdateGastoUnico, actualizarGastoUnico);
 router.delete('/gastos-unicos/:id', authenticateToken, validateIdParam, eliminarGastoUnico);
+
+// 💰 Rutas para Ingresos Únicos - Requieren autenticación
+router.get('/ingresos-unicos', authenticateToken, validateIngresoUnicoFilters, obtenerIngresosUnicosConFiltros);
+router.get('/ingresos-unicos/:id', authenticateToken, validateIdParam, obtenerIngresoUnicoPorId);
+router.post('/ingresos-unicos', authenticateToken, validateCreateIngresoUnico, crearIngresoUnico);
+router.put('/ingresos-unicos/:id', authenticateToken, validateIdParam, validateUpdateIngresoUnico, actualizarIngresoUnico);
+router.delete('/ingresos-unicos/:id', authenticateToken, validateIdParam, eliminarIngresoUnico);
+
+// 💰 Rutas para Ingresos Recurrentes - Requieren autenticación
+router.get('/ingresos-recurrentes', authenticateToken, validateIngresoRecurrenteFilters, obtenerIngresosRecurrentesConFiltros);
+router.get('/ingresos-recurrentes/:id', authenticateToken, validateIdParam, obtenerIngresoRecurrentePorId);
+router.post('/ingresos-recurrentes', authenticateToken, validateCreateIngresoRecurrente, crearIngresoRecurrente);
+router.put('/ingresos-recurrentes/:id', authenticateToken, validateIdParam, validateUpdateIngresoRecurrente, actualizarIngresoRecurrente);
+router.patch('/ingresos-recurrentes/:id/toggle-activo', authenticateToken, validateIdParam, toggleActivoIngresoRecurrente);
+router.delete('/ingresos-recurrentes/:id', authenticateToken, validateIdParam, eliminarIngresoRecurrente);
 
 // 🔐 Rutas para Tarjetas - Requieren autenticación
 router.get('/tarjetas', authenticateToken, validateTarjetaFilters, obtenerTarjetas); // Con filtros opcionales y paginación
@@ -163,6 +206,7 @@ router.get('/catalogos/categorias', authenticateToken, obtenerCategorias);
 router.get('/catalogos/importancias', authenticateToken, obtenerImportancias);
 router.get('/catalogos/tipos-pago', authenticateToken, obtenerTiposPago);
 router.get('/catalogos/frecuencias', authenticateToken, obtenerFrecuencias);
+router.get('/catalogos/fuentes-ingreso', authenticateToken, obtenerFuentesIngreso);
 
 // 📊 Rutas para Proyección de Gastos - Requieren autenticación
 router.get('/proyeccion', authenticateToken, validateProyeccionFilters, obtenerProyeccion);

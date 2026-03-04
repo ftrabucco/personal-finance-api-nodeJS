@@ -12,6 +12,9 @@ import { defineGastoUnico } from './GastoUnico.model.js';
 import { defineTarjeta } from './Tarjeta.model.js';
 import { defineUsuario } from './Usuario.model.js';
 import { defineTipoCambio } from './TipoCambio.model.js';
+import { defineFuenteIngreso } from './fuenteIngreso.model.js';
+import { defineIngresoUnico } from './ingresoUnico.model.js';
+import { defineIngresoRecurrente } from './ingresoRecurrente.model.js';
 
 // Configuración para PostgreSQL
 const isProduction = process.env.NODE_ENV === 'production';
@@ -54,7 +57,10 @@ const models = {
   GastoUnico: defineGastoUnico(sequelize),
   Tarjeta: defineTarjeta(sequelize),
   Usuario: defineUsuario(sequelize),
-  TipoCambio: defineTipoCambio(sequelize)
+  TipoCambio: defineTipoCambio(sequelize),
+  FuenteIngreso: defineFuenteIngreso(sequelize),
+  IngresoUnico: defineIngresoUnico(sequelize),
+  IngresoRecurrente: defineIngresoRecurrente(sequelize)
 };
 
 // Relacionamos los modelos
@@ -73,5 +79,8 @@ export const {
   GastoUnico,
   Tarjeta,
   Usuario,
-  TipoCambio
+  TipoCambio,
+  FuenteIngreso,
+  IngresoUnico,
+  IngresoRecurrente
 } = models;
