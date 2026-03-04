@@ -19,7 +19,8 @@ class TestRecurringStrategy extends BaseRecurringStrategy {
   constructor() {
     super();
     this.Gasto = {
-      create: jest.fn().mockResolvedValue({ id: 100, monto_ars: 1000 })
+      create: jest.fn().mockResolvedValue({ id: 100, monto_ars: 1000 }),
+      findOne: jest.fn().mockResolvedValue(null) // No existing expense by default
     };
   }
 

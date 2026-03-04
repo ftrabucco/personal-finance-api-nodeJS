@@ -38,6 +38,8 @@ jest.unstable_mockModule('../../src/models/index.js', () => ({
   IngresoUnico: {},
   IngresoRecurrente: {},
   TipoCambio: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn() },
+  UserCategoriaPreference: {},
+  UserFuenteIngresoPreference: {},
   sequelize: {
     authenticate: jest.fn().mockResolvedValue(true),
     sync: jest.fn().mockResolvedValue(true)

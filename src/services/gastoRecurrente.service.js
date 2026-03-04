@@ -489,13 +489,16 @@ export class GastoRecurrenteService extends BaseService {
     }
 
     // Regular tolerance for missed dates (3 days)
-    const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
-    if (tolerance.withinTolerance) {
-      return {
-        matches: true,
-        reason: `Monthly frequency - tolerance applied for day ${targetDay} (adjusted to ${adjustedDay})`,
-        adjustedDate: today.format('YYYY-MM-DD')
-      };
+    // Only apply tolerance if already generated before (not for first-time generation)
+    if (expense.ultima_fecha_generado) {
+      const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
+      if (tolerance.withinTolerance) {
+        return {
+          matches: true,
+          reason: `Monthly frequency - tolerance applied for day ${targetDay} (adjusted to ${adjustedDay})`,
+          adjustedDate: adjustedDate.format('YYYY-MM-DD') // Use target date, not today
+        };
+      }
     }
 
     return {

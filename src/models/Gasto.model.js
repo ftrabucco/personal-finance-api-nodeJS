@@ -10,7 +10,13 @@ export function defineGasto(sequelize) {
       validate: {
         isDate: true,
         notFuture(value) {
-          if (new Date(value) > new Date()) {
+          // Compare dates only (ignore time) to avoid timezone issues
+          // Both dates are set to start of day in local timezone for fair comparison
+          const inputDate = new Date(value + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          inputDate.setHours(0, 0, 0, 0);
+          if (inputDate > today) {
             throw new Error('La fecha no puede ser futura');
           }
         }
