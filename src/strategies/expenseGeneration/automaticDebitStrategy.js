@@ -1,6 +1,7 @@
 import { BaseRecurringStrategy } from './baseRecurringStrategy.js';
 import { Gasto } from '../../models/index.js';
 import moment from 'moment-timezone';
+import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
 
 /**
@@ -30,6 +31,33 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
     try {
       const today = moment().tz('America/Argentina/Buenos_Aires');
       const fechaParaBD = today.format('YYYY-MM-DD');
+
+      // Check for existing expense in the same month to prevent duplicates
+      const startOfMonth = today.clone().startOf('month').format('YYYY-MM-DD');
+      const endOfMonth = today.clone().endOf('month').format('YYYY-MM-DD');
+
+      const existingExpense = await Gasto.findOne({
+        where: {
+          tipo_origen: 'debito_automatico',
+          id_origen: debitoAutomatico.id,
+          fecha: {
+            [Op.between]: [startOfMonth, endOfMonth]
+          }
+        },
+        transaction
+      });
+
+      if (existingExpense) {
+        logger.warn('Automatic debit expense already exists for this month - skipping duplicate', {
+          debitoAutomatico_id: debitoAutomatico.id,
+          existing_gasto_id: existingExpense.id,
+          existing_fecha: existingExpense.fecha,
+          target_date: fechaParaBD
+        });
+        // Update ultima_fecha_generado to prevent future attempts
+        await this.updateSourceLastGenerated(debitoAutomatico, fechaParaBD, transaction);
+        return null;
+      }
 
       // 💱 Use pre-calculated multi-currency amounts (updated daily by ExchangeRateScheduler)
       const gastoData = this.createGastoData(debitoAutomatico, {

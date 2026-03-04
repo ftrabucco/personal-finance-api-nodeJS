@@ -1,5 +1,6 @@
 import { BaseExpenseGenerationStrategy } from './baseStrategy.js';
 import moment from 'moment-timezone';
+import { Op } from 'sequelize';
 import logger from '../../utils/logger.js';
 
 /**
@@ -165,10 +166,44 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
   async generateRecurringExpenseWithDate(source, additionalData, targetDate, transaction) {
     // Only validate source structure, skip shouldGenerate check
     if (!this.validateSource(source)) {
+      logger.warn(`${this.getType()} validation failed - missing required fields`, {
+        source_id: source.id,
+        has_categoria: !!source.categoria_gasto_id,
+        has_importancia: !!source.importancia_gasto_id,
+        has_tipo_pago: !!source.tipo_pago_id,
+        has_usuario: !!source.usuario_id
+      });
       return null;
     }
 
     try {
+      // Check for existing expense in the same month to prevent duplicates
+      const startOfMonth = moment(targetDate).startOf('month').format('YYYY-MM-DD');
+      const endOfMonth = moment(targetDate).endOf('month').format('YYYY-MM-DD');
+
+      const existingExpense = await this.Gasto.findOne({
+        where: {
+          tipo_origen: this.getType(),
+          id_origen: source.id,
+          fecha: {
+            [Op.between]: [startOfMonth, endOfMonth]
+          }
+        },
+        transaction
+      });
+
+      if (existingExpense) {
+        logger.warn(`${this.getType()} expense already exists for this month - skipping duplicate`, {
+          source_id: source.id,
+          existing_gasto_id: existingExpense.id,
+          existing_fecha: existingExpense.fecha,
+          target_date: targetDate
+        });
+        // Update ultima_fecha_generado to prevent future attempts
+        await this.updateLastGeneratedDate(source, targetDate, transaction);
+        return null;
+      }
+
       // 💱 Use pre-calculated multi-currency amounts (updated daily by ExchangeRateScheduler)
       const gastoData = this.createGastoData(source, {
         fecha: targetDate,
