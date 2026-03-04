@@ -37,6 +37,7 @@ jest.unstable_mockModule('../../src/models/index.js', () => ({
   FuenteIngreso: {},
   IngresoUnico: {},
   IngresoRecurrente: {},
+  CuentaBancaria: {},
   TipoCambio: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn() },
   UserCategoriaPreference: {},
   UserFuenteIngresoPreference: {},

@@ -73,6 +73,16 @@ import {
 } from '../../controllers/api/tarjeta.controller.js';
 
 import {
+  obtenerCuentasBancarias,
+  obtenerCuentaBancariaPorId,
+  crearCuentaBancaria,
+  actualizarCuentaBancaria,
+  eliminarCuentaBancaria,
+  obtenerEstadisticasCuentasBancarias,
+  validarUsoCuentaBancaria
+} from '../../controllers/api/cuentaBancaria.controller.js';
+
+import {
   obtenerTipoCambioActual,
   obtenerHistoricoTipoCambio,
   configurarTipoCambioManual,
@@ -116,7 +126,10 @@ import {
   validateIngresoUnicoFilters,
   validateCreateIngresoRecurrente,
   validateUpdateIngresoRecurrente,
-  validateIngresoRecurrenteFilters
+  validateIngresoRecurrenteFilters,
+  validateCreateCuentaBancaria,
+  validateUpdateCuentaBancaria,
+  validateCuentaBancariaFilters
 } from '../../middlewares/validation.middleware.js';
 
 import { obtenerProyeccion } from '../../controllers/api/proyeccion.controller.js';
@@ -192,6 +205,15 @@ router.get('/tarjetas/:id/usage', authenticateToken, validateIdParam, validarUso
 router.post('/tarjetas', authenticateToken, validateCreateTarjeta, crearTarjeta);
 router.put('/tarjetas/:id', authenticateToken, validateIdParam, validateUpdateTarjeta, actualizarTarjeta);
 router.delete('/tarjetas/:id', authenticateToken, validateIdParam, eliminarTarjeta);
+
+// 🏦 Rutas para Cuentas Bancarias - Requieren autenticación
+router.get('/cuentas-bancarias', authenticateToken, validateCuentaBancariaFilters, obtenerCuentasBancarias);
+router.get('/cuentas-bancarias/stats', authenticateToken, obtenerEstadisticasCuentasBancarias);
+router.get('/cuentas-bancarias/:id', authenticateToken, validateIdParam, obtenerCuentaBancariaPorId);
+router.get('/cuentas-bancarias/:id/usage', authenticateToken, validateIdParam, validarUsoCuentaBancaria);
+router.post('/cuentas-bancarias', authenticateToken, validateCreateCuentaBancaria, crearCuentaBancaria);
+router.put('/cuentas-bancarias/:id', authenticateToken, validateIdParam, validateUpdateCuentaBancaria, actualizarCuentaBancaria);
+router.delete('/cuentas-bancarias/:id', authenticateToken, validateIdParam, eliminarCuentaBancaria);
 
 // 💱 Rutas para Tipo de Cambio - Requieren autenticación
 router.get('/tipo-cambio/actual', authenticateToken, obtenerTipoCambioActual); // Obtener TC actual

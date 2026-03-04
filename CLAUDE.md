@@ -110,6 +110,38 @@ DI benefits:
 - Dashboard and CRUD interfaces at root path `/`
 - API endpoints at `/api`
 
+## Git Workflow (MANDATORY)
+
+**ALWAYS follow this workflow when implementing features or fixes:**
+
+1. **Before starting any work:**
+   ```bash
+   git checkout master && git pull origin master
+   git checkout -b feature/<descriptive-name>  # or fix/<descriptive-name>
+   ```
+
+2. **During development:**
+   - Make atomic commits with clear messages
+   - Run tests frequently: `npm test`
+   - Keep changes focused on the feature/fix scope
+
+3. **Before creating PR:**
+   - Run full test suite: `npm test`
+   - Verify no linting errors
+   - Update Swagger docs if API changed
+   - Review all changed files
+
+4. **Creating PR:**
+   - Push branch: `git push -u origin <branch-name>`
+   - Create PR via `gh pr create`
+   - Include summary and test plan in PR description
+
+**Branch naming conventions:**
+- `feature/<name>` - New functionality
+- `fix/<name>` - Bug fixes
+- `refactor/<name>` - Code improvements without behavior change
+- `docs/<name>` - Documentation only
+
 ## Important Notes
 
 - All database operations use the `finanzas` schema
