@@ -16,6 +16,7 @@ import { defineFuenteIngreso } from './fuenteIngreso.model.js';
 import { defineIngresoUnico } from './ingresoUnico.model.js';
 import { defineIngresoRecurrente } from './ingresoRecurrente.model.js';
 import { defineCuentaBancaria } from './CuentaBancaria.model.js';
+import { definePreferenciasUsuario } from './PreferenciasUsuario.model.js';
 
 // Configuración para PostgreSQL
 const isProduction = process.env.NODE_ENV === 'production';
@@ -62,7 +63,8 @@ const models = {
   FuenteIngreso: defineFuenteIngreso(sequelize),
   IngresoUnico: defineIngresoUnico(sequelize),
   IngresoRecurrente: defineIngresoRecurrente(sequelize),
-  CuentaBancaria: defineCuentaBancaria(sequelize)
+  CuentaBancaria: defineCuentaBancaria(sequelize),
+  PreferenciasUsuario: definePreferenciasUsuario(sequelize)
 };
 
 // Relacionamos los modelos
@@ -85,5 +87,6 @@ export const {
   FuenteIngreso,
   IngresoUnico,
   IngresoRecurrente,
-  CuentaBancaria
+  CuentaBancaria,
+  PreferenciasUsuario
 } = models;

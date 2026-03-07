@@ -1,0 +1,63 @@
+import { DataTypes } from 'sequelize';
+
+// Modulos disponibles y sus defaults
+export const MODULOS_DISPONIBLES = {
+  // Core modules (siempre visibles en sidebar, no se pueden deshabilitar)
+  dashboard: { nombre: 'Dashboard', descripcion: 'Pagina principal con resumen', core: true },
+  historial: { nombre: 'Historial', descripcion: 'Historial de gastos', core: true },
+  gastos_unicos: { nombre: 'Gastos Unicos', descripcion: 'Registro de gastos puntuales', core: true },
+  ingresos_unicos: { nombre: 'Ingresos Unicos', descripcion: 'Registro de ingresos puntuales', core: true },
+  configuracion: { nombre: 'Configuracion', descripcion: 'Ajustes de la aplicacion', core: true },
+  perfil: { nombre: 'Perfil', descripcion: 'Tu perfil de usuario', core: true },
+
+  // Optional modules (deshabilitados por defecto)
+  compras: { nombre: 'Compras en Cuotas', descripcion: 'Gestiona compras con pagos en cuotas', core: false },
+  gastos_recurrentes: { nombre: 'Gastos Recurrentes', descripcion: 'Gastos que se repiten periodicamente', core: false },
+  debitos_automaticos: { nombre: 'Debitos Automaticos', descripcion: 'Suscripciones y servicios automaticos', core: false },
+  ingresos_recurrentes: { nombre: 'Ingresos Recurrentes', descripcion: 'Ingresos que se repiten (salario, etc)', core: false },
+  tarjetas: { nombre: 'Tarjetas', descripcion: 'Gestiona tus tarjetas de credito y debito', core: false },
+  cuentas_bancarias: { nombre: 'Cuentas Bancarias', descripcion: 'Gestiona tus cuentas bancarias', core: false },
+  proyecciones: { nombre: 'Proyecciones', descripcion: 'Proyeccion de gastos futuros', core: false },
+  salud_financiera: { nombre: 'Salud Financiera', descripcion: 'Analisis de tu situacion financiera', core: false },
+};
+
+// Modulos habilitados por defecto (solo los opcionales que queremos activos inicialmente)
+export const MODULOS_DEFAULT = ['gastos_unicos', 'ingresos_unicos'];
+
+export function definePreferenciasUsuario(sequelize) {
+  return sequelize.define('PreferenciasUsuario', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    usuario_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      unique: true,
+      references: {
+        model: 'usuarios',
+        key: 'id',
+      },
+    },
+    modulos_activos: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: MODULOS_DEFAULT,
+      comment: 'Lista de modulos opcionales habilitados por el usuario',
+    },
+    tema: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'system',
+      validate: {
+        isIn: [['light', 'dark', 'system']],
+      },
+    },
+  }, {
+    tableName: 'preferencias_usuario',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+  });
+}

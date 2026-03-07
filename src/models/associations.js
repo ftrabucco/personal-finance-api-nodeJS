@@ -14,7 +14,8 @@ export function setupAssociations(models) {
     FuenteIngreso,
     IngresoUnico,
     IngresoRecurrente,
-    CuentaBancaria
+    CuentaBancaria,
+    PreferenciasUsuario
   } = models;
 
   // Gasto
@@ -133,5 +134,9 @@ export function setupAssociations(models) {
   // Cuenta Bancaria
   CuentaBancaria.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(CuentaBancaria, { foreignKey: 'usuario_id', as: 'cuentasBancarias' });
+
+  // Preferencias Usuario
+  PreferenciasUsuario.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasOne(PreferenciasUsuario, { foreignKey: 'usuario_id', as: 'preferencias' });
 
 }
