@@ -133,6 +133,12 @@ const debitoAutomaticoSchema = Joi.object({
   importancia_gasto_id: baseGastoSchema.importancia_gasto_id,
   tipo_pago_id: baseGastoSchema.tipo_pago_id,
   tarjeta_id: baseGastoSchema.tarjeta_id,
+  cuenta_bancaria_id: Joi.number().integer().positive().allow(null).optional()
+    .messages({
+      'number.base': 'La cuenta bancaria debe ser un número',
+      'number.integer': 'La cuenta bancaria debe ser un número entero',
+      'number.positive': 'La cuenta bancaria debe ser un ID válido'
+    }),
   // dia_de_pago is optional when using credit card (uses card's due date)
   dia_de_pago: Joi.number().integer().min(1).max(31).allow(null)
     .messages({
@@ -235,6 +241,7 @@ const debitoAutomaticoFiltersSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive().optional(),
   tipo_pago_id: Joi.number().integer().positive().optional(),
   tarjeta_id: Joi.number().integer().positive().optional(),
+  cuenta_bancaria_id: Joi.number().integer().positive().optional(),
   frecuencia_gasto_id: Joi.number().integer().positive().optional(),
   monto_min: Joi.number().positive().optional(),
   monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
@@ -688,3 +695,98 @@ export const validateIngresoUnicoFilters = createValidationMiddleware(ingresoUni
 export const validateCreateIngresoRecurrente = createValidationMiddleware(ingresoRecurrenteSchema, 'body');
 export const validateUpdateIngresoRecurrente = createValidationMiddleware(ingresoRecurrenteSchema, 'body');
 export const validateIngresoRecurrenteFilters = createValidationMiddleware(ingresoRecurrenteFiltersSchema, 'query');
+
+// =============================================================================
+// CUENTAS BANCARIAS VALIDATIONS
+// =============================================================================
+
+const cuentaBancariaSchema = Joi.object({
+  nombre: Joi.string().trim().min(2).max(100).required()
+    .messages({
+      'string.min': 'El nombre debe tener al menos 2 caracteres',
+      'string.max': 'El nombre no puede exceder 100 caracteres',
+      'any.required': 'El nombre de la cuenta es requerido'
+    }),
+
+  banco: Joi.string().trim().min(2).max(100).required()
+    .messages({
+      'string.min': 'El banco debe tener al menos 2 caracteres',
+      'string.max': 'El banco no puede exceder 100 caracteres',
+      'any.required': 'El banco es requerido'
+    }),
+
+  tipo: Joi.string().valid('ahorro', 'corriente').required()
+    .messages({
+      'any.only': 'El tipo debe ser: ahorro o corriente',
+      'any.required': 'El tipo de cuenta es requerido'
+    }),
+
+  ultimos_4_digitos: Joi.string().length(4).pattern(/^\d{4}$/).optional().allow(null, '')
+    .messages({
+      'string.length': 'Debe ingresar exactamente 4 dígitos',
+      'string.pattern.base': 'Solo se permiten números'
+    }),
+
+  moneda: Joi.string().valid('ARS', 'USD').default('ARS')
+    .messages({
+      'any.only': 'La moneda debe ser: ARS o USD'
+    }),
+
+  activa: Joi.boolean().default(true)
+    .messages({
+      'boolean.base': 'El campo activa debe ser verdadero o falso'
+    })
+});
+
+const cuentaBancariaFiltersSchema = Joi.object({
+  tipo: Joi.string().valid('ahorro', 'corriente').optional()
+    .messages({
+      'any.only': 'El tipo debe ser: ahorro o corriente'
+    }),
+
+  banco: Joi.string().trim().min(1).max(100).optional()
+    .messages({
+      'string.min': 'El banco debe tener al menos 1 caracter para la búsqueda',
+      'string.max': 'El banco no puede exceder 100 caracteres'
+    }),
+
+  moneda: Joi.string().valid('ARS', 'USD').optional()
+    .messages({
+      'any.only': 'La moneda debe ser: ARS o USD'
+    }),
+
+  activa: Joi.string().valid('true', 'false').optional()
+    .messages({
+      'any.only': 'El campo activa debe ser "true" o "false"'
+    }),
+
+  limit: Joi.number().integer().min(1).max(100).optional()
+    .messages({
+      'number.base': 'El límite debe ser un número',
+      'number.integer': 'El límite debe ser un número entero',
+      'number.min': 'El límite debe ser al menos 1',
+      'number.max': 'El límite no puede ser mayor a 100'
+    }),
+
+  offset: Joi.number().integer().min(0).optional()
+    .messages({
+      'number.base': 'El offset debe ser un número',
+      'number.integer': 'El offset debe ser un número entero',
+      'number.min': 'El offset debe ser 0 o mayor'
+    }),
+
+  orderBy: Joi.string().valid('nombre', 'tipo', 'banco', 'id').optional()
+    .messages({
+      'any.only': 'El ordenamiento debe ser por: nombre, tipo, banco o id'
+    }),
+
+  orderDirection: Joi.string().valid('ASC', 'DESC').optional()
+    .messages({
+      'any.only': 'La dirección debe ser ASC o DESC'
+    })
+});
+
+// Exportar validaciones de cuentas bancarias
+export const validateCreateCuentaBancaria = createValidationMiddleware(cuentaBancariaSchema, 'body');
+export const validateUpdateCuentaBancaria = createValidationMiddleware(cuentaBancariaSchema, 'body');
+export const validateCuentaBancariaFilters = createValidationMiddleware(cuentaBancariaFiltersSchema, 'query');

@@ -13,7 +13,9 @@ export function setupAssociations(models) {
     Usuario,
     FuenteIngreso,
     IngresoUnico,
-    IngresoRecurrente
+    IngresoRecurrente,
+    CuentaBancaria,
+    PreferenciasUsuario
   } = models;
 
   // Gasto
@@ -66,6 +68,9 @@ export function setupAssociations(models) {
 
   DebitoAutomatico.belongsTo(Tarjeta, { foreignKey: 'tarjeta_id', as: 'tarjeta' });
   Tarjeta.hasMany(DebitoAutomatico, { foreignKey: 'tarjeta_id', as: 'debitos' });
+
+  DebitoAutomatico.belongsTo(CuentaBancaria, { foreignKey: 'cuenta_bancaria_id', as: 'cuentaBancaria' });
+  CuentaBancaria.hasMany(DebitoAutomatico, { foreignKey: 'cuenta_bancaria_id', as: 'debitosAutomaticos' });
 
   DebitoAutomatico.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(DebitoAutomatico, { foreignKey: 'usuario_id', as: 'debitosAutomaticos' });
@@ -125,5 +130,13 @@ export function setupAssociations(models) {
 
   IngresoRecurrente.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(IngresoRecurrente, { foreignKey: 'usuario_id', as: 'ingresosRecurrentes' });
+
+  // Cuenta Bancaria
+  CuentaBancaria.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasMany(CuentaBancaria, { foreignKey: 'usuario_id', as: 'cuentasBancarias' });
+
+  // Preferencias Usuario
+  PreferenciasUsuario.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Usuario.hasOne(PreferenciasUsuario, { foreignKey: 'usuario_id', as: 'preferencias' });
 
 }

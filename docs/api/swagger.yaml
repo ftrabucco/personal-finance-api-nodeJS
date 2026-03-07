@@ -26,6 +26,8 @@ tags:
     description: Operaciones con débitos automáticos (suscripciones, servicios)
   - name: tarjetas
     description: Gestión de tarjetas de débito y crédito del usuario
+  - name: cuentas-bancarias
+    description: Gestión de cuentas bancarias (ahorro/corriente) para débitos automáticos
   - name: tipo-cambio
     description: Sistema multi-moneda - Gestión de tipos de cambio USD/ARS
   - name: proyeccion
@@ -754,6 +756,154 @@ components:
               type: integer
               description: Total de registros que usan esta tarjeta
               example: 7
+
+    CuentaBancaria:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único de la cuenta bancaria
+          example: 1
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre descriptivo de la cuenta
+          example: "Cuenta Sueldo Galicia"
+        banco:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre del banco
+          example: "Banco Galicia"
+        tipo:
+          type: string
+          enum: [ahorro, corriente]
+          description: Tipo de cuenta
+          example: "ahorro"
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: '^\d{4}$'
+          nullable: true
+          description: Últimos 4 dígitos del CBU/número de cuenta
+          example: "5678"
+        moneda:
+          type: string
+          enum: [ARS, USD]
+          description: Moneda de la cuenta
+          example: "ARS"
+        activa:
+          type: boolean
+          description: Si la cuenta está activa
+          example: true
+        usuario_id:
+          type: integer
+          description: ID del usuario propietario
+          example: 1
+
+    CuentaBancariaInput:
+      type: object
+      required: [nombre, banco, tipo]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre descriptivo de la cuenta
+          example: "Cuenta Sueldo Galicia"
+        banco:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Nombre del banco
+          example: "Banco Galicia"
+        tipo:
+          type: string
+          enum: [ahorro, corriente]
+          description: Tipo de cuenta
+          example: "ahorro"
+        ultimos_4_digitos:
+          type: string
+          minLength: 4
+          maxLength: 4
+          pattern: '^\d{4}$'
+          description: Últimos 4 dígitos del CBU/número de cuenta (opcional)
+          example: "5678"
+        moneda:
+          type: string
+          enum: [ARS, USD]
+          default: ARS
+          description: Moneda de la cuenta
+          example: "ARS"
+        activa:
+          type: boolean
+          default: true
+          description: Si la cuenta está activa
+          example: true
+
+    CuentaBancariaStats:
+      type: object
+      properties:
+        estadisticas:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total de cuentas del usuario
+              example: 3
+            ahorro:
+              type: integer
+              description: Cantidad de cuentas de ahorro
+              example: 2
+            corriente:
+              type: integer
+              description: Cantidad de cuentas corrientes
+              example: 1
+            activas:
+              type: integer
+              description: Cantidad de cuentas activas
+              example: 2
+            inactivas:
+              type: integer
+              description: Cantidad de cuentas inactivas
+              example: 1
+        usuario_id:
+          type: integer
+          description: ID del usuario
+          example: 1
+
+    CuentaBancariaUsage:
+      type: object
+      properties:
+        cuenta:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            nombre:
+              type: string
+              example: "Cuenta Sueldo Galicia"
+            tipo:
+              type: string
+              example: "ahorro"
+        inUse:
+          type: boolean
+          description: Indica si la cuenta está siendo utilizada
+          example: false
+        usage:
+          type: object
+          properties:
+            debitosAutomaticos:
+              type: integer
+              description: Cantidad de débitos automáticos que usan esta cuenta
+              example: 3
+            total:
+              type: integer
+              description: Total de registros que usan esta cuenta
+              example: 3
 
     Frecuencia:
       type: object
@@ -3492,6 +3642,279 @@ paths:
                     total: 7
         '404':
           description: Tarjeta no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # =============================================================================
+  # CUENTAS BANCARIAS ENDPOINTS
+  # =============================================================================
+  /cuentas-bancarias:
+    get:
+      tags:
+        - cuentas-bancarias
+      summary: Listar cuentas bancarias del usuario
+      description: |
+        Obtiene todas las cuentas bancarias del usuario autenticado con filtros opcionales.
+
+        **Filtros disponibles:**
+        - `tipo`: Filtrar por tipo de cuenta (ahorro, corriente)
+        - `banco`: Búsqueda parcial por nombre del banco
+        - `moneda`: Filtrar por moneda (ARS, USD)
+        - `activa`: Filtrar por estado activo (true/false)
+        - `limit`: Límite de resultados (1-100)
+        - `offset`: Offset para paginación
+        - `orderBy`: Campo de ordenamiento (nombre, tipo, banco, id)
+        - `orderDirection`: Dirección del ordenamiento (ASC, DESC)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+            enum: [ahorro, corriente]
+          description: Filtrar por tipo de cuenta
+        - name: banco
+          in: query
+          schema:
+            type: string
+          description: Búsqueda parcial por nombre del banco
+        - name: moneda
+          in: query
+          schema:
+            type: string
+            enum: [ARS, USD]
+          description: Filtrar por moneda
+        - name: activa
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Filtrar por estado activo
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [nombre, tipo, banco, id]
+        - name: orderDirection
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+      responses:
+        '200':
+          description: Lista de cuentas bancarias obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CuentaBancaria'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - cuentas-bancarias
+      summary: Crear nueva cuenta bancaria
+      description: Crea una nueva cuenta bancaria para el usuario autenticado.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CuentaBancariaInput'
+            examples:
+              ahorro:
+                summary: Cuenta de ahorro
+                value:
+                  nombre: "Cuenta Sueldo Galicia"
+                  banco: "Banco Galicia"
+                  tipo: "ahorro"
+                  moneda: "ARS"
+              corriente:
+                summary: Cuenta corriente
+                value:
+                  nombre: "Cuenta Corriente BBVA"
+                  banco: "BBVA"
+                  tipo: "corriente"
+                  ultimos_4_digitos: "5678"
+      responses:
+        '201':
+          description: Cuenta bancaria creada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CuentaBancaria'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cuentas-bancarias/stats:
+    get:
+      tags:
+        - cuentas-bancarias
+      summary: Obtener estadísticas de cuentas bancarias
+      description: Obtiene estadísticas resumidas de las cuentas bancarias del usuario.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Estadísticas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CuentaBancariaStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cuentas-bancarias/{id}:
+    get:
+      tags:
+        - cuentas-bancarias
+      summary: Obtener cuenta bancaria por ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Cuenta bancaria obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CuentaBancaria'
+        '404':
+          description: Cuenta bancaria no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - cuentas-bancarias
+      summary: Actualizar cuenta bancaria
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CuentaBancariaInput'
+      responses:
+        '200':
+          description: Cuenta bancaria actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CuentaBancaria'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          description: Cuenta bancaria no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - cuentas-bancarias
+      summary: Eliminar cuenta bancaria
+      description: Elimina una cuenta bancaria. Falla si está en uso por débitos automáticos.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Cuenta bancaria eliminada exitosamente
+        '400':
+          description: La cuenta está en uso y no puede eliminarse
+        '404':
+          description: Cuenta bancaria no encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cuentas-bancarias/{id}/usage:
+    get:
+      tags:
+        - cuentas-bancarias
+      summary: Validar uso de cuenta bancaria
+      description: Verifica si la cuenta bancaria está siendo utilizada por débitos automáticos.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Estado de uso obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CuentaBancariaUsage'
+        '404':
+          description: Cuenta bancaria no encontrada
         '401':
           $ref: '#/components/responses/Unauthorized'
 

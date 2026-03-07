@@ -11,56 +11,56 @@ async function seedInitialData() {
 
     logger.info('🌱 Iniciando seeding de datos...');
 
-    // 1. ✨ CATEGORÍAS DE GASTO - Más completas y organizadas
+    // 1. ✨ CATEGORÍAS DE GASTO - Más completas y organizadas (categorías del sistema)
     logger.info('📂 Insertando categorías de gasto...');
     await sequelize.query(`
-      INSERT INTO finanzas.categorias_gasto (nombre_categoria) VALUES
+      INSERT INTO finanzas.categorias_gasto (nombre_categoria, icono, es_sistema, activo, orden) VALUES
         -- 🏠 Vivienda
-        ('Alquiler'),
-        ('Expensas'),
-        ('Servicios (luz, gas, agua)'),
-        ('Internet / Cable'),
-        ('Hogar / Mantenimiento'),
+        ('Alquiler', '🏠', true, true, 1),
+        ('Expensas', '🏢', true, true, 2),
+        ('Servicios (luz, gas, agua)', '💡', true, true, 3),
+        ('Internet / Cable', '📶', true, true, 4),
+        ('Hogar / Mantenimiento', '🔧', true, true, 5),
         -- 🛒 Alimentación
-        ('Supermercado'),
-        ('Almacén / Verdulería'),
-        ('Delivery / Comida'),
-        ('Restaurantes'),
+        ('Supermercado', '🛒', true, true, 6),
+        ('Almacén / Verdulería', '🥬', true, true, 7),
+        ('Delivery / Comida', '🍕', true, true, 8),
+        ('Restaurantes', '🍽️', true, true, 9),
         -- 🚗 Transporte
-        ('Transporte público'),
-        ('Combustible'),
-        ('Uber / Taxi'),
-        ('Mantenimiento vehículo'),
+        ('Transporte público', '🚌', true, true, 10),
+        ('Combustible', '⛽', true, true, 11),
+        ('Uber / Taxi', '🚕', true, true, 12),
+        ('Mantenimiento vehículo', '🔧', true, true, 13),
         -- 💊 Salud
-        ('Farmacia'),
-        ('Médicos / Consultas'),
-        ('Obra social / Prepaga'),
+        ('Farmacia', '💊', true, true, 14),
+        ('Médicos / Consultas', '🏥', true, true, 15),
+        ('Obra social / Prepaga', '🏥', true, true, 16),
         -- 🎯 Personal
-        ('Peluquería / Estética'),
-        ('Ropa / Calzado'),
-        ('Gimnasio / Deportes'),
+        ('Peluquería / Estética', '💇', true, true, 17),
+        ('Ropa / Calzado', '👕', true, true, 18),
+        ('Gimnasio / Deportes', '🏋️', true, true, 19),
         -- 🎮 Entretenimiento
-        ('Streaming / Suscripciones'),
-        ('Cine / Teatro'),
-        ('Libros / Cursos'),
-        ('Hobbies'),
+        ('Streaming / Suscripciones', '📺', true, true, 20),
+        ('Cine / Teatro', '🎬', true, true, 21),
+        ('Libros / Cursos', '📚', true, true, 22),
+        ('Hobbies', '🎮', true, true, 23),
         -- 💳 Financiero
-        ('Tarjetas de crédito'),
-        ('Préstamos'),
-        ('Seguros'),
-        ('Impuestos'),
+        ('Tarjetas de crédito', '💳', true, true, 24),
+        ('Préstamos', '🏦', true, true, 25),
+        ('Seguros', '🛡️', true, true, 26),
+        ('Impuestos', '📋', true, true, 27),
         -- 👥 Social
-        ('Regalos'),
-        ('Salidas con amigos'),
-        ('Familia'),
+        ('Regalos', '🎁', true, true, 28),
+        ('Salidas con amigos', '🍻', true, true, 29),
+        ('Familia', '👨‍👩‍👧', true, true, 30),
         -- 🐕 Mascotas
-        ('Veterinario'),
-        ('Comida mascotas'),
+        ('Veterinario', '🐾', true, true, 31),
+        ('Comida mascotas', '🐕', true, true, 32),
         -- 💰 Otros
-        ('Ahorro / Inversión'),
-        ('Emergencias'),
-        ('Otros')
-      ON CONFLICT (nombre_categoria) DO NOTHING;
+        ('Ahorro / Inversión', '💰', true, true, 33),
+        ('Emergencias', '🚨', true, true, 34),
+        ('Otros', '📦', true, true, 35)
+      ON CONFLICT DO NOTHING;
     `);
 
     // 2. 💳 TIPOS DE PAGO
@@ -101,20 +101,20 @@ async function seedInitialData() {
       ON CONFLICT (id) DO UPDATE SET nombre_importancia = EXCLUDED.nombre_importancia;
     `);
 
-    // 4.5. 💰 FUENTES DE INGRESO
+    // 4.5. 💰 FUENTES DE INGRESO (fuentes del sistema)
     logger.info('💰 Insertando fuentes de ingreso...');
     await sequelize.query(`
-      INSERT INTO finanzas.fuentes_ingreso (nombre) VALUES
-        ('Salario'),
-        ('Freelance'),
-        ('Alquiler'),
-        ('Inversiones'),
-        ('Venta'),
-        ('Regalo'),
-        ('Reembolso'),
-        ('Bono'),
-        ('Otro')
-      ON CONFLICT (nombre) DO NOTHING;
+      INSERT INTO finanzas.fuentes_ingreso (nombre, icono, es_sistema, activo, orden) VALUES
+        ('Salario', '💼', true, true, 1),
+        ('Freelance', '💻', true, true, 2),
+        ('Alquiler', '🏠', true, true, 3),
+        ('Inversiones', '📈', true, true, 4),
+        ('Venta', '🛍️', true, true, 5),
+        ('Regalo', '🎁', true, true, 6),
+        ('Reembolso', '↩️', true, true, 7),
+        ('Bono', '🎉', true, true, 8),
+        ('Otro', '💰', true, true, 9)
+      ON CONFLICT DO NOTHING;
     `);
 
     // 5. 👤 USUARIO EJEMPLO - Con password hasheado

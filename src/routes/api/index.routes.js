@@ -73,6 +73,16 @@ import {
 } from '../../controllers/api/tarjeta.controller.js';
 
 import {
+  obtenerCuentasBancarias,
+  obtenerCuentaBancariaPorId,
+  crearCuentaBancaria,
+  actualizarCuentaBancaria,
+  eliminarCuentaBancaria,
+  obtenerEstadisticasCuentasBancarias,
+  validarUsoCuentaBancaria
+} from '../../controllers/api/cuentaBancaria.controller.js';
+
+import {
   obtenerTipoCambioActual,
   obtenerHistoricoTipoCambio,
   configurarTipoCambioManual,
@@ -81,13 +91,31 @@ import {
 } from '../../controllers/api/tipoCambio.controller.js';
 
 import {
-  obtenerCategorias,
+  obtenerCategorias as obtenerCategoriasCatalogo,
   obtenerImportancias,
   obtenerTiposPago,
   obtenerFrecuencias,
-  obtenerFuentesIngreso,
+  obtenerFuentesIngreso as obtenerFuentesIngresoCatalogo,
   obtenerTodosCatalogos
 } from '../../controllers/api/catalogo.controller.js';
+
+import {
+  obtenerCategorias,
+  obtenerCategoriaPorId,
+  crearCategoria,
+  actualizarCategoria,
+  toggleActivo as toggleCategoriaActivo,
+  eliminarCategoria
+} from '../../controllers/api/categoria.controller.js';
+
+import {
+  obtenerFuentesIngreso,
+  obtenerFuenteIngresoPorId,
+  crearFuenteIngreso,
+  actualizarFuenteIngreso,
+  toggleActivo as toggleFuenteActivo,
+  eliminarFuenteIngreso
+} from '../../controllers/api/fuenteIngreso.controller.js';
 
 import {
   validateGastoFilters,
@@ -116,11 +144,21 @@ import {
   validateIngresoUnicoFilters,
   validateCreateIngresoRecurrente,
   validateUpdateIngresoRecurrente,
-  validateIngresoRecurrenteFilters
+  validateIngresoRecurrenteFilters,
+  validateCreateCuentaBancaria,
+  validateUpdateCuentaBancaria,
+  validateCuentaBancariaFilters
 } from '../../middlewares/validation.middleware.js';
 
 import { obtenerProyeccion } from '../../controllers/api/proyeccion.controller.js';
 import { obtenerSaludFinanciera } from '../../controllers/api/saludFinanciera.controller.js';
+import {
+  getPreferencias,
+  updatePreferencias,
+  toggleModulo,
+  getModulos,
+  getModulosDisponibles
+} from '../../controllers/api/preferenciasUsuario.controller.js';
 
 import { authenticateToken } from '../../middlewares/auth.middleware.js';
 
@@ -193,6 +231,15 @@ router.post('/tarjetas', authenticateToken, validateCreateTarjeta, crearTarjeta)
 router.put('/tarjetas/:id', authenticateToken, validateIdParam, validateUpdateTarjeta, actualizarTarjeta);
 router.delete('/tarjetas/:id', authenticateToken, validateIdParam, eliminarTarjeta);
 
+// 🏦 Rutas para Cuentas Bancarias - Requieren autenticación
+router.get('/cuentas-bancarias', authenticateToken, validateCuentaBancariaFilters, obtenerCuentasBancarias);
+router.get('/cuentas-bancarias/stats', authenticateToken, obtenerEstadisticasCuentasBancarias);
+router.get('/cuentas-bancarias/:id', authenticateToken, validateIdParam, obtenerCuentaBancariaPorId);
+router.get('/cuentas-bancarias/:id/usage', authenticateToken, validateIdParam, validarUsoCuentaBancaria);
+router.post('/cuentas-bancarias', authenticateToken, validateCreateCuentaBancaria, crearCuentaBancaria);
+router.put('/cuentas-bancarias/:id', authenticateToken, validateIdParam, validateUpdateCuentaBancaria, actualizarCuentaBancaria);
+router.delete('/cuentas-bancarias/:id', authenticateToken, validateIdParam, eliminarCuentaBancaria);
+
 // 💱 Rutas para Tipo de Cambio - Requieren autenticación
 router.get('/tipo-cambio/actual', authenticateToken, obtenerTipoCambioActual); // Obtener TC actual
 router.get('/tipo-cambio/historico', authenticateToken, obtenerHistoricoTipoCambio); // Obtener historial con filtros
@@ -202,16 +249,39 @@ router.post('/tipo-cambio/convertir', authenticateToken, convertirMonto); // Con
 
 // 📚 Rutas para Catálogos - Requieren autenticación
 router.get('/catalogos', authenticateToken, obtenerTodosCatalogos); // Todos los catálogos en una sola llamada
-router.get('/catalogos/categorias', authenticateToken, obtenerCategorias);
+router.get('/catalogos/categorias', authenticateToken, obtenerCategoriasCatalogo);
 router.get('/catalogos/importancias', authenticateToken, obtenerImportancias);
 router.get('/catalogos/tipos-pago', authenticateToken, obtenerTiposPago);
 router.get('/catalogos/frecuencias', authenticateToken, obtenerFrecuencias);
-router.get('/catalogos/fuentes-ingreso', authenticateToken, obtenerFuentesIngreso);
+router.get('/catalogos/fuentes-ingreso', authenticateToken, obtenerFuentesIngresoCatalogo);
+
+// 🏷️ Rutas para Categorías (CRUD por usuario) - Requieren autenticación
+router.get('/categorias', authenticateToken, obtenerCategorias);
+router.get('/categorias/:id', authenticateToken, validateIdParam, obtenerCategoriaPorId);
+router.post('/categorias', authenticateToken, crearCategoria);
+router.put('/categorias/:id', authenticateToken, validateIdParam, actualizarCategoria);
+router.patch('/categorias/:id/toggle-activo', authenticateToken, validateIdParam, toggleCategoriaActivo);
+router.delete('/categorias/:id', authenticateToken, validateIdParam, eliminarCategoria);
+
+// 💵 Rutas para Fuentes de Ingreso (CRUD por usuario) - Requieren autenticación
+router.get('/fuentes-ingreso', authenticateToken, obtenerFuentesIngreso);
+router.get('/fuentes-ingreso/:id', authenticateToken, validateIdParam, obtenerFuenteIngresoPorId);
+router.post('/fuentes-ingreso', authenticateToken, crearFuenteIngreso);
+router.put('/fuentes-ingreso/:id', authenticateToken, validateIdParam, actualizarFuenteIngreso);
+router.patch('/fuentes-ingreso/:id/toggle-activo', authenticateToken, validateIdParam, toggleFuenteActivo);
+router.delete('/fuentes-ingreso/:id', authenticateToken, validateIdParam, eliminarFuenteIngreso);
 
 // 📊 Rutas para Proyección de Gastos - Requieren autenticación
 router.get('/proyeccion', authenticateToken, validateProyeccionFilters, obtenerProyeccion);
 
 // 💚 Rutas para Salud Financiera - Requieren autenticación
 router.get('/salud-financiera', authenticateToken, validateSaludFinancieraFilters, obtenerSaludFinanciera);
+
+// ⚙️ Rutas para Preferencias de Usuario - Requieren autenticación
+router.get('/preferencias', authenticateToken, getPreferencias);
+router.put('/preferencias', authenticateToken, updatePreferencias);
+router.patch('/preferencias/modulos', authenticateToken, toggleModulo);
+router.get('/modulos', authenticateToken, getModulos);
+router.get('/modulos/disponibles', authenticateToken, getModulosDisponibles);
 
 export default router;

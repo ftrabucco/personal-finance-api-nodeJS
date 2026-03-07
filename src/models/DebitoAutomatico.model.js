@@ -77,6 +77,15 @@ export function defineDebitoAutomatico(sequelize) {
         key: 'id'
       }
     },
+    cuenta_bancaria_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'cuentas_bancarias',
+        key: 'id'
+      },
+      comment: 'Cuenta bancaria de la cual se debita (alternativa a tarjeta)'
+    },
     usuario_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
