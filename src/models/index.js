@@ -46,25 +46,30 @@ const sequelize = new Sequelize({
   }
 });
 
-// Definimos los modelos
+// Definimos los modelos - ORDEN IMPORTANTE: tablas referenciadas deben ir primero
 const models = {
-  Gasto: defineGasto(sequelize),
+  // 1. Tablas base (sin FKs a otras tablas del app)
+  Usuario: defineUsuario(sequelize),
   TipoPago: defineTipoPago(sequelize),
   CategoriaGasto: defineCategoriaGasto(sequelize),
   FrecuenciaGasto: defineFrecuenciaGasto(sequelize),
   ImportanciaGasto: defineImportanciaGasto(sequelize),
+  TipoCambio: defineTipoCambio(sequelize),
+  FuenteIngreso: defineFuenteIngreso(sequelize),
+
+  // 2. Tablas que dependen de Usuario
+  Tarjeta: defineTarjeta(sequelize),
+  CuentaBancaria: defineCuentaBancaria(sequelize),
+  PreferenciasUsuario: definePreferenciasUsuario(sequelize),
+
+  // 3. Tablas que dependen de las anteriores
+  Gasto: defineGasto(sequelize),
   Compra: defineCompra(sequelize),
   DebitoAutomatico: defineDebitoAutomatico(sequelize),
   GastoRecurrente: defineGastoRecurrente(sequelize),
   GastoUnico: defineGastoUnico(sequelize),
-  Tarjeta: defineTarjeta(sequelize),
-  Usuario: defineUsuario(sequelize),
-  TipoCambio: defineTipoCambio(sequelize),
-  FuenteIngreso: defineFuenteIngreso(sequelize),
   IngresoUnico: defineIngresoUnico(sequelize),
-  IngresoRecurrente: defineIngresoRecurrente(sequelize),
-  CuentaBancaria: defineCuentaBancaria(sequelize),
-  PreferenciasUsuario: definePreferenciasUsuario(sequelize)
+  IngresoRecurrente: defineIngresoRecurrente(sequelize)
 };
 
 // Relacionamos los modelos
