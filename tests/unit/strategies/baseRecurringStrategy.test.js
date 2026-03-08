@@ -207,8 +207,11 @@ describe('BaseRecurringStrategy', () => {
     });
 
     it('should return true when today equals fecha_fin', () => {
-      const source = { id: 1, fecha_fin: todayDateStr };
-      expect(strategy.validateDateBoundaries(source, now)).toBe(true);
+      // Use a fresh moment to ensure consistency
+      const currentMoment = moment().tz('America/Argentina/Buenos_Aires');
+      const currentDateStr = currentMoment.format('YYYY-MM-DD');
+      const source = { id: 1, fecha_fin: currentDateStr };
+      expect(strategy.validateDateBoundaries(source, currentMoment)).toBe(true);
     });
 
     it('should check both boundaries when both are present', () => {

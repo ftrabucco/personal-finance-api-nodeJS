@@ -400,6 +400,19 @@ export class ExchangeRateService {
       const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
       logger.debug('[DolarAPI] Fecha:', { today });
 
+      // Check if we already have a rate from API for today (avoid unnecessary API calls)
+      const existingRate = await TipoCambio.findOne({
+        where: { fecha: today, activo: true }
+      });
+
+      if (existingRate && existingRate.fuente !== 'manual') {
+        logger.info('[DolarAPI] Ya existe tipo de cambio de API para hoy, omitiendo actualización', {
+          fecha: today,
+          fuente: existingRate.fuente
+        });
+        return existingRate;
+      }
+
       // Llamar a DolarAPI (gratuita, no requiere token) - Dólar Blue
       logger.info('[DolarAPI] Llamando a API externa...');
       const response = await axios.get('https://dolarapi.com/v1/dolares/blue', {

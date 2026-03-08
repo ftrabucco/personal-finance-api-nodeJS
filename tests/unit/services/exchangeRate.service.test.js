@@ -284,8 +284,11 @@ describe('ExchangeRateService', () => {
     });
 
     test('should return existing rate if already updated today', async () => {
+      // Use today's date to ensure the test works regardless of when it runs
+      const today = new Date().toISOString().split('T')[0];
       mockTipoCambio.findOne.mockResolvedValue({
         ...mockExchangeRate,
+        fecha: today,
         fuente: 'api_dolar_api' // Not manual
       });
 
