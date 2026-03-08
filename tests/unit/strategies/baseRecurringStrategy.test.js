@@ -207,11 +207,11 @@ describe('BaseRecurringStrategy', () => {
     });
 
     it('should return true when today equals fecha_fin', () => {
-      // Use a fresh moment to ensure consistency
-      const currentMoment = moment().tz('America/Argentina/Buenos_Aires');
-      const currentDateStr = currentMoment.format('YYYY-MM-DD');
-      const source = { id: 1, fecha_fin: currentDateStr };
-      expect(strategy.validateDateBoundaries(source, currentMoment)).toBe(true);
+      // Create both dates from the same base to ensure consistency
+      const baseDate = '2024-06-15';
+      const testMoment = moment.tz(baseDate, 'America/Argentina/Buenos_Aires').startOf('day');
+      const source = { id: 1, fecha_fin: baseDate };
+      expect(strategy.validateDateBoundaries(source, testMoment)).toBe(true);
     });
 
     it('should check both boundaries when both are present', () => {
