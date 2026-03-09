@@ -2,6 +2,7 @@ import { CategoriaGasto, Gasto, GastoUnico, GastoRecurrente, DebitoAutomatico, C
 import { sendSuccess, sendError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 import { Op } from 'sequelize';
+import { getOrCreatePreferencias, toggleCategoriaVisibilidad } from '../../services/preferenciasUsuario.service.js';
 
 /**
  * Controller for user-customizable categories
@@ -15,6 +16,10 @@ export const obtenerCategorias = async (req, res) => {
     const usuarioId = req.user.id;
     const { includeInactive } = req.query;
 
+    // Get user preferences to know which system categories are hidden
+    const preferencias = await getOrCreatePreferencias(usuarioId);
+    const categoriasOcultas = preferencias.categorias_ocultas || [];
+
     const whereClause = {
       [Op.or]: [
         { es_sistema: true },
@@ -22,9 +27,13 @@ export const obtenerCategorias = async (req, res) => {
       ]
     };
 
-    // By default, only show active categories
+    // By default, only show active categories (for personal categories)
+    // System categories use the preferencias-based visibility
     if (includeInactive !== 'true') {
-      whereClause.activo = true;
+      whereClause[Op.or] = [
+        { es_sistema: true }, // Always include system categories (we'll add visibility field)
+        { usuario_id: usuarioId, activo: true }
+      ];
     }
 
     const categorias = await CategoriaGasto.findAll({
@@ -36,7 +45,25 @@ export const obtenerCategorias = async (req, res) => {
       ]
     });
 
-    return sendSuccess(res, categorias);
+    // Add visibility info to each category
+    const categoriasConVisibilidad = categorias.map(cat => {
+      const catData = cat.toJSON();
+      if (cat.es_sistema) {
+        // For system categories, visibility is based on user preferences
+        catData.visible = !categoriasOcultas.includes(cat.id);
+      } else {
+        // For personal categories, visibility equals activo
+        catData.visible = cat.activo;
+      }
+      return catData;
+    });
+
+    // If not including inactive, filter out hidden system categories
+    const resultado = includeInactive === 'true'
+      ? categoriasConVisibilidad
+      : categoriasConVisibilidad.filter(cat => cat.visible);
+
+    return sendSuccess(res, resultado);
   } catch (error) {
     logger.error('Error al obtener categorías:', { error });
     return sendError(res, 500, 'Error al obtener categorías', error.message);
@@ -175,31 +202,37 @@ export const actualizarCategoria = async (req, res) => {
   }
 };
 
-// PATCH /api/categorias/:id/toggle-activo - Toggle active status
+// PATCH /api/categorias/:id/toggle-activo - Toggle active/visibility status
 export const toggleActivo = async (req, res) => {
   try {
     const usuarioId = req.user.id;
     const { id } = req.params;
+    const categoriaId = parseInt(id, 10);
 
-    const categoria = await CategoriaGasto.findByPk(id);
+    const categoria = await CategoriaGasto.findByPk(categoriaId);
 
     if (!categoria) {
       return sendError(res, 404, 'Categoría no encontrada');
     }
 
-    // Can't toggle system categories
+    // For system categories, toggle visibility in user preferences
     if (categoria.es_sistema) {
-      return sendError(res, 403, 'No se pueden modificar categorías del sistema');
+      const { visible } = await toggleCategoriaVisibilidad(usuarioId, categoriaId);
+      const catData = categoria.toJSON();
+      catData.visible = visible;
+      return sendSuccess(res, catData);
     }
 
-    // Can only toggle own categories
+    // For personal categories, can only toggle own categories
     if (categoria.usuario_id !== usuarioId) {
       return sendError(res, 403, 'No tienes permiso para modificar esta categoría');
     }
 
     await categoria.update({ activo: !categoria.activo });
+    const catData = categoria.toJSON();
+    catData.visible = categoria.activo;
 
-    return sendSuccess(res, categoria);
+    return sendSuccess(res, catData);
   } catch (error) {
     logger.error('Error al cambiar estado de categoría:', { error });
     return sendError(res, 500, 'Error al cambiar estado de categoría', error.message);
