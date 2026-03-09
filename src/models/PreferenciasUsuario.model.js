@@ -18,7 +18,7 @@ export const MODULOS_DISPONIBLES = {
   tarjetas: { nombre: 'Tarjetas', descripcion: 'Gestiona tus tarjetas de credito y debito', core: false },
   cuentas_bancarias: { nombre: 'Cuentas Bancarias', descripcion: 'Gestiona tus cuentas bancarias', core: false },
   proyecciones: { nombre: 'Proyecciones', descripcion: 'Proyeccion de gastos futuros', core: false },
-  salud_financiera: { nombre: 'Salud Financiera', descripcion: 'Analisis de tu situacion financiera', core: false },
+  salud_financiera: { nombre: 'Salud Financiera', descripcion: 'Analisis de tu situacion financiera', core: false }
 };
 
 // Modulos habilitados por defecto (solo los opcionales que queremos activos inicialmente)
@@ -29,7 +29,7 @@ export function definePreferenciasUsuario(sequelize) {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true,
+      autoIncrement: true
     },
     usuario_id: {
       type: DataTypes.INTEGER,
@@ -37,27 +37,27 @@ export function definePreferenciasUsuario(sequelize) {
       unique: true,
       references: {
         model: 'usuarios',
-        key: 'id',
-      },
+        key: 'id'
+      }
     },
     modulos_activos: {
       type: DataTypes.JSONB,
       allowNull: false,
       defaultValue: MODULOS_DEFAULT,
-      comment: 'Lista de modulos opcionales habilitados por el usuario',
+      comment: 'Lista de modulos opcionales habilitados por el usuario'
     },
     tema: {
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'system',
       validate: {
-        isIn: [['light', 'dark', 'system']],
-      },
-    },
+        isIn: [['light', 'dark', 'system']]
+      }
+    }
   }, {
     tableName: 'preferencias_usuario',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at',
+    updatedAt: 'updated_at'
   });
 }

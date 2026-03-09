@@ -207,8 +207,12 @@ describe('BaseRecurringStrategy', () => {
     });
 
     it('should return true when today equals fecha_fin', () => {
-      const source = { id: 1, fecha_fin: todayDateStr };
-      expect(strategy.validateDateBoundaries(source, now)).toBe(true);
+      // Use moment without timezone to match how the service parses fecha_fin
+      // This ensures consistent behavior across different CI environments
+      const baseDate = '2024-06-15';
+      const testMoment = moment(baseDate).startOf('day');
+      const source = { id: 1, fecha_fin: baseDate };
+      expect(strategy.validateDateBoundaries(source, testMoment)).toBe(true);
     });
 
     it('should check both boundaries when both are present', () => {

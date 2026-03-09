@@ -106,17 +106,26 @@ jobs:
               // Sync independent tables first (no foreign keys)
               const independentModels = [
                 'Usuario', 'TipoPago', 'CategoriaGasto',
-                'FrecuenciaGasto', 'ImportanciaGasto', 'TipoCambio'
+                'FrecuenciaGasto', 'ImportanciaGasto', 'TipoCambio', 'FuenteIngreso'
               ];
               for (const name of independentModels) {
                 await models[name].sync();
                 console.log('Synced: ' + name);
               }
 
-              // Then sync dependent tables (have foreign keys to the above)
+              // Sync tables that depend on Usuario
+              const userDependentModels = [
+                'Tarjeta', 'CuentaBancaria', 'PreferenciasUsuario'
+              ];
+              for (const name of userDependentModels) {
+                await models[name].sync();
+                console.log('Synced: ' + name);
+              }
+
+              // Then sync tables that depend on all the above
               const dependentModels = [
-                'Tarjeta', 'Gasto', 'GastoUnico',
-                'GastoRecurrente', 'DebitoAutomatico', 'Compra'
+                'Gasto', 'GastoUnico', 'GastoRecurrente',
+                'DebitoAutomatico', 'Compra', 'IngresoUnico', 'IngresoRecurrente'
               ];
               for (const name of dependentModels) {
                 await models[name].sync();
