@@ -2,6 +2,7 @@ import { FuenteIngreso, IngresoUnico, IngresoRecurrente } from '../../models/ind
 import { sendSuccess, sendError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 import { Op } from 'sequelize';
+import { getOrCreatePreferencias, toggleFuenteVisibilidad } from '../../services/preferenciasUsuario.service.js';
 
 /**
  * Controller for user-customizable income sources
@@ -15,6 +16,10 @@ export const obtenerFuentesIngreso = async (req, res) => {
     const usuarioId = req.user.id;
     const { includeInactive } = req.query;
 
+    // Get user preferences to know which system fuentes are hidden
+    const preferencias = await getOrCreatePreferencias(usuarioId);
+    const fuentesOcultas = preferencias.fuentes_ocultas || [];
+
     const whereClause = {
       [Op.or]: [
         { es_sistema: true },
@@ -22,9 +27,13 @@ export const obtenerFuentesIngreso = async (req, res) => {
       ]
     };
 
-    // By default, only show active sources
+    // By default, only show active sources (for personal fuentes)
+    // System fuentes use the preferencias-based visibility
     if (includeInactive !== 'true') {
-      whereClause.activo = true;
+      whereClause[Op.or] = [
+        { es_sistema: true }, // Always include system fuentes (we'll add visibility field)
+        { usuario_id: usuarioId, activo: true }
+      ];
     }
 
     const fuentes = await FuenteIngreso.findAll({
@@ -36,7 +45,25 @@ export const obtenerFuentesIngreso = async (req, res) => {
       ]
     });
 
-    return sendSuccess(res, fuentes);
+    // Add visibility info to each fuente
+    const fuentesConVisibilidad = fuentes.map(fuente => {
+      const fuenteData = fuente.toJSON();
+      if (fuente.es_sistema) {
+        // For system fuentes, visibility is based on user preferences
+        fuenteData.visible = !fuentesOcultas.includes(fuente.id);
+      } else {
+        // For personal fuentes, visibility equals activo
+        fuenteData.visible = fuente.activo;
+      }
+      return fuenteData;
+    });
+
+    // If not including inactive, filter out hidden system fuentes
+    const resultado = includeInactive === 'true'
+      ? fuentesConVisibilidad
+      : fuentesConVisibilidad.filter(f => f.visible);
+
+    return sendSuccess(res, resultado);
   } catch (error) {
     logger.error('Error al obtener fuentes de ingreso:', { error });
     return sendError(res, 500, 'Error al obtener fuentes de ingreso', error.message);
@@ -175,31 +202,37 @@ export const actualizarFuenteIngreso = async (req, res) => {
   }
 };
 
-// PATCH /api/fuentes-ingreso/:id/toggle-activo - Toggle active status
+// PATCH /api/fuentes-ingreso/:id/toggle-activo - Toggle active/visibility status
 export const toggleActivo = async (req, res) => {
   try {
     const usuarioId = req.user.id;
     const { id } = req.params;
+    const fuenteId = parseInt(id, 10);
 
-    const fuente = await FuenteIngreso.findByPk(id);
+    const fuente = await FuenteIngreso.findByPk(fuenteId);
 
     if (!fuente) {
       return sendError(res, 404, 'Fuente de ingreso no encontrada');
     }
 
-    // Can't toggle system sources
+    // For system fuentes, toggle visibility in user preferences
     if (fuente.es_sistema) {
-      return sendError(res, 403, 'No se pueden modificar fuentes del sistema');
+      const { visible } = await toggleFuenteVisibilidad(usuarioId, fuenteId);
+      const fuenteData = fuente.toJSON();
+      fuenteData.visible = visible;
+      return sendSuccess(res, fuenteData);
     }
 
-    // Can only toggle own sources
+    // For personal fuentes, can only toggle own fuentes
     if (fuente.usuario_id !== usuarioId) {
       return sendError(res, 403, 'No tienes permiso para modificar esta fuente');
     }
 
     await fuente.update({ activo: !fuente.activo });
+    const fuenteData = fuente.toJSON();
+    fuenteData.visible = fuente.activo;
 
-    return sendSuccess(res, fuente);
+    return sendSuccess(res, fuenteData);
   } catch (error) {
     logger.error('Error al cambiar estado de fuente:', { error });
     return sendError(res, 500, 'Error al cambiar estado de fuente', error.message);

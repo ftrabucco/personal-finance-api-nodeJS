@@ -53,6 +53,18 @@ export function definePreferenciasUsuario(sequelize) {
       validate: {
         isIn: [['light', 'dark', 'system']]
       }
+    },
+    categorias_ocultas: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [],
+      comment: 'IDs de categorias del sistema que el usuario quiere ocultar'
+    },
+    fuentes_ocultas: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [],
+      comment: 'IDs de fuentes de ingreso del sistema que el usuario quiere ocultar'
     }
   }, {
     tableName: 'preferencias_usuario',

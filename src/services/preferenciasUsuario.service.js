@@ -131,11 +131,95 @@ export async function isModuloActivo(usuarioId, modulo) {
   return preferencias.modulos_activos.includes(modulo);
 }
 
+/**
+ * Toggle visibility of a system category for a user
+ * @param {number} usuarioId - User ID
+ * @param {number} categoriaId - Category ID
+ * @returns {Promise<{visible: boolean, preferencias: PreferenciasUsuario}>}
+ */
+export async function toggleCategoriaVisibilidad(usuarioId, categoriaId) {
+  const preferencias = await getOrCreatePreferencias(usuarioId);
+  let categoriasOcultas = [...(preferencias.categorias_ocultas || [])];
+
+  const isCurrentlyHidden = categoriasOcultas.includes(categoriaId);
+
+  if (isCurrentlyHidden) {
+    // Remove from hidden list (make visible)
+    categoriasOcultas = categoriasOcultas.filter(id => id !== categoriaId);
+  } else {
+    // Add to hidden list
+    categoriasOcultas.push(categoriaId);
+  }
+
+  await preferencias.update({ categorias_ocultas: categoriasOcultas });
+
+  return {
+    visible: isCurrentlyHidden, // If it was hidden, now it's visible
+    preferencias
+  };
+}
+
+/**
+ * Toggle visibility of a system income source for a user
+ * @param {number} usuarioId - User ID
+ * @param {number} fuenteId - Income source ID
+ * @returns {Promise<{visible: boolean, preferencias: PreferenciasUsuario}>}
+ */
+export async function toggleFuenteVisibilidad(usuarioId, fuenteId) {
+  const preferencias = await getOrCreatePreferencias(usuarioId);
+  let fuentesOcultas = [...(preferencias.fuentes_ocultas || [])];
+
+  const isCurrentlyHidden = fuentesOcultas.includes(fuenteId);
+
+  if (isCurrentlyHidden) {
+    // Remove from hidden list (make visible)
+    fuentesOcultas = fuentesOcultas.filter(id => id !== fuenteId);
+  } else {
+    // Add to hidden list
+    fuentesOcultas.push(fuenteId);
+  }
+
+  await preferencias.update({ fuentes_ocultas: fuentesOcultas });
+
+  return {
+    visible: isCurrentlyHidden, // If it was hidden, now it's visible
+    preferencias
+  };
+}
+
+/**
+ * Check if a category is visible for a user
+ * @param {number} usuarioId - User ID
+ * @param {number} categoriaId - Category ID
+ * @returns {Promise<boolean>}
+ */
+export async function isCategoriaVisible(usuarioId, categoriaId) {
+  const preferencias = await getOrCreatePreferencias(usuarioId);
+  const categoriasOcultas = preferencias.categorias_ocultas || [];
+  return !categoriasOcultas.includes(categoriaId);
+}
+
+/**
+ * Check if an income source is visible for a user
+ * @param {number} usuarioId - User ID
+ * @param {number} fuenteId - Income source ID
+ * @returns {Promise<boolean>}
+ */
+export async function isFuenteVisible(usuarioId, fuenteId) {
+  const preferencias = await getOrCreatePreferencias(usuarioId);
+  const fuentesOcultas = preferencias.fuentes_ocultas || [];
+  return !fuentesOcultas.includes(fuenteId);
+}
+
 export default {
   getOrCreatePreferencias,
   getPreferencias,
   updatePreferencias,
   toggleModulo,
   getModulosConEstado,
-  isModuloActivo
+  isModuloActivo,
+  toggleCategoriaVisibilidad,
+  toggleFuenteVisibilidad,
+  isCategoriaVisible,
+  isFuenteVisible
 };
