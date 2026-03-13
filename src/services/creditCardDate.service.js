@@ -98,10 +98,9 @@ export class CreditCardDateService {
 
     // Agregar los meses correspondientes a la cuota
     const fechaVencimiento = moment(primeraFechaVencimiento)
-      .add(cuotaNumero, 'months')
-      .date(diaVencimiento);
+      .add(cuotaNumero, 'months');
 
-    // Manejar casos edge como 31 de febrero
+    // Clamp day to max days in the month to prevent overflow
     fechaVencimiento.date(Math.min(diaVencimiento, fechaVencimiento.daysInMonth()));
 
     logger.debug('Calculando fecha para cuota siguiente:', {
@@ -120,15 +119,10 @@ export class CreditCardDateService {
    * @returns {moment.Moment} Fecha de cierre
    */
   static getClosingDateForMonth(fechaBase, diaCierre) {
-    const fechaCierre = moment(fechaBase).date(diaCierre);
-
-    // Manejar casos donde el día de cierre no existe en el mes (ej: 31 de febrero)
-    if (fechaCierre.date() !== diaCierre) {
-      // Si el día no existe, usar el último día del mes
-      fechaCierre.endOf('month');
-    }
-
-    return fechaCierre;
+    const fecha = moment(fechaBase);
+    // Clamp day to max days in the month to prevent overflow (e.g., day 29 on Feb → Feb 28)
+    const diaReal = Math.min(diaCierre, fecha.daysInMonth());
+    return fecha.date(diaReal);
   }
 
   /**
@@ -150,14 +144,9 @@ export class CreditCardDateService {
    */
   static getDueDateForClosingCycle(fechaCierre, diaVencimiento) {
     const mesVencimiento = moment(fechaCierre).add(1, 'month');
-    const fechaVencimiento = mesVencimiento.date(diaVencimiento);
-
-    // Manejar casos edge como 31 de febrero
-    if (fechaVencimiento.date() !== diaVencimiento) {
-      fechaVencimiento.endOf('month');
-    }
-
-    return fechaVencimiento;
+    // Clamp day to max days in the month to prevent overflow
+    const diaReal = Math.min(diaVencimiento, mesVencimiento.daysInMonth());
+    return mesVencimiento.date(diaReal);
   }
 
   /**
