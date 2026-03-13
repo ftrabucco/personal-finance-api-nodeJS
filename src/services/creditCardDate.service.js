@@ -28,7 +28,7 @@ export class CreditCardDateService {
       throw new Error('La tarjeta de crédito debe tener configurados los días de cierre y vencimiento');
     }
 
-    const fechaCompra = moment(compra.fecha).tz(this.TIMEZONE);
+    const fechaCompra = moment(compra.fecha_compra).tz(this.TIMEZONE);
     const referencia = fechaReferencia ? moment(fechaReferencia).tz(this.TIMEZONE) : moment().tz(this.TIMEZONE);
 
     // Para la primera cuota, calcular basado en el ciclo de la tarjeta
@@ -186,6 +186,40 @@ export class CreditCardDateService {
       return esHoy;
     } catch (error) {
       logger.error('Error al verificar día de vencimiento:', {
+        error: error.message,
+        compra_id: compra.id,
+        cuotaNumero
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Verifica si la fecha de vencimiento ya pasó o es hoy (para catch-up manual)
+   * @param {Object} compra - La compra
+   * @param {Object} tarjeta - La tarjeta de crédito
+   * @param {number} cuotaNumero - Número de cuota
+   * @param {moment.Moment} fechaHoy - Fecha actual (opcional)
+   * @returns {boolean} True si la fecha de vencimiento ya pasó o es hoy
+   */
+  static isDueDateTodayOrPassed(compra, tarjeta, cuotaNumero = 0, fechaHoy = null) {
+    try {
+      const hoy = fechaHoy ? moment(fechaHoy).tz(this.TIMEZONE) : moment().tz(this.TIMEZONE);
+      const fechaVencimiento = this.calculateDueDate(compra, tarjeta, cuotaNumero, hoy);
+
+      const yaPasoOEsHoy = hoy.isSameOrAfter(fechaVencimiento, 'day');
+
+      logger.debug('Verificando si fecha de vencimiento ya pasó o es hoy (catch-up):', {
+        compra_id: compra.id,
+        cuotaNumero,
+        fechaHoy: hoy.format('YYYY-MM-DD'),
+        fechaVencimiento: fechaVencimiento.format('YYYY-MM-DD'),
+        yaPasoOEsHoy
+      });
+
+      return yaPasoOEsHoy;
+    } catch (error) {
+      logger.error('Error al verificar fecha de vencimiento (catch-up):', {
         error: error.message,
         compra_id: compra.id,
         cuotaNumero

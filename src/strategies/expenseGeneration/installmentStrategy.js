@@ -23,7 +23,9 @@ import logger from '../../utils/logger.js';
  */
 export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
   async generate(compra, transaction = null) {
-    if (!this.validateSource(compra) || !await this.shouldGenerate(compra)) {
+    // Only validate source structure, skip shouldGenerate check.
+    // shouldGenerate is already called by findReadyForGeneration upstream.
+    if (!this.validateSource(compra)) {
       return null;
     }
 
@@ -73,7 +75,11 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     }
   }
 
-  async shouldGenerate(compra) {
+  /**
+   * @param {Object} compra - La compra
+   * @param {boolean} allowCatchUp - Si true, genera cuotas cuya fecha de vencimiento ya pasó (para generación manual)
+   */
+  async shouldGenerate(compra, allowCatchUp = false) {
     if (!compra.pendiente_cuotas) {
       return false;
     }
@@ -89,17 +95,17 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     // Para cuota única
     if (totalCuotas === 1) {
-      return this.shouldGenerateSingleInstallment(compra, today);
+      return this.shouldGenerateSingleInstallment(compra, today, allowCatchUp);
     }
 
     // Para múltiples cuotas
-    return this.shouldGenerateMultipleInstallment(compra, today, cuotasGeneradas);
+    return this.shouldGenerateMultipleInstallment(compra, today, cuotasGeneradas, allowCatchUp);
   }
 
   /**
    * Verifica si debe generar una cuota única
    */
-  shouldGenerateSingleInstallment(compra, today) {
+  shouldGenerateSingleInstallment(compra, today, allowCatchUp = false) {
     // Si ya se generó, no generar de nuevo
     if (compra.fecha_ultima_cuota_generada) {
       return false;
@@ -107,7 +113,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     // Si es tarjeta de crédito, verificar día de vencimiento
     if (this.isCreditCardPayment(compra)) {
-      return this.shouldGenerateOnCreditCardDueDate(compra, today);
+      return this.shouldGenerateOnCreditCardDueDate(compra, today, 0, allowCatchUp);
     }
 
     // Para otros medios de pago (efectivo, débito, transferencia)
@@ -128,7 +134,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
    *   - Efectivo/Débito/Transferencia: Generar el mismo día del mes de la compra
    *   - Tarjeta de Crédito: Generar en día de vencimiento de la tarjeta
    */
-  shouldGenerateMultipleInstallment(compra, today, cuotasGeneradas) {
+  shouldGenerateMultipleInstallment(compra, today, cuotasGeneradas, allowCatchUp = false) {
     // Verificar que no se haya generado cuota este mes
     if (compra.fecha_ultima_cuota_generada) {
       const ultimaCuota = moment(compra.fecha_ultima_cuota_generada);
@@ -139,7 +145,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     // Si es tarjeta de crédito, siempre usar día de vencimiento
     if (this.isCreditCardPayment(compra)) {
-      return this.shouldGenerateOnCreditCardDueDate(compra, today, cuotasGeneradas);
+      return this.shouldGenerateOnCreditCardDueDate(compra, today, cuotasGeneradas, allowCatchUp);
     }
 
     // Para otros medios de pago (efectivo, débito, transferencia):
@@ -151,6 +157,10 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     }
 
     // Cuotas siguientes: mismo día del mes que la fecha de compra
+    // Con catch-up: también generar si ya pasó el día este mes
+    if (allowCatchUp) {
+      return today.date() >= fechaCompra.date();
+    }
     return today.date() === fechaCompra.date();
   }
 
@@ -166,7 +176,14 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
    * Verifica si debe generar en el día de vencimiento de la tarjeta de crédito
    * Utiliza el CreditCardDateService para cálculos inteligentes
    */
-  shouldGenerateOnCreditCardDueDate(compra, today, cuotaNumero = 0) {
+  /**
+   * Verifica si debe generar en el día de vencimiento de la tarjeta de crédito
+   * @param {Object} compra - La compra
+   * @param {moment.Moment} today - Fecha actual
+   * @param {number} cuotaNumero - Número de cuota (0-based)
+   * @param {boolean} allowCatchUp - Si true, también genera si la fecha de vencimiento ya pasó
+   */
+  shouldGenerateOnCreditCardDueDate(compra, today, cuotaNumero = 0, allowCatchUp = false) {
     if (!compra.tarjeta || compra.tarjeta.tipo !== 'credito') {
       logger.error('Tarjeta de crédito inválida o no configurada:', {
         compra_id: compra.id,
@@ -188,24 +205,22 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
         return false;
       }
 
-      // Verificar si hoy es día de vencimiento usando el servicio inteligente
-      const esHoyDiaVencimiento = CreditCardDateService.isDueDateToday(
-        compra,
-        compra.tarjeta,
-        cuotaNumero,
-        today
-      );
+      // Verificar si hoy es día de vencimiento (o ya pasó, en modo catch-up)
+      const shouldGenerate = allowCatchUp
+        ? CreditCardDateService.isDueDateTodayOrPassed(compra, compra.tarjeta, cuotaNumero, today)
+        : CreditCardDateService.isDueDateToday(compra, compra.tarjeta, cuotaNumero, today);
 
-      if (esHoyDiaVencimiento) {
-        logger.info('Día de vencimiento detectado para compra:', {
+      if (shouldGenerate) {
+        logger.info(`Día de vencimiento ${allowCatchUp ? '(catch-up) ' : ''}detectado para compra:`, {
           compra_id: compra.id,
           tarjeta_id: compra.tarjeta_id,
           cuotaNumero: cuotaNumero + 1,
-          fecha_hoy: today.format('YYYY-MM-DD')
+          fecha_hoy: today.format('YYYY-MM-DD'),
+          allowCatchUp
         });
       }
 
-      return esHoyDiaVencimiento;
+      return shouldGenerate;
     } catch (error) {
       logger.error('Error al verificar día de vencimiento:', {
         error: error.message,

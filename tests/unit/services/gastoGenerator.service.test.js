@@ -282,26 +282,24 @@ describe('GastoGeneratorService', () => {
       monto_ars: 500
     };
 
-    it('should generate gasto from compra when shouldGenerate returns true', async () => {
-      mockInstallmentShouldGenerate.mockResolvedValue(true);
+    it('should generate gasto from compra directly (shouldGenerate handled by findReadyForGeneration)', async () => {
       mockInstallmentGenerate.mockResolvedValue(mockGeneratedGasto);
 
       const result = await GastoGeneratorService.generateFromCompra(mockCompra);
 
       expect(result).toEqual(mockGeneratedGasto);
-      expect(mockInstallmentShouldGenerate).toHaveBeenCalledWith(mockCompra);
+      expect(mockInstallmentShouldGenerate).not.toHaveBeenCalled();
       expect(mockInstallmentGenerate).toHaveBeenCalledWith(mockCompra, mockTransaction);
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
-    it('should return null when shouldGenerate returns false', async () => {
-      mockInstallmentShouldGenerate.mockResolvedValue(false);
+    it('should handle null result from generate (skipped by strategy)', async () => {
+      mockInstallmentGenerate.mockResolvedValue(null);
 
       const result = await GastoGeneratorService.generateFromCompra(mockCompra);
 
       expect(result).toBeNull();
-      expect(mockInstallmentGenerate).not.toHaveBeenCalled();
-      expect(mockTransaction.rollback).toHaveBeenCalled();
+      expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
     it('should throw error when foreign keys are missing', async () => {
@@ -317,7 +315,6 @@ describe('GastoGeneratorService', () => {
     });
 
     it('should rollback transaction on strategy error', async () => {
-      mockInstallmentShouldGenerate.mockResolvedValue(true);
       mockInstallmentGenerate.mockRejectedValue(new Error('Installment error'));
 
       await expect(GastoGeneratorService.generateFromCompra(mockCompra))
@@ -347,7 +344,7 @@ describe('GastoGeneratorService', () => {
 
       expect(mockFindReadyRecurrentes).toHaveBeenCalledWith(123);
       expect(mockFindReadyDebitos).toHaveBeenCalledWith(123);
-      expect(mockFindReadyCompras).toHaveBeenCalledWith(123);
+      expect(mockFindReadyCompras).toHaveBeenCalledWith(123, false);
     });
 
     it('should include processing time in results', async () => {

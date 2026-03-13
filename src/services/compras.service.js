@@ -199,7 +199,12 @@ export class ComprasService extends BaseService {
    * Used by the scheduler service
    * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
    */
-  async findReadyForGeneration(userId = null) {
+  /**
+   * Find purchases that should generate installments today
+   * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)
+   * @param {boolean} allowCatchUp - Si true, incluye cuotas cuya fecha ya pasó (para generación manual)
+   */
+  async findReadyForGeneration(userId = null, allowCatchUp = false) {
     // Build where clause with optional user filter
     const whereClause = { pendiente_cuotas: true };
     if (userId) {
@@ -210,7 +215,7 @@ export class ComprasService extends BaseService {
     const readyPurchases = [];
 
     for (const purchase of pendingPurchases) {
-      const shouldGenerate = await this.installmentStrategy.shouldGenerate(purchase);
+      const shouldGenerate = await this.installmentStrategy.shouldGenerate(purchase, allowCatchUp);
       if (shouldGenerate) {
         readyPurchases.push(purchase);
       }
@@ -531,7 +536,7 @@ export class ComprasService extends BaseService {
         }
       } else {
         // For non-credit card payments, calculate regular schedule
-        const fechaCompra = moment(compra.fecha);
+        const fechaCompra = moment(compra.fecha_compra);
         for (let i = cuotasGeneradas; i < totalCuotas; i++) {
           const fechaCuota = moment(fechaCompra).add(i, 'months');
           scheduleInfo.upcoming_dates.push({
