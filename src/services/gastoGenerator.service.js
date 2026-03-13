@@ -129,6 +129,9 @@ export class GastoGeneratorService {
   /**
    * Genera un gasto real desde una compra (cuotas)
    * Usa InstallmentExpenseStrategy
+   *
+   * IMPORTANT: Like other generators, this is called AFTER findReadyForGeneration
+   * has already filtered purchases, so we skip shouldGenerate to ensure catch-up works.
    */
   static async generateFromCompra(compra) {
     const transaction = await sequelize.transaction();
@@ -147,22 +150,21 @@ export class GastoGeneratorService {
 
       const installmentStrategy = new InstallmentExpenseStrategy();
 
-      // Verificar si debe generar cuota hoy
-      const shouldGenerate = await installmentStrategy.shouldGenerate(compra);
-      if (!shouldGenerate) {
-        await transaction.rollback();
-        return null;
-      }
+      // NOTE: We skip shouldGenerate check because findReadyForGeneration
+      // already filtered purchases. This ensures catch-up logic works correctly.
 
       // Generar el gasto usando la estrategia
       const gasto = await installmentStrategy.generate(compra, transaction);
 
       await transaction.commit();
-      logger.info('Gasto generado desde compra con estrategia:', {
-        gasto_id: gasto.id,
-        compra_id: compra.id,
-        monto: gasto.monto_ars
-      });
+
+      if (gasto) {
+        logger.info('Gasto generado desde compra con estrategia:', {
+          gasto_id: gasto.id,
+          compra_id: compra.id,
+          monto: gasto.monto_ars
+        });
+      }
       return gasto;
     } catch (error) {
       await transaction.rollback();
@@ -190,8 +192,9 @@ export class GastoGeneratorService {
    * Los gastos únicos se procesan inmediatamente al crearlos
    * Usado por el scheduler automático con procesamiento optimizado
    * @param {number|null} userId - ID del usuario para filtrar gastos (null = todos los usuarios, para scheduler)
+   * @param {boolean} allowCatchUp - Si true, genera cuotas cuya fecha ya pasó (para generación manual)
    */
-  static async generateScheduledExpenses(userId = null) {
+  static async generateScheduledExpenses(userId = null, allowCatchUp = false) {
     const startTime = Date.now();
     const results = {
       success: [],
@@ -247,7 +250,7 @@ export class GastoGeneratorService {
       );
 
       // Process installment purchases with improved logging
-      const compras = await this.comprasService.findReadyForGeneration(userId);
+      const compras = await this.comprasService.findReadyForGeneration(userId, allowCatchUp);
       results.summary.breakdown.compras.processed = compras.length;
 
       logger.debug('Processing installment purchases', {
@@ -393,7 +396,8 @@ export class GastoGeneratorService {
 
     try {
       // Generar gastos programados (recurrentes, débitos, compras)
-      const scheduledResults = await this.generateScheduledExpenses(userId);
+      // allowCatchUp: true para que genere cuotas atrasadas al ejecutar manualmente
+      const scheduledResults = await this.generateScheduledExpenses(userId, true);
       results.success.push(...scheduledResults.success);
       results.errors.push(...scheduledResults.errors);
 
