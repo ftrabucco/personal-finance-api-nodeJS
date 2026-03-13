@@ -1,4 +1,5 @@
-import { Compra, CategoriaGasto, ImportanciaGasto, Tarjeta, TipoPago } from '../../models/index.js';
+import { Compra, Gasto, CategoriaGasto, ImportanciaGasto, Tarjeta, TipoPago } from '../../models/index.js';
+import { fn, col, literal } from 'sequelize';
 import { CompraController } from '../api/compra.controller.js';
 import logger from '../../utils/logger.js';
 
@@ -70,7 +71,25 @@ export const renderListaCompras = async (req, res) => {
       order: [['fecha_compra', 'DESC']]
     });
 
-    const comprasPlanas = compras.map(compra => compra.get({ plain: true }));
+    // Get cuotas pagadas count for each compra in a single query
+    const cuotasCounts = await Gasto.findAll({
+      attributes: [
+        'id_origen',
+        [fn('COUNT', col('id')), 'cuotas_pagadas']
+      ],
+      where: { tipo_origen: 'compra' },
+      group: ['id_origen'],
+      raw: true
+    });
+
+    const cuotasMap = new Map(cuotasCounts.map(c => [c.id_origen, parseInt(c.cuotas_pagadas)]));
+
+    const comprasPlanas = compras.map(compra => {
+      const plain = compra.get({ plain: true });
+      plain.cuotas_pagadas = cuotasMap.get(plain.id) || 0;
+      return plain;
+    });
+
     res.render('compras/lista', { compras: comprasPlanas });
   } catch (error) {
     logger.error('Error al obtener compras:', { error });

@@ -36,9 +36,21 @@ export const helpers = {
     return str.toLowerCase().includes(search.toLowerCase());
   },
 
-  // Helper para dividir
+  // Helpers matemáticos
   div: function (a, b) {
     return parseFloat(a) / parseFloat(b);
+  },
+
+  sub: function (a, b) {
+    return parseFloat(a) - parseFloat(b);
+  },
+
+  mul: function (a, b) {
+    return parseFloat(a) * parseFloat(b);
+  },
+
+  round: function (a) {
+    return Math.round(parseFloat(a));
   },
 
   // Helper para JSON
