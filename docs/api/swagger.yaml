@@ -367,6 +367,10 @@ components:
           nullable: true
           description: Tipo de cambio usado para la conversión (snapshot histórico)
           example: 1000.00
+        cuotas_pagadas:
+          type: integer
+          description: Cantidad de cuotas ya generadas/pagadas (calculado desde tabla Gasto)
+          example: 3
         createdAt:
           type: string
           format: date-time
