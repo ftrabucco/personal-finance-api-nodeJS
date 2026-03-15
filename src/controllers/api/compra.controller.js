@@ -3,6 +3,7 @@ import { Compra, CategoriaGasto, ImportanciaGasto, TipoPago, Tarjeta, Gasto } fr
 import { GastoGeneratorService } from '../../services/gastoGenerator.service.js';
 import { ExchangeRateService } from '../../services/exchangeRate.service.js';
 import sequelize from '../../db/postgres.js';
+import { fn, col } from 'sequelize';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import logger from '../../utils/logger.js';
 import { cleanEntityFormData } from '../../utils/formDataHelper.js';
@@ -261,6 +262,65 @@ export class CompraController extends BaseController {
     return { isValid: true };
   }
 
+  // Enrich compras with cuotas_pagadas count from Gasto table
+  async enrichWithCuotasPagadas(compras) {
+    const compraIds = compras.map(c => c.id || c.get?.('id'));
+    if (compraIds.length === 0) return compras;
+
+    const cuotasCounts = await Gasto.findAll({
+      attributes: [
+        'id_origen',
+        [fn('COUNT', col('id')), 'cuotas_pagadas']
+      ],
+      where: { tipo_origen: 'compra', id_origen: compraIds },
+      group: ['id_origen'],
+      raw: true
+    });
+
+    const cuotasMap = new Map(cuotasCounts.map(c => [c.id_origen, parseInt(c.cuotas_pagadas)]));
+
+    return compras.map(compra => {
+      const plain = typeof compra.get === 'function' ? compra.get({ plain: true }) : compra;
+      plain.cuotas_pagadas = cuotasMap.get(plain.id) || 0;
+      return plain;
+    });
+  }
+
+  async getAll(req, res) {
+    try {
+      const compras = await this.model.findAll({
+        where: { usuario_id: req.user.id },
+        include: this.getIncludes(),
+        order: [['fecha_compra', 'DESC']]
+      });
+
+      const enriched = await this.enrichWithCuotasPagadas(compras);
+      return sendSuccess(res, enriched);
+    } catch (error) {
+      logger.error('Error al obtener compras:', { error });
+      return sendError(res, 500, 'Error al obtener compras', error.message);
+    }
+  }
+
+  async getById(req, res) {
+    try {
+      const compra = await this.model.findOne({
+        where: { id: req.params.id, usuario_id: req.user.id },
+        include: this.getIncludes()
+      });
+
+      if (!compra) {
+        return sendError(res, 404, 'Compra no encontrada');
+      }
+
+      const [enriched] = await this.enrichWithCuotasPagadas([compra]);
+      return sendSuccess(res, enriched);
+    } catch (error) {
+      logger.error('Error al obtener compra:', { error });
+      return sendError(res, 500, 'Error al obtener compra', error.message);
+    }
+  }
+
   // Método para obtener compras con filtros y paginación inteligente
   async getWithFilters(req, res) {
     try {
@@ -289,10 +349,12 @@ export class CompraController extends BaseController {
       if (limit) {
         const compras = await this.model.findAndCountAll(queryOptions);
         const pagination = buildPagination(compras.count, limit, offset);
-        return sendPaginatedSuccess(res, compras.rows, pagination);
+        const enriched = await this.enrichWithCuotasPagadas(compras.rows);
+        return sendPaginatedSuccess(res, enriched, pagination);
       } else {
         const compras = await this.model.findAll(queryOptions);
-        return sendSuccess(res, compras);
+        const enriched = await this.enrichWithCuotasPagadas(compras);
+        return sendSuccess(res, enriched);
       }
     } catch (error) {
       logger.error('Error al obtener compras con filtros:', { error });
