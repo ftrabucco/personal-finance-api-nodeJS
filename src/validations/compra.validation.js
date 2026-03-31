@@ -4,6 +4,7 @@ export const createCompraSchema = Joi.object({
   descripcion: Joi.string().trim().min(3).max(255).required(),
   monto_total: Joi.number().positive().precision(2).required(),
   cantidad_cuotas: Joi.number().integer().min(1).max(60).default(1),
+  cuotas_pagadas: Joi.number().integer().min(0).default(0),
   fecha_compra: Joi.date().iso().max('now').required(),
   categoria_gasto_id: Joi.number().integer().positive().required(),
   importancia_gasto_id: Joi.number().integer().positive().required(),

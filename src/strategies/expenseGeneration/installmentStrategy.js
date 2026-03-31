@@ -31,10 +31,20 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     try {
       const today = moment().tz('America/Argentina/Buenos_Aires');
-      const fechaParaBD = today.format('YYYY-MM-DD');
 
       // Calcular cuál cuota corresponde
       const cuotaActual = await this.calculateCurrentInstallment(compra);
+
+      // Calcular fecha: tarjeta de crédito usa fecha de vencimiento, otros usan hoy
+      let fechaParaBD;
+      const isCreditCard = compra.tarjeta_id && compra.tarjeta?.tipo === 'credito';
+      if (isCreditCard) {
+        const cuotaNumero0Based = cuotaActual - 1;
+        const fechaVencimiento = CreditCardDateService.calculateDueDate(compra, compra.tarjeta, cuotaNumero0Based);
+        fechaParaBD = fechaVencimiento.format('YYYY-MM-DD');
+      } else {
+        fechaParaBD = today.format('YYYY-MM-DD');
+      }
 
       // 💱 Calculate installment amount in both currencies
       const { montoCuotaARS, montoCuotaUSD } = await this.calculateInstallmentAmountMultiCurrency(compra);
@@ -299,6 +309,54 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     }
 
     await compra.update(updateData, { transaction });
+  }
+
+  /**
+   * Genera gastos históricos para cuotas ya pagadas al crear una compra.
+   * Reutiliza calculateInstallmentAmountMultiCurrency y createGastoData.
+   */
+  async generateHistoricalInstallments(compra, cuotasPagadas, transaction) {
+    const isCreditCard = compra.tarjeta_id && compra.tarjeta?.tipo === 'credito';
+    const cantidadCuotas = compra.cantidad_cuotas || 1;
+    const { montoCuotaARS, montoCuotaUSD } = await this.calculateInstallmentAmountMultiCurrency(compra);
+
+    const gastos = [];
+    let lastDate = null;
+    const today = moment().tz('America/Argentina/Buenos_Aires');
+
+    for (let i = 0; i < cuotasPagadas; i++) {
+      let fechaMoment;
+
+      if (isCreditCard) {
+        fechaMoment = CreditCardDateService.calculateDueDate(compra, compra.tarjeta, i);
+      } else {
+        const fechaCompra = moment(compra.fecha_compra);
+        fechaMoment = moment(compra.fecha_compra).add(i, 'months');
+        fechaMoment.date(Math.min(fechaCompra.date(), fechaMoment.daysInMonth()));
+      }
+
+      // Cuotas "pagadas" no pueden tener fecha futura
+      if (fechaMoment.isAfter(today, 'day')) {
+        fechaMoment = today.clone();
+      }
+
+      const fecha = fechaMoment.format('YYYY-MM-DD');
+
+      const gastoData = this.createGastoData(compra, {
+        fecha,
+        monto_ars: montoCuotaARS,
+        monto_usd: montoCuotaUSD,
+        moneda_origen: compra.moneda_origen || 'ARS',
+        tipo_cambio_usado: compra.tipo_cambio_usado || null,
+        descripcion: `${compra.descripcion} - Cuota ${i + 1}/${cantidadCuotas}`
+      });
+
+      const gasto = await Gasto.create(gastoData, { transaction });
+      gastos.push(gasto);
+      lastDate = fecha;
+    }
+
+    return { gastos, lastDate };
   }
 
   getType() {

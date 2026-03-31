@@ -8,6 +8,7 @@ import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } fro
 import logger from '../../utils/logger.js';
 import { cleanEntityFormData } from '../../utils/formDataHelper.js';
 import { FilterBuilder, buildQueryOptions, buildPagination } from '../../utils/filterBuilder.js';
+import { InstallmentExpenseStrategy } from '../../strategies/expenseGeneration/installmentStrategy.js';
 
 export class CompraController extends BaseController {
   constructor() {
@@ -54,12 +55,17 @@ export class CompraController extends BaseController {
       const montoTotal = req.body.monto_total;
       const monedaOrigen = req.body.moneda_origen || 'ARS';
 
+      const cuotasPagadas = req.body.cuotas_pagadas || 0;
+
       let compraData = {
         ...req.body,
         usuario_id: req.user.id,
         pendiente_cuotas: true,
         moneda_origen: monedaOrigen
       };
+
+      // Eliminar cuotas_pagadas de compraData - no es columna del modelo Compra
+      delete compraData.cuotas_pagadas;
 
       // Calculate monto_total_ars, monto_total_usd, tipo_cambio_usado
       try {
@@ -98,15 +104,51 @@ export class CompraController extends BaseController {
         transaction
       });
 
-      // 3. Intentar generar primer gasto si corresponde (business rule: compras de 1 cuota se generan inmediatamente)
+      // 3. Generar gastos según cuotas_pagadas
       let gasto = null;
-      if (compra.cantidad_cuotas === 1 || compra.cantidad_cuotas === null) {
-        try {
-          gasto = await GastoGeneratorService.generateFromCompra(compraCompleta);
-        } catch (error) {
-          logger.warn('No se pudo generar gasto inmediato para compra:', {
+      let gastosHistoricos = [];
+
+      if (cuotasPagadas > 0) {
+        // Generar gastos históricos para cuotas ya pagadas
+        const installmentStrategy = new InstallmentExpenseStrategy();
+        const result = await installmentStrategy.generateHistoricalInstallments(compraCompleta, cuotasPagadas, transaction);
+        gastosHistoricos = result.gastos;
+
+        // Actualizar estado de la compra
+        const cantidadCuotas = compraCompleta.cantidad_cuotas || 1;
+        const updateData = {
+          fecha_ultima_cuota_generada: result.lastDate
+        };
+
+        if (cuotasPagadas >= cantidadCuotas) {
+          updateData.pendiente_cuotas = false;
+        }
+
+        await compraCompleta.update(updateData, { transaction });
+
+        logger.info('Cuotas históricas generadas:', {
+          compra_id: compra.id,
+          cuotas_pagadas: cuotasPagadas,
+          gastos_generados: gastosHistoricos.length,
+          completamente_pagada: cuotasPagadas >= cantidadCuotas
+        });
+      } else if (compra.cantidad_cuotas === 1 || compra.cantidad_cuotas === null) {
+        // Compras de 1 cuota con tarjeta de crédito: no generar inmediatamente,
+        // el scheduler lo genera cuando llega la fecha de vencimiento de la tarjeta
+        const isCreditCard = compraCompleta.tarjeta_id && compraCompleta.tarjeta?.tipo === 'credito';
+        if (!isCreditCard) {
+          try {
+            gasto = await GastoGeneratorService.generateFromCompra(compraCompleta);
+          } catch (error) {
+            logger.warn('No se pudo generar gasto inmediato para compra:', {
+              compra_id: compra.id,
+              error: error.message
+            });
+          }
+        } else {
+          logger.info('Compra con tarjeta de crédito - gasto se generará en fecha de vencimiento:', {
             compra_id: compra.id,
-            error: error.message
+            tarjeta_id: compraCompleta.tarjeta_id
           });
         }
       }
@@ -116,10 +158,15 @@ export class CompraController extends BaseController {
         compra_id: compra.id,
         gasto_id: gasto?.id,
         primera_generacion: !!gasto,
+        cuotas_pagadas: cuotasPagadas,
         es_cuotas: compra.cantidad_cuotas > 1
       });
 
-      return sendSuccess(res, { compra: compraCompleta, gasto }, 201);
+      return sendSuccess(res, {
+        compra: compraCompleta,
+        gasto,
+        gastos_historicos: gastosHistoricos.length > 0 ? gastosHistoricos : undefined
+      }, 201);
     } catch (error) {
       await transaction.rollback();
       logger.error('Error al crear compra:', { error });
@@ -235,6 +282,17 @@ export class CompraController extends BaseController {
         isValid: false,
         message: 'La fecha de compra no puede ser futura'
       };
+    }
+
+    // Validar cuotas pagadas vs cantidad de cuotas
+    if (data.cuotas_pagadas > 0) {
+      const cantidadCuotas = data.cantidad_cuotas || 1;
+      if (data.cuotas_pagadas > cantidadCuotas) {
+        return {
+          isValid: false,
+          message: 'Las cuotas pagadas no pueden superar la cantidad total de cuotas'
+        };
+      }
     }
 
     return { isValid: true };
