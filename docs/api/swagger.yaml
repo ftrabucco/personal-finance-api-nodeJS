@@ -2653,6 +2653,13 @@ paths:
                   minimum: 1
                   maximum: 60
                   default: 1
+                cuotas_pagadas:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                  description: >
+                    Número de cuotas ya pagadas (para compras existentes que se cargan retroactivamente).
+                    Debe ser <= cantidad_cuotas. Si es igual a cantidad_cuotas, la compra se marca como completamente pagada.
                 categoria_gasto_id:
                   type: integer
                   minimum: 1
@@ -2669,6 +2676,28 @@ paths:
       responses:
         '201':
           description: Compra creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      compra:
+                        type: object
+                        description: La compra creada con sus relaciones
+                      gasto:
+                        type: object
+                        nullable: true
+                        description: Gasto generado inmediatamente (solo para compras de 1 cuota sin tarjeta de crédito)
+                      gastos_historicos:
+                        type: array
+                        items:
+                          type: object
+                        description: Gastos generados para cuotas ya pagadas (solo cuando cuotas_pagadas > 0)
 
   /compras/{id}:
     get:

@@ -77,6 +77,12 @@ const compraSchema = Joi.object({
       'number.min': 'La cantidad de cuotas debe ser al menos 1',
       'number.max': 'La cantidad de cuotas no puede exceder 60'
     }),
+  cuotas_pagadas: Joi.number().integer().min(0).default(0)
+    .messages({
+      'number.base': 'Las cuotas pagadas deben ser un número',
+      'number.integer': 'Las cuotas pagadas deben ser un número entero',
+      'number.min': 'Las cuotas pagadas no pueden ser negativas'
+    }),
   // 💱 Multi-currency fields
   moneda_origen: Joi.string().valid('ARS', 'USD').default('ARS'),
   monto_total_ars: Joi.forbidden(),
