@@ -321,7 +321,7 @@ describe('CompraController - cuotas_pagadas', () => {
       expect(call.monto_ars).toBe(500); // Full amount for single cuota
     });
 
-    it('should clamp future dates to today', async () => {
+    it('should preserve real dates even if they are in the future', async () => {
       const compra = {
         id: 6,
         descripcion: 'Compra reciente',
@@ -340,16 +340,13 @@ describe('CompraController - cuotas_pagadas', () => {
         usuario_id: 1
       };
 
-      // 3 cuotas: Feb 15 (past), Mar 15 (past), Apr 15 (future → clamped)
+      // 3 cuotas: Feb 15, Mar 15, Apr 15 — all keep their real dates
       const result = await strategy.generateHistoricalInstallments(compra, 3, mockTransaction);
 
       const calls = mockGastoCreate.mock.calls;
       expect(calls[0][0].fecha).toBe('2026-02-15');
       expect(calls[1][0].fecha).toBe('2026-03-15');
-      // Apr 15 is future, should be clamped to today
-      const moment = (await import('moment-timezone')).default;
-      const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
-      expect(calls[2][0].fecha).toBe(today);
+      expect(calls[2][0].fecha).toBe('2026-04-15');
     });
 
     it('should pass transaction to all Gasto.create calls', async () => {

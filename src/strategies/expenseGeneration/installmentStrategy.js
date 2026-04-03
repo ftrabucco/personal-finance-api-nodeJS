@@ -322,7 +322,6 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     const gastos = [];
     let lastDate = null;
-    const today = moment().tz('America/Argentina/Buenos_Aires');
 
     for (let i = 0; i < cuotasPagadas; i++) {
       let fechaMoment;
@@ -333,11 +332,6 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
         const fechaCompra = moment(compra.fecha_compra);
         fechaMoment = moment(compra.fecha_compra).add(i, 'months');
         fechaMoment.date(Math.min(fechaCompra.date(), fechaMoment.daysInMonth()));
-      }
-
-      // Cuotas "pagadas" no pueden tener fecha futura
-      if (fechaMoment.isAfter(today, 'day')) {
-        fechaMoment = today.clone();
       }
 
       const fecha = fechaMoment.format('YYYY-MM-DD');
