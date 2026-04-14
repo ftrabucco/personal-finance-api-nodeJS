@@ -65,6 +65,15 @@ export function definePreferenciasUsuario(sequelize) {
       allowNull: false,
       defaultValue: [],
       comment: 'IDs de fuentes de ingreso del sistema que el usuario quiere ocultar'
+    },
+    balance_inicial: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Balance inicial del usuario antes de empezar a usar la app (en ARS)',
+      validate: {
+        min: 0
+      }
     }
   }, {
     tableName: 'preferencias_usuario',
