@@ -56,6 +56,10 @@ export async function updatePreferencias(usuarioId, data) {
     updateData.tema = data.tema;
   }
 
+  if (data.balance_inicial !== undefined) {
+    updateData.balance_inicial = data.balance_inicial;
+  }
+
   await preferencias.update(updateData);
   return preferencias;
 }

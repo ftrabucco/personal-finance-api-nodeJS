@@ -147,11 +147,13 @@ import {
   validateIngresoRecurrenteFilters,
   validateCreateCuentaBancaria,
   validateUpdateCuentaBancaria,
-  validateCuentaBancariaFilters
+  validateCuentaBancariaFilters,
+  validateBalanceEvolucionFilters
 } from '../../middlewares/validation.middleware.js';
 
 import { obtenerProyeccion } from '../../controllers/api/proyeccion.controller.js';
 import { obtenerSaludFinanciera } from '../../controllers/api/saludFinanciera.controller.js';
+import { getEvolucionBalance } from '../../controllers/api/balance.controller.js';
 import {
   getPreferencias,
   updatePreferencias,
@@ -276,6 +278,9 @@ router.get('/proyeccion', authenticateToken, validateProyeccionFilters, obtenerP
 
 // 💚 Rutas para Salud Financiera - Requieren autenticación
 router.get('/salud-financiera', authenticateToken, validateSaludFinancieraFilters, obtenerSaludFinanciera);
+
+// 📊 Rutas para Balance - Requieren autenticación
+router.get('/balance/evolucion', authenticateToken, validateBalanceEvolucionFilters, getEvolucionBalance);
 
 // ⚙️ Rutas para Preferencias de Usuario - Requieren autenticación
 router.get('/preferencias', authenticateToken, getPreferencias);

@@ -24,11 +24,12 @@ export async function getPreferencias(req, res) {
 export async function updatePreferencias(req, res) {
   try {
     const usuarioId = req.user.id;
-    const { modulos_activos, tema } = req.body;
+    const { modulos_activos, tema, balance_inicial } = req.body;
 
     const preferencias = await preferenciasService.updatePreferencias(usuarioId, {
       modulos_activos,
-      tema
+      tema,
+      balance_inicial
     });
 
     logger.info('Preferencias actualizadas:', { usuarioId });

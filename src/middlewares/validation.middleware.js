@@ -796,3 +796,22 @@ const cuentaBancariaFiltersSchema = Joi.object({
 export const validateCreateCuentaBancaria = createValidationMiddleware(cuentaBancariaSchema, 'body');
 export const validateUpdateCuentaBancaria = createValidationMiddleware(cuentaBancariaSchema, 'body');
 export const validateCuentaBancariaFilters = createValidationMiddleware(cuentaBancariaFiltersSchema, 'query');
+
+// ==========================================
+// 📊 Balance - Evolución mensual
+// ==========================================
+
+const balanceEvolucionFiltersSchema = Joi.object({
+  desde: Joi.string().pattern(/^\d{4}-\d{2}$/).required()
+    .messages({
+      'string.pattern.base': 'El formato de "desde" debe ser YYYY-MM',
+      'any.required': 'El parámetro "desde" es requerido'
+    }),
+  hasta: Joi.string().pattern(/^\d{4}-\d{2}$/).required()
+    .messages({
+      'string.pattern.base': 'El formato de "hasta" debe ser YYYY-MM',
+      'any.required': 'El parámetro "hasta" es requerido'
+    })
+}).unknown(false);
+
+export const validateBalanceEvolucionFilters = createValidationMiddleware(balanceEvolucionFiltersSchema, 'query');
