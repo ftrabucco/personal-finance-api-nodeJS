@@ -1,5 +1,5 @@
 import { PreferenciasUsuario } from '../models/index.js';
-import { MODULOS_DISPONIBLES, MODULOS_DEFAULT } from '../models/PreferenciasUsuario.model.js';
+import { MODULOS_DISPONIBLES, MODULOS_DEFAULT, DASHBOARD_SECTIONS_DISPONIBLES, DASHBOARD_SECTIONS_DEFAULT } from '../models/PreferenciasUsuario.model.js';
 
 /**
  * Obtiene las preferencias de un usuario, creándolas si no existen
@@ -15,7 +15,8 @@ export async function getOrCreatePreferencias(usuarioId) {
     preferencias = await PreferenciasUsuario.create({
       usuario_id: usuarioId,
       modulos_activos: MODULOS_DEFAULT,
-      tema: 'system'
+      tema: 'system',
+      dashboard_sections: DASHBOARD_SECTIONS_DEFAULT
     });
   }
 
@@ -58,6 +59,13 @@ export async function updatePreferencias(usuarioId, data) {
 
   if (data.balance_inicial !== undefined) {
     updateData.balance_inicial = data.balance_inicial;
+  }
+
+  if (data.dashboard_sections !== undefined) {
+    const seccionesValidas = data.dashboard_sections.filter(
+      s => DASHBOARD_SECTIONS_DISPONIBLES.includes(s)
+    );
+    updateData.dashboard_sections = seccionesValidas;
   }
 
   await preferencias.update(updateData);

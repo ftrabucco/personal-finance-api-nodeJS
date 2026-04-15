@@ -24,6 +24,21 @@ export const MODULOS_DISPONIBLES = {
 // Modulos habilitados por defecto (solo los opcionales que queremos activos inicialmente)
 export const MODULOS_DEFAULT = ['gastos_unicos', 'ingresos_unicos'];
 
+// Secciones del dashboard disponibles
+export const DASHBOARD_SECTIONS_DISPONIBLES = [
+  'balance_acumulado',
+  'tasa_ahorro',
+  'evolucion_tabla',
+  'ingresos_vs_gastos',
+  'gastos_categoria',
+  'desglose_mes',
+  'gastos_recientes',
+  'proyeccion',
+];
+
+// Todas las secciones activas por defecto
+export const DASHBOARD_SECTIONS_DEFAULT = [...DASHBOARD_SECTIONS_DISPONIBLES];
+
 export function definePreferenciasUsuario(sequelize) {
   return sequelize.define('PreferenciasUsuario', {
     id: {
@@ -74,6 +89,12 @@ export function definePreferenciasUsuario(sequelize) {
       validate: {
         min: 0
       }
+    },
+    dashboard_sections: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: DASHBOARD_SECTIONS_DEFAULT,
+      comment: 'Secciones del dashboard habilitadas por el usuario'
     }
   }, {
     tableName: 'preferencias_usuario',
