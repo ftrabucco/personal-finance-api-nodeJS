@@ -25,6 +25,10 @@ jobs:
             cd /opt/finanzas/api
             git pull origin master
 
+            # Run pending migrations
+            chmod +x ./scripts/migrate.sh
+            DB_NAME=finanzas_personal ./scripts/migrate.sh finanzas_postgres
+
             # Build image directly from Dockerfile
             docker build --no-cache -t finanzas-api:latest .
 
