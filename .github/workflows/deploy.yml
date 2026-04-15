@@ -27,7 +27,13 @@ jobs:
 
             # Run pending migrations
             chmod +x ./scripts/migrate.sh
-            DB_NAME=finanzas_personal ./scripts/migrate.sh finanzas_postgres
+            POSTGRES_CONTAINER=$(docker ps --filter "ancestor=postgres" --filter "status=running" --format "{{.Names}}" | head -1)
+            if [ -z "$POSTGRES_CONTAINER" ]; then
+              echo "⚠️  No postgres container found, skipping migrations"
+            else
+              echo "📦 Postgres container: $POSTGRES_CONTAINER"
+              DB_NAME=finanzas_personal ./scripts/migrate.sh "$POSTGRES_CONTAINER"
+            fi
 
             # Build image directly from Dockerfile
             docker build --no-cache -t finanzas-api:latest .
