@@ -379,16 +379,10 @@ export class ProyeccionService {
     }
 
     case 'bimestral': {
-      // Every 2 months - check if this month is in sequence
-      // Starting from month 1, generates on months 1, 3, 5, 7, 9, 11
-      // Starting from month 2, generates on months 2, 4, 6, 8, 10, 12
-      const monthNumber = targetMonth.month() + 1; // 1-12
-      const startMonth = expense.fecha_inicio ?
-        moment(expense.fecha_inicio).month() + 1 :
-        1;
-
-      // Check if months since start is divisible by 2
-      const monthsSinceStart = monthNumber - startMonth;
+      // Every 2 months from fecha_inicio. Uses moment.diff to handle year boundaries correctly.
+      if (!expense.fecha_inicio) return { generates: false, dates: [] };
+      const fechaInicio = moment(expense.fecha_inicio);
+      const monthsSinceStart = targetMonth.diff(fechaInicio, 'months');
       if (monthsSinceStart >= 0 && monthsSinceStart % 2 === 0) {
         const validDate = this.getValidDayForMonth(targetMonth, targetDay);
         return { generates: true, dates: [validDate] };
@@ -397,11 +391,11 @@ export class ProyeccionService {
     }
 
     case 'trimestral': {
-      // Every 3 months - months 1, 4, 7, 10 or based on start month
-      const monthNumber = targetMonth.month() + 1;
-      const quarterMonths = [1, 4, 7, 10];
-
-      if (quarterMonths.includes(monthNumber)) {
+      // Every 3 months from fecha_inicio. Uses moment.diff to handle year boundaries correctly.
+      if (!expense.fecha_inicio) return { generates: false, dates: [] };
+      const fechaInicio = moment(expense.fecha_inicio);
+      const monthsSinceStart = targetMonth.diff(fechaInicio, 'months');
+      if (monthsSinceStart >= 0 && monthsSinceStart % 3 === 0) {
         const validDate = this.getValidDayForMonth(targetMonth, targetDay);
         return { generates: true, dates: [validDate] };
       }
@@ -409,11 +403,11 @@ export class ProyeccionService {
     }
 
     case 'semestral': {
-      // Every 6 months - months 1, 7 or based on mes_de_pago
-      const monthNumber = targetMonth.month() + 1;
-      const semesterMonths = [1, 7];
-
-      if (semesterMonths.includes(monthNumber)) {
+      // Every 6 months from fecha_inicio. Uses moment.diff to handle year boundaries correctly.
+      if (!expense.fecha_inicio) return { generates: false, dates: [] };
+      const fechaInicio = moment(expense.fecha_inicio);
+      const monthsSinceStart = targetMonth.diff(fechaInicio, 'months');
+      if (monthsSinceStart >= 0 && monthsSinceStart % 6 === 0) {
         const validDate = this.getValidDayForMonth(targetMonth, targetDay);
         return { generates: true, dates: [validDate] };
       }

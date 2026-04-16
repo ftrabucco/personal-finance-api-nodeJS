@@ -274,6 +274,20 @@ export class DebitoAutomaticoService extends BaseService {
         if (ultimaFecha.isSame(today, 'day')) {
           return { should: false, reason: 'Already generated today' };
         }
+      } else if (frecuenciaNombre === 'trimestral') {
+        const monthsSince = today.diff(ultimaFecha, 'months');
+        if (monthsSince < 3) {
+          return { should: false, reason: `Already generated ${monthsSince} months ago (quarterly needs 3)` };
+        }
+      } else if (frecuenciaNombre === 'semestral') {
+        const monthsSince = today.diff(ultimaFecha, 'months');
+        if (monthsSince < 6) {
+          return { should: false, reason: `Already generated ${monthsSince} months ago (semiannual needs 6)` };
+        }
+      } else if (frecuenciaNombre === 'anual') {
+        if (ultimaFecha.isSame(today, 'year')) {
+          return { should: false, reason: 'Already generated this year' };
+        }
       }
     }
 

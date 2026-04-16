@@ -280,6 +280,26 @@ export class GastoRecurrenteService extends BaseService {
           result.reason = 'Already generated today';
           return result;
         }
+      } else if (frecuenciaNombre === 'trimestral') {
+        // For quarterly, check if already generated within the last 3 months
+        const monthsSince = today.diff(ultimaFecha, 'months');
+        if (monthsSince < 3) {
+          result.reason = `Already generated ${monthsSince} months ago (quarterly needs 3)`;
+          return result;
+        }
+      } else if (frecuenciaNombre === 'semestral') {
+        // For semiannual, check if already generated within the last 6 months
+        const monthsSince = today.diff(ultimaFecha, 'months');
+        if (monthsSince < 6) {
+          result.reason = `Already generated ${monthsSince} months ago (semiannual needs 6)`;
+          return result;
+        }
+      } else if (frecuenciaNombre === 'anual') {
+        // For annual, check if already generated this year
+        if (ultimaFecha.isSame(today, 'year')) {
+          result.reason = 'Already generated this year';
+          return result;
+        }
       }
     }
 
@@ -553,8 +573,10 @@ export class GastoRecurrenteService extends BaseService {
 
   /**
    * Check quarterly frequency (every 3 months)
+   * Uses ultima_fecha_generado to determine the next due month dynamically,
+   * so the schedule follows the actual start date rather than hardcoded months.
    */
-  checkQuarterlyFrequency(expense, today, diaActual, mesActual) {
+  checkQuarterlyFrequency(expense, today, diaActual, _mesActual) {
     const targetDay = expense.dia_de_pago;
     const adjustedDate = this.getValidMonthlyDate(today, targetDay);
     const adjustedDay = adjustedDate.date();
@@ -567,27 +589,39 @@ export class GastoRecurrenteService extends BaseService {
       };
     }
 
-    // Check if current month is a quarter month (1, 4, 7, 10)
-    const quarterMonths = [1, 4, 7, 10];
-    if (!quarterMonths.includes(mesActual)) {
+    // First generation ever
+    if (!expense.ultima_fecha_generado) {
       return {
-        matches: false,
-        reason: `Quarterly frequency - not a quarter month (${mesActual})`,
-        adjustedDate: null
+        matches: true,
+        reason: 'First quarterly generation',
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    const lastGeneration = moment(expense.ultima_fecha_generado);
+    const monthsSince = today.diff(lastGeneration, 'months');
+
+    if (monthsSince >= 3) {
+      return {
+        matches: true,
+        reason: `Quarterly frequency - ${monthsSince} months since last generation`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
       };
     }
 
     return {
-      matches: true,
-      reason: `Quarterly frequency - generating in quarter month ${mesActual}`,
-      adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      matches: false,
+      reason: `Quarterly frequency - only ${monthsSince} months since last generation`,
+      adjustedDate: null
     };
   }
 
   /**
    * Check semiannual frequency (every 6 months)
+   * Uses ultima_fecha_generado to determine the next due month dynamically,
+   * so the schedule follows the actual start date rather than hardcoded months.
    */
-  checkSemiannualFrequency(expense, today, diaActual, mesActual) {
+  checkSemiannualFrequency(expense, today, diaActual, _mesActual) {
     const targetDay = expense.dia_de_pago;
     const adjustedDate = this.getValidMonthlyDate(today, targetDay);
     const adjustedDay = adjustedDate.date();
@@ -600,20 +634,30 @@ export class GastoRecurrenteService extends BaseService {
       };
     }
 
-    // Check if current month is a semiannual month (1, 7)
-    const semiannualMonths = [1, 7];
-    if (!semiannualMonths.includes(mesActual)) {
+    // First generation ever
+    if (!expense.ultima_fecha_generado) {
       return {
-        matches: false,
-        reason: `Semiannual frequency - not a semiannual month (${mesActual})`,
-        adjustedDate: null
+        matches: true,
+        reason: 'First semiannual generation',
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      };
+    }
+
+    const lastGeneration = moment(expense.ultima_fecha_generado);
+    const monthsSince = today.diff(lastGeneration, 'months');
+
+    if (monthsSince >= 6) {
+      return {
+        matches: true,
+        reason: `Semiannual frequency - ${monthsSince} months since last generation`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
       };
     }
 
     return {
-      matches: true,
-      reason: `Semiannual frequency - generating in month ${mesActual}`,
-      adjustedDate: adjustedDate.format('YYYY-MM-DD')
+      matches: false,
+      reason: `Semiannual frequency - only ${monthsSince} months since last generation`,
+      adjustedDate: null
     };
   }
 
