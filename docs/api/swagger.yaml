@@ -81,6 +81,28 @@ components:
           format: date-time
           description: Timestamp del error
 
+    PreferenciasUsuario:
+      type: object
+      properties:
+        balance_inicial_ars:
+          type: number
+          description: Balance inicial en pesos argentinos
+          example: 50000
+        balance_inicial_usd:
+          type: number
+          description: Balance inicial en dólares
+          example: 200
+        dashboard_sections:
+          type: object
+          description: Configuración de visibilidad de secciones del dashboard
+          additionalProperties:
+            type: boolean
+          example:
+            show_balance_acumulado: true
+            show_gastos_categoria: true
+            show_ingresos_vs_gastos: true
+            show_proyeccion: false
+
     ValidationError:
       type: object
       properties:
@@ -4932,6 +4954,184 @@ paths:
                     - "Considerá reducir gastos prescindibles"
         '400':
           description: Parámetros de validación inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /balance/evolucion:
+    get:
+      tags:
+        - Balance
+      summary: Evolución mensual del balance acumulado
+      description: |
+        Retorna el balance acumulado mes a mes considerando ingresos y gastos
+        en un rango de fechas. El balance inicial (configurable por el usuario)
+        se suma al primer mes para derivar el acumulado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: fecha_inicio
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2026-01-01'
+          description: Fecha de inicio del rango (primer día del mes)
+        - in: query
+          name: fecha_fin
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2026-12-31'
+          description: Fecha de fin del rango (último día del mes)
+      responses:
+        '200':
+          description: Evolución mensual del balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  evolucion:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        mes:
+                          type: string
+                          description: Mes en formato YYYY-MM
+                          example: '2026-01'
+                        ingresos_ars:
+                          type: number
+                          example: 150000
+                        gastos_ars:
+                          type: number
+                          example: 120000
+                        balance_mes_ars:
+                          type: number
+                          description: Ingresos - Gastos del mes
+                          example: 30000
+                        balance_acumulado_ars:
+                          type: number
+                          description: Balance acumulado incluyendo balance inicial
+                          example: 80000
+                        ingresos_usd:
+                          type: number
+                          example: 0
+                        gastos_usd:
+                          type: number
+                          example: 100
+                        balance_mes_usd:
+                          type: number
+                          example: -100
+                        balance_acumulado_usd:
+                          type: number
+                          example: -100
+              example:
+                evolucion:
+                  - mes: '2026-01'
+                    ingresos_ars: 150000
+                    gastos_ars: 120000
+                    balance_mes_ars: 30000
+                    balance_acumulado_ars: 80000
+                    ingresos_usd: 0
+                    gastos_usd: 100
+                    balance_mes_usd: -100
+                    balance_acumulado_usd: -100
+        '400':
+          description: Parámetros de fecha inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /preferencias:
+    get:
+      tags:
+        - Preferencias
+      summary: Obtener preferencias del usuario
+      description: Retorna las preferencias del usuario autenticado, incluyendo balance inicial y configuración del dashboard.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Preferencias del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenciasUsuario'
+              example:
+                balance_inicial_ars: 50000
+                balance_inicial_usd: 200
+                dashboard_sections:
+                  show_balance_acumulado: true
+                  show_gastos_categoria: true
+                  show_ingresos_vs_gastos: true
+                  show_proyeccion: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags:
+        - Preferencias
+      summary: Actualizar preferencias del usuario
+      description: |
+        Actualiza las preferencias del usuario. Solo los campos enviados
+        son actualizados (merge parcial). Los campos no enviados conservan
+        su valor anterior.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                balance_inicial_ars:
+                  type: number
+                  description: Balance inicial en pesos argentinos
+                  example: 50000
+                balance_inicial_usd:
+                  type: number
+                  description: Balance inicial en dólares
+                  example: 200
+                dashboard_sections:
+                  type: object
+                  description: Mapa de secciones visibles en el dashboard
+                  additionalProperties:
+                    type: boolean
+                  example:
+                    show_balance_acumulado: true
+                    show_gastos_categoria: false
+            example:
+              balance_inicial_ars: 50000
+              balance_inicial_usd: 200
+              dashboard_sections:
+                show_balance_acumulado: true
+                show_gastos_categoria: true
+      responses:
+        '200':
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenciasUsuario'
+        '400':
+          description: Datos inválidos
           content:
             application/json:
               schema:

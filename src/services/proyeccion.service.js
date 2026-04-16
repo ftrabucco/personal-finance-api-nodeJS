@@ -379,6 +379,7 @@ export class ProyeccionService {
     }
 
     case 'bimestral': {
+      // Every 2 months from fecha_inicio. Uses moment.diff to handle year boundaries correctly.
       if (!expense.fecha_inicio) return { generates: false, dates: [] };
       const fechaInicio = moment(expense.fecha_inicio);
       const monthsSinceStart = targetMonth.diff(fechaInicio, 'months');
@@ -390,6 +391,7 @@ export class ProyeccionService {
     }
 
     case 'trimestral': {
+      // Every 3 months from fecha_inicio. Uses moment.diff to handle year boundaries correctly.
       if (!expense.fecha_inicio) return { generates: false, dates: [] };
       const fechaInicio = moment(expense.fecha_inicio);
       const monthsSinceStart = targetMonth.diff(fechaInicio, 'months');
@@ -401,6 +403,7 @@ export class ProyeccionService {
     }
 
     case 'semestral': {
+      // Every 6 months from fecha_inicio. Uses moment.diff to handle year boundaries correctly.
       if (!expense.fecha_inicio) return { generates: false, dates: [] };
       const fechaInicio = moment(expense.fecha_inicio);
       const monthsSinceStart = targetMonth.diff(fechaInicio, 'months');
