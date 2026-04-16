@@ -4999,7 +4999,19 @@ paths:
               schema:
                 type: object
                 properties:
-                  evolucion:
+                  balance_inicial:
+                    type: number
+                    description: Balance inicial configurado por el usuario en ARS
+                    example: 500000
+                  balance_actual_ars:
+                    type: number
+                    description: Acumulado del último mes en ARS
+                    example: 630000
+                  balance_actual_usd:
+                    type: number
+                    description: Acumulado del último mes en USD nativo
+                    example: 50
+                  meses:
                     type: array
                     items:
                       type: object
@@ -5014,24 +5026,24 @@ paths:
                         gastos_ars:
                           type: number
                           example: 120000
-                        balance_mes_ars:
+                        saldo_ars:
                           type: number
-                          description: Ingresos - Gastos del mes
+                          description: Ingresos - Gastos del mes en ARS
                           example: 30000
-                        balance_acumulado_ars:
+                        acumulado_ars:
                           type: number
-                          description: Balance acumulado incluyendo balance inicial
-                          example: 80000
+                          description: Balance acumulado incluyendo balance inicial en ARS
+                          example: 530000
                         ingresos_usd:
                           type: number
                           example: 0
                         gastos_usd:
                           type: number
                           example: 100
-                        balance_mes_usd:
+                        saldo_usd:
                           type: number
                           example: -100
-                        balance_acumulado_usd:
+                        acumulado_usd:
                           type: number
                           example: -100
                         tipo_cambio_mes:
@@ -5040,16 +5052,19 @@ paths:
                           description: TC de venta USD/ARS vigente al último día del mes. Null si no hay registro histórico.
                           example: 1350.50
               example:
-                evolucion:
+                balance_inicial: 500000
+                balance_actual_ars: 530000
+                balance_actual_usd: -100
+                meses:
                   - mes: '2026-01'
                     ingresos_ars: 150000
                     gastos_ars: 120000
-                    balance_mes_ars: 30000
-                    balance_acumulado_ars: 80000
+                    saldo_ars: 30000
+                    acumulado_ars: 530000
                     ingresos_usd: 0
                     gastos_usd: 100
-                    balance_mes_usd: -100
-                    balance_acumulado_usd: -100
+                    saldo_usd: -100
+                    acumulado_usd: -100
                     tipo_cambio_mes: 1350.50
         '400':
           description: Parámetros de fecha inválidos

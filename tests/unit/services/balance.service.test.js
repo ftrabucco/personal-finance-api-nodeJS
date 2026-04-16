@@ -11,6 +11,7 @@ const mockIngresoRecurrente = {
 };
 
 const mockGetOrCreatePreferencias = jest.fn();
+const mockGetRateForDate = jest.fn();
 
 jest.unstable_mockModule('../../../src/models/index.js', () => ({
   sequelize: mockSequelize,
@@ -19,6 +20,12 @@ jest.unstable_mockModule('../../../src/models/index.js', () => ({
 
 jest.unstable_mockModule('../../../src/services/preferenciasUsuario.service.js', () => ({
   getOrCreatePreferencias: mockGetOrCreatePreferencias
+}));
+
+jest.unstable_mockModule('../../../src/services/exchangeRate.service.js', () => ({
+  ExchangeRateService: {
+    getRateForDate: mockGetRateForDate
+  }
 }));
 
 const {
@@ -73,6 +80,8 @@ function setupMocks({
 describe('Balance Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: TC available for every month
+    mockGetRateForDate.mockResolvedValue({ valor_venta_usd_ars: '1350.00' });
   });
 
   // ==========================================
@@ -317,6 +326,56 @@ describe('Balance Service', () => {
       // Plus 50k recurring in April itself
       // acumulado = 500k + 150k (saldo previo recurrentes) + 50k (recurrente in Apr) = 700k
       expect(result.meses[0].acumulado_ars).toBe(700000);
+    });
+
+    // ─── tipo_cambio_mes ────────────────────────────────────────────────────────
+
+    it('should include tipo_cambio_mes from ExchangeRateService in each month', async () => {
+      mockGetRateForDate.mockResolvedValue({ valor_venta_usd_ars: '1350.50' });
+      setupMocks();
+
+      const result = await getEvolucionMensual(usuarioId, '2026-04', '2026-04');
+
+      expect(result.meses[0].tipo_cambio_mes).toBe(1350.50);
+      expect(mockGetRateForDate).toHaveBeenCalledWith('2026-04-30');
+    });
+
+    it('should use last day of each month when fetching TC', async () => {
+      mockGetRateForDate
+        .mockResolvedValueOnce({ valor_venta_usd_ars: '1300.00' }) // Jan
+        .mockResolvedValueOnce({ valor_venta_usd_ars: '1400.00' }); // Feb
+      setupMocks();
+
+      const result = await getEvolucionMensual(usuarioId, '2026-01', '2026-02');
+
+      expect(mockGetRateForDate).toHaveBeenCalledWith('2026-01-31');
+      expect(mockGetRateForDate).toHaveBeenCalledWith('2026-02-28');
+      expect(result.meses[0].tipo_cambio_mes).toBe(1300);
+      expect(result.meses[1].tipo_cambio_mes).toBe(1400);
+    });
+
+    it('should set tipo_cambio_mes to null when ExchangeRateService throws', async () => {
+      mockGetRateForDate.mockRejectedValue(new Error('No TC found'));
+      setupMocks();
+
+      const result = await getEvolucionMensual(usuarioId, '2026-04', '2026-04');
+
+      expect(result.meses[0].tipo_cambio_mes).toBeNull();
+    });
+
+    it('should not affect ARS balance calculations when TC is unavailable', async () => {
+      mockGetRateForDate.mockRejectedValue(new Error('No TC found'));
+      setupMocks({
+        gastosPorMes: [{ mes: '2026-04', total_ars: '100000', total_usd: '0' }],
+        ingresosUnicosPorMes: [{ mes: '2026-04', total_ars: '150000', total_usd: '0' }],
+      });
+
+      const result = await getEvolucionMensual(usuarioId, '2026-04', '2026-04');
+
+      // ARS balance unaffected
+      expect(result.meses[0].saldo_ars).toBe(50000);
+      expect(result.meses[0].acumulado_ars).toBe(550000);
+      expect(result.meses[0].tipo_cambio_mes).toBeNull();
     });
   });
 });
