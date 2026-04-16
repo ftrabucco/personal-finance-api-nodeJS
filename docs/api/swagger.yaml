@@ -5034,6 +5034,11 @@ paths:
                         balance_acumulado_usd:
                           type: number
                           example: -100
+                        tipo_cambio_mes:
+                          type: number
+                          nullable: true
+                          description: TC de venta USD/ARS vigente al último día del mes. Null si no hay registro histórico.
+                          example: 1350.50
               example:
                 evolucion:
                   - mes: '2026-01'
@@ -5045,6 +5050,7 @@ paths:
                     gastos_usd: 100
                     balance_mes_usd: -100
                     balance_acumulado_usd: -100
+                    tipo_cambio_mes: 1350.50
         '400':
           description: Parámetros de fecha inválidos
           content:

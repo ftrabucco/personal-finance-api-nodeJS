@@ -2,6 +2,7 @@ import { IngresoRecurrente } from '../models/index.js';
 import { sequelize } from '../models/index.js';
 import { QueryTypes } from 'sequelize';
 import { getOrCreatePreferencias } from './preferenciasUsuario.service.js';
+import { ExchangeRateService } from './exchangeRate.service.js';
 
 /**
  * Obtiene la evolución mensual del balance de un usuario
@@ -95,6 +96,19 @@ export async function getEvolucionMensual(usuarioId, desde, hasta) {
   let acumuladoArs = balanceInicial + saldoPrevioArs;
   let acumuladoUsd = saldoPrevioUsd;
 
+  // Obtener TC histórico para cada mes en paralelo (usa el último día del mes como referencia)
+  const tcPorMes = await Promise.all(
+    meses.map(async mes => {
+      try {
+        const tc = await ExchangeRateService.getRateForDate(getLastDayOfMonth(mes));
+        return { mes, tc_venta: parseFloat(tc.valor_venta_usd_ars) };
+      } catch {
+        return { mes, tc_venta: null };
+      }
+    })
+  );
+  const tcMap = new Map(tcPorMes.map(({ mes, tc_venta }) => [mes, tc_venta]));
+
   const evolucion = meses.map(mes => {
     const gastos = gastosMap.get(mes) || { total_ars: 0, total_usd: 0 };
     const ingresosU = ingresosUnicosMap.get(mes) || { total_ars: 0, total_usd: 0 };
@@ -135,7 +149,8 @@ export async function getEvolucionMensual(usuarioId, desde, hasta) {
       ingresos_usd: round2(totalIngresosUsd),
       gastos_usd: round2(totalGastosUsd),
       saldo_usd: round2(saldoUsd),
-      acumulado_usd: round2(acumuladoUsd)
+      acumulado_usd: round2(acumuladoUsd),
+      tipo_cambio_mes: tcMap.get(mes) ?? null
     };
   });
 
