@@ -27,7 +27,7 @@ jobs:
 
             # Run pending migrations
             chmod +x ./scripts/migrate.sh
-            POSTGRES_CONTAINER=$(docker ps --filter "ancestor=postgres" --filter "status=running" --format "{{.Names}}" | head -1)
+            POSTGRES_CONTAINER=$(docker ps --filter "name=finanzas-db" --filter "status=running" --format "{{.Names}}" | head -1)
             if [ -z "$POSTGRES_CONTAINER" ]; then
               echo "⚠️  No postgres container found, skipping migrations"
             else
