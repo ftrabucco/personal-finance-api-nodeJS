@@ -33,7 +33,7 @@ export const DASHBOARD_SECTIONS_DISPONIBLES = [
   'gastos_categoria',
   'desglose_mes',
   'gastos_recientes',
-  'proyeccion',
+  'proyeccion'
 ];
 
 // Todas las secciones activas por defecto
