@@ -18,8 +18,8 @@ const sequelize = new Sequelize({
     useUTC: false, // No usar UTC para las fechas
     dateStrings: true, // Usar cadenas de fecha en lugar de objetos Date
     typeCast: true, // Permitir el casteo de tipos
-    // SSL requerido para Render y otros proveedores cloud
-    ...(isProduction && {
+    // SSL opcional según variable de entorno (requerido en Render, no en Docker local)
+    ...(isProduction && process.env.DB_SSL !== 'false' && {
       ssl: {
         require: true,
         rejectUnauthorized: false
