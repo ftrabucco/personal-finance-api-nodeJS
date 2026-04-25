@@ -31,8 +31,7 @@ const sequelize = new Sequelize({
   schema: 'finanzas',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   dialectOptions: {
-    // SSL requerido para Render y otros proveedores cloud
-    ...(isProduction && {
+    ...(isProduction && process.env.DB_SSL !== 'false' && {
       ssl: {
         require: true,
         rejectUnauthorized: false
