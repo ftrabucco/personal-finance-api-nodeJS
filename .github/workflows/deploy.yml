@@ -13,6 +13,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -35,12 +42,11 @@ jobs:
               DB_USER=finanzas_user DB_NAME=finanzas_personal ./scripts/migrate.sh "$POSTGRES_CONTAINER"
             fi
 
-            # Build image directly from Dockerfile
-            docker build --no-cache -t finanzas-api:latest .
-
+            # Build and restart API
             cd /opt/finanzas
-            docker-compose stop api
-            docker-compose rm -f api
-            docker-compose up -d api
+            docker compose down
+            docker rmi finanzas-api:latest --force || true
+            docker compose build --no-cache api
+            docker compose up -d
             docker system prune -f
             echo "Deploy completed at $(date)"
