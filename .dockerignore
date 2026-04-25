@@ -30,7 +30,8 @@ jest.config.js
 .gitlab-ci.yml
 
 # Documentation
-docs
+docs/**
+!docs/api/swagger.yaml
 *.md
 !README.md
 
