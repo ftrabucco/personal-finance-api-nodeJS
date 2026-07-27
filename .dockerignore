@@ -51,8 +51,8 @@ Dockerfile
 docker-compose*.yml
 
 # Database
-*.sql
-migrations
+# Keep schema and migrations in the Docker image so deployed environments can
+# bootstrap clean databases.
 
 # MCP (no necesario en container)
 mcp-server.js

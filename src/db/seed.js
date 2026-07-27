@@ -156,26 +156,47 @@ async function seedInitialData() {
     const deseadoId = importancias.find(i => i.nombre_importancia === 'Deseado')?.id || 2;
     const debitoId = tiposPago.find(t => t.nombre === 'Débito')?.id || 1;
     const creditoId = tiposPago.find(t => t.nombre === 'Crédito')?.id || 3;
+    const [exchangeRates] = await sequelize.query(`
+      SELECT valor_venta_usd_ars
+      FROM finanzas.tipos_cambio
+      WHERE activo = true
+      ORDER BY fecha DESC
+      LIMIT 1;
+    `);
+    const exchangeRate = Number(exchangeRates[0]?.valor_venta_usd_ars || 1500);
+
+    const toUsd = (amount) => (amount / exchangeRate).toFixed(2);
 
     // Gasto Único de ejemplo
     await sequelize.query(`
-      INSERT INTO finanzas.gastos_unico (descripcion, monto, fecha, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, usuario_id, procesado) VALUES
-        ('Supermercado Coto - compra semanal', 15000, '2025-01-15', ${supermercadoId}, ${necesarioId}, ${debitoId}, ${userId}, true),
-        ('Farmacia - medicamentos', 8500, '2025-01-14', ${supermercadoId}, ${necesarioId}, ${debitoId}, ${userId}, true)
+      INSERT INTO finanzas.gastos_unico (
+        descripcion, monto, fecha, categoria_gasto_id, importancia_gasto_id, tipo_pago_id,
+        usuario_id, procesado, moneda_origen, monto_ars, monto_usd, tipo_cambio_usado
+      ) VALUES
+        ('Supermercado Coto - compra semanal', 15000, '2025-01-15', ${supermercadoId}, ${necesarioId}, ${debitoId}, ${userId}, true, 'ARS', 15000, ${toUsd(15000)}, ${exchangeRate}),
+        ('Farmacia - medicamentos', 8500, '2025-01-14', ${supermercadoId}, ${necesarioId}, ${debitoId}, ${userId}, true, 'ARS', 8500, ${toUsd(8500)}, ${exchangeRate})
       ON CONFLICT DO NOTHING;
     `);
 
     // Gasto Recurrente de ejemplo
     await sequelize.query(`
-      INSERT INTO finanzas.gastos_recurrentes (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo, created_at, updated_at) VALUES
-        ('Alquiler departamento', 180000, 5, ${alquilerId}, ${necesarioId}, ${debitoId}, 4, ${userId}, true, NOW(), NOW())
+      INSERT INTO finanzas.gastos_recurrentes (
+        descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id,
+        frecuencia_gasto_id, usuario_id, activo, moneda_origen, monto_ars, monto_usd,
+        tipo_cambio_referencia, created_at, updated_at
+      ) VALUES
+        ('Alquiler departamento', 180000, 5, ${alquilerId}, ${necesarioId}, ${debitoId}, 4, ${userId}, true, 'ARS', 180000, ${toUsd(180000)}, ${exchangeRate}, NOW(), NOW())
       ON CONFLICT DO NOTHING;
     `);
 
     // Débito Automático de ejemplo
     await sequelize.query(`
-      INSERT INTO finanzas.debitos_automaticos (descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id, frecuencia_gasto_id, usuario_id, activo, created_at, updated_at) VALUES
-        ('Netflix Premium', 5990, 12, ${streamingId}, ${deseadoId}, ${creditoId}, 4, ${userId}, true, NOW(), NOW())
+      INSERT INTO finanzas.debitos_automaticos (
+        descripcion, monto, dia_de_pago, categoria_gasto_id, importancia_gasto_id, tipo_pago_id,
+        frecuencia_gasto_id, usuario_id, activo, moneda_origen, monto_ars, monto_usd,
+        tipo_cambio_referencia, created_at, updated_at
+      ) VALUES
+        ('Netflix Premium', 5990, 12, ${streamingId}, ${deseadoId}, ${creditoId}, 4, ${userId}, true, 'ARS', 5990, ${toUsd(5990)}, ${exchangeRate}, NOW(), NOW())
       ON CONFLICT DO NOTHING;
     `);
 

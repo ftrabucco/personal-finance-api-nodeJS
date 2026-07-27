@@ -72,7 +72,7 @@ EXPOSE 3030
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3030/health || exit 1
+    CMD curl -f "http://localhost:${PORT:-3030}/health" || exit 1
 
 # Variables de entorno por defecto (se sobrescriben en runtime)
 ENV NODE_ENV=production
