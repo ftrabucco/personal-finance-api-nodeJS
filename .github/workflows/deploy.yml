@@ -1,19 +1,39 @@
-name: Deploy to Hetzner
+name: Deploy API
 
 on:
   push:
     branches:
       - master
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: master
+        type: string
 
 jobs:
-  deploy:
+  deploy-staging:
+    name: Deploy staging API
+    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
     runs-on: ubuntu-latest
+    environment: staging
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
 
-      - name: Deploy to server
+      - name: Deploy staging to server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -21,11 +41,61 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
+            DEPLOY_REF="${{ github.event.inputs.ref || github.ref_name }}"
+
             git config --global --add safe.directory /opt/finanzas/api
             cd /opt/finanzas/api
-            git pull origin master
+            git fetch origin
+            git checkout "$DEPLOY_REF"
+            git pull origin "$DEPLOY_REF"
 
-            # Run pending migrations
+            # Run pending migrations against staging/test database
+            chmod +x ./scripts/migrate.sh
+            POSTGRES_CONTAINER=$(docker ps --filter "name=finanzas-db" --filter "status=running" --format "{{.Names}}" | head -1)
+            if [ -z "$POSTGRES_CONTAINER" ]; then
+              echo "⚠️  No postgres container found, skipping migrations"
+            else
+              echo "📦 Postgres container: $POSTGRES_CONTAINER"
+              DB_USER=finanzas_user DB_NAME=finanzas_personal_test ./scripts/migrate.sh "$POSTGRES_CONTAINER"
+            fi
+
+            # Build and restart only staging API
+            cd /opt/finanzas
+            docker rmi finanzas-api:latest --force || true
+            docker compose build --no-cache api-test
+            docker compose up -d --force-recreate api-test
+            docker system prune -f
+            echo "Staging deploy completed at $(date)"
+
+  deploy-production:
+    name: Deploy production API
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Deploy production to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            DEPLOY_REF="${{ github.event.inputs.ref }}"
+
+            git config --global --add safe.directory /opt/finanzas/api
+            cd /opt/finanzas/api
+            git fetch origin
+            git checkout "$DEPLOY_REF"
+            git pull origin "$DEPLOY_REF"
+
+            # Run pending migrations against production database
             chmod +x ./scripts/migrate.sh
             POSTGRES_CONTAINER=$(docker ps --filter "name=finanzas-db" --filter "status=running" --format "{{.Names}}" | head -1)
             if [ -z "$POSTGRES_CONTAINER" ]; then
@@ -35,11 +105,10 @@ jobs:
               DB_USER=finanzas_user DB_NAME=finanzas_personal ./scripts/migrate.sh "$POSTGRES_CONTAINER"
             fi
 
-            # Build and restart API
+            # Build and restart only production API
             cd /opt/finanzas
-            docker compose down
             docker rmi finanzas-api:latest --force || true
             docker compose build --no-cache api
-            docker compose up -d
+            docker compose up -d --force-recreate api
             docker system prune -f
-            echo "Deploy completed at $(date)"
+            echo "Production deploy completed at $(date)"
