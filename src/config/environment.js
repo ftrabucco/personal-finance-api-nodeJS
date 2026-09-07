@@ -8,6 +8,20 @@ const __dirname = path.dirname(__filename);
 // Cargar variables de entorno
 dotenv.config();
 
+function parseCorsOrigin(defaultOrigin = false) {
+  if (!process.env.CORS_ORIGIN) return defaultOrigin;
+
+  const origins = process.env.CORS_ORIGIN
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  if (origins.length === 0) return defaultOrigin;
+  if (origins.length === 1) return origins[0];
+
+  return origins;
+}
+
 // Configuración por entorno
 const environments = {
   development: {
@@ -39,7 +53,7 @@ const environments = {
         max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000 // 10k requests por minuto
       },
       cors: {
-        origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : 'http://localhost:3000',
+        origin: parseCorsOrigin('http://localhost:3000'),
         credentials: true
       },
       helmet: {
@@ -140,7 +154,7 @@ const environments = {
         max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 50 // Más restrictivo en producción
       },
       cors: {
-        origin: process.env.CORS_ORIGIN || false,
+        origin: parseCorsOrigin(false),
         credentials: true
       },
       helmet: {

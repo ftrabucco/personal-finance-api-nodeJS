@@ -45,8 +45,8 @@ export const rateLimitMiddleware = process.env.NODE_ENV === 'test'
 export const authRateLimitMiddleware = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
   ? (req, res, next) => next()
   : rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 5, // 5 intentos por ventana
+    windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
+    max: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS) || 5, // 5 intentos por ventana
     message: {
       error: 'Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.'
     },
@@ -60,7 +60,8 @@ export const authRateLimitMiddleware = process.env.NODE_ENV === 'test' || proces
 
       res.status(429).json({
         success: false,
-        error: 'Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.'
+        error: 'Demasiados intentos de autenticación, intenta de nuevo en 15 minutos.',
+        retryAfter: Math.ceil((parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
       });
     }
   });
