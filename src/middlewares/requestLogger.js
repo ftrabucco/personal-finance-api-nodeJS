@@ -6,7 +6,13 @@ export function requestLogger(req, res, next) {
 
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.info(`${method} ${originalUrl} - ${res.statusCode} - ${duration}ms`);
+    logger.info('HTTP request completed', {
+      method,
+      path: originalUrl,
+      statusCode: res.statusCode,
+      durationMs: duration,
+      ...(req.e2eMetadata ? { e2e: req.e2eMetadata } : {})
+    });
   });
 
   next();
