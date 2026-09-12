@@ -6,6 +6,7 @@ import viewRouter from './src/routes/views/index.routes.js';
 import { errorMiddleware } from './src/middlewares/errorMiddleware.js';
 import logger from './src/utils/logger.js';
 import { requestLogger } from './src/middlewares/requestLogger.js';
+import { e2eMetadata } from './src/middlewares/e2eMetadata.middleware.js';
 import exphbs from 'express-handlebars';
 import path from 'path';
 import { helpers } from './src/utils/handlebars.helpers.js';
@@ -51,6 +52,7 @@ app.use(security.validateContentType);
 // Configuración de method-override para PUT y DELETE de las vistas
 app.use(methodOverride('_method'));
 
+app.use(e2eMetadata);
 app.use(requestLogger);
 
 // Health check endpoint (antes de otros middlewares)
@@ -134,4 +136,3 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Exportar app para tests
 export default app;
-
