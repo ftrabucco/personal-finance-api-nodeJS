@@ -11,7 +11,7 @@ export function requestLogger(req, res, next) {
       path: originalUrl,
       statusCode: res.statusCode,
       durationMs: duration,
-      e2e: req.e2eMetadata
+      ...(req.e2eMetadata ? { e2e: req.e2eMetadata } : {})
     });
   });
 

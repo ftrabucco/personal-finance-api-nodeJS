@@ -90,4 +90,24 @@ describe('Request logger E2E metadata', () => {
       })
     );
   });
+
+  it('does not include E2E metadata when request has no E2E headers', () => {
+    const mockReq = {
+      method: 'GET',
+      originalUrl: '/health'
+    };
+    const mockRes = new EventEmitter();
+    mockRes.statusCode = 200;
+    const mockNext = jest.fn();
+
+    requestLogger(mockReq, mockRes, mockNext);
+    mockRes.emit('finish');
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'HTTP request completed',
+      expect.not.objectContaining({
+        e2e: expect.anything()
+      })
+    );
+  });
 });
