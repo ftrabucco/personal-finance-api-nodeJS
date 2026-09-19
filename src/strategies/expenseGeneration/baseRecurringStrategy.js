@@ -51,7 +51,7 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
 
     // Check if already generated today
     if (source.ultima_fecha_generado) {
-      const ultimaFecha = moment(source.ultima_fecha_generado);
+      const ultimaFecha = moment.tz(source.ultima_fecha_generado, 'America/Argentina/Buenos_Aires');
       if (ultimaFecha.isSame(today, 'day')) {
         logger.debug(`${this.getType()} already generated today`, {
           id: source.id,
@@ -76,7 +76,7 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
   validateDateBoundaries(source, today) {
     // Check start date if exists
     if (source.fecha_inicio) {
-      const fechaInicio = moment(source.fecha_inicio);
+      const fechaInicio = moment.tz(source.fecha_inicio, 'America/Argentina/Buenos_Aires');
       if (today.isBefore(fechaInicio, 'day')) {
         logger.debug(`${this.getType()} start date not reached`, {
           id: source.id,
@@ -90,7 +90,7 @@ export class BaseRecurringStrategy extends BaseExpenseGenerationStrategy {
 
     // Check end date if exists
     if (source.fecha_fin) {
-      const fechaFin = moment(source.fecha_fin);
+      const fechaFin = moment.tz(source.fecha_fin, 'America/Argentina/Buenos_Aires');
       if (today.isAfter(fechaFin, 'day')) {
         logger.debug(`${this.getType()} end date passed`, {
           id: source.id,
