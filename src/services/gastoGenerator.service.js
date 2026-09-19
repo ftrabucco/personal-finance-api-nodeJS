@@ -391,7 +391,8 @@ export class GastoGeneratorService {
   static async generatePendingExpenses(userId) {
     const results = {
       success: [],
-      errors: []
+      errors: [],
+      summary: null
     };
 
     try {
@@ -400,6 +401,7 @@ export class GastoGeneratorService {
       const scheduledResults = await this.generateScheduledExpenses(userId, true);
       results.success.push(...scheduledResults.success);
       results.errors.push(...scheduledResults.errors);
+      results.summary = scheduledResults.summary;
 
       // Procesar gastos únicos pendientes (para endpoint manual únicamente)
       const whereClause = { procesado: false };

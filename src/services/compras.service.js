@@ -213,13 +213,36 @@ export class ComprasService extends BaseService {
 
     const pendingPurchases = await this.findAll({ where: whereClause });
     const readyPurchases = [];
+    const skipped = [];
 
     for (const purchase of pendingPurchases) {
       const shouldGenerate = await this.installmentStrategy.shouldGenerate(purchase, allowCatchUp);
       if (shouldGenerate) {
         readyPurchases.push(purchase);
+      } else {
+        skipped.push({
+          id: purchase.id,
+          descripcion: purchase.descripcion,
+          cantidad_cuotas: purchase.cantidad_cuotas,
+          fecha_compra: purchase.fecha_compra,
+          fecha_ultima_cuota_generada: purchase.fecha_ultima_cuota_generada,
+          tarjeta_id: purchase.tarjeta_id,
+          tarjeta_tipo: purchase.tarjeta?.tipo
+        });
       }
     }
+
+    logger.info('Compras evaluadas para generación de cuotas', {
+      userId: userId || 'all',
+      allowCatchUp,
+      pending_count: pendingPurchases.length,
+      ready_count: readyPurchases.length,
+      skipped_count: skipped.length
+    });
+
+    logger.debug('Compras salteadas para generación de cuotas', {
+      skipped
+    });
 
     return readyPurchases;
   }

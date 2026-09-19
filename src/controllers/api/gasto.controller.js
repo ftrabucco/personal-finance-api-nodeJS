@@ -168,7 +168,8 @@ export class GastoController extends BaseController {
 
       const responseData = {
         summary,
-        details: results
+        details: results,
+        scheduled_summary: results.summary
       };
 
       return sendSuccess(res, responseData, 200, 'Generación manual de gastos completada exitosamente');

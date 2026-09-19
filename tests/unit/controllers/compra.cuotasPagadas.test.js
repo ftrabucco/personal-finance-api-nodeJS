@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, jest, afterEach } from '@jest/globals';
+import moment from 'moment-timezone';
 
 // Mock sequelize
 const mockTransaction = {
@@ -373,6 +374,87 @@ describe('CompraController - cuotas_pagadas', () => {
       expect(mockGastoCreate).toHaveBeenCalledTimes(2);
       expect(mockGastoCreate.mock.calls[0][1]).toEqual({ transaction: mockTransaction });
       expect(mockGastoCreate.mock.calls[1][1]).toEqual({ transaction: mockTransaction });
+    });
+  });
+
+  describe('catch-up installment generation', () => {
+    let strategy;
+
+    beforeEach(() => {
+      strategy = new InstallmentExpenseStrategy();
+      mockGastoCreate.mockImplementation((data) => Promise.resolve({ id: Math.random(), ...data }));
+    });
+
+    it('should not generate a regular installment after its date unless catch-up is enabled', () => {
+      const compra = {
+        id: 10,
+        descripcion: 'Compra mensual',
+        monto_total: 6000,
+        cantidad_cuotas: 6,
+        fecha_compra: '2026-04-10',
+        fecha_ultima_cuota_generada: '2026-04-10',
+        pendiente_cuotas: true,
+        tarjeta_id: null,
+        tarjeta: null
+      };
+      const today = moment.tz('2026-05-19', 'America/Argentina/Buenos_Aires');
+
+      expect(strategy.shouldGenerateMultipleInstallment(compra, today, 1, false)).toBe(false);
+      expect(strategy.shouldGenerateMultipleInstallment(compra, today, 1, true)).toBe(true);
+      expect(compra.adjustedDate).toBe('2026-05-10');
+      expect(compra.nextInstallmentNumber).toBe(2);
+    });
+
+    it('should catch up a missed credit-card due date and remember the real due date', () => {
+      const compra = {
+        id: 11,
+        descripcion: 'Compra tarjeta',
+        monto_total: 12000,
+        cantidad_cuotas: 12,
+        fecha_compra: '2026-04-10',
+        pendiente_cuotas: true,
+        tarjeta_id: 1,
+        tarjeta: { tipo: 'credito', dia_mes_cierre: 20, dia_mes_vencimiento: 10 }
+      };
+      const today = moment.tz('2026-05-19', 'America/Argentina/Buenos_Aires');
+
+      expect(strategy.shouldGenerateOnCreditCardDueDate(compra, today, 0, false)).toBe(false);
+      expect(strategy.shouldGenerateOnCreditCardDueDate(compra, today, 0, true)).toBe(true);
+      expect(compra.adjustedDate).toBe('2026-05-10');
+      expect(compra.nextInstallmentNumber).toBe(1);
+    });
+
+    it('should persist the recovered installment with its target date', async () => {
+      const compra = {
+        id: 12,
+        descripcion: 'Compra recuperada',
+        monto_total: 6000,
+        monto_total_ars: 6000,
+        monto_total_usd: null,
+        cantidad_cuotas: 6,
+        fecha_compra: '2026-04-10',
+        moneda_origen: 'ARS',
+        tipo_cambio_usado: null,
+        categoria_gasto_id: 1,
+        importancia_gasto_id: 1,
+        tipo_pago_id: 2,
+        tarjeta_id: null,
+        tarjeta: null,
+        usuario_id: 1,
+        pendiente_cuotas: true,
+        adjustedDate: '2026-05-10',
+        nextInstallmentNumber: 2,
+        update: jest.fn().mockResolvedValue()
+      };
+
+      await strategy.generate(compra, mockTransaction);
+
+      expect(mockGastoCreate.mock.calls[0][0].fecha).toBe('2026-05-10');
+      expect(mockGastoCreate.mock.calls[0][0].descripcion).toBe('Compra recuperada - Cuota 2/6');
+      expect(compra.update).toHaveBeenCalledWith(
+        { fecha_ultima_cuota_generada: '2026-05-10' },
+        { transaction: mockTransaction }
+      );
     });
   });
 });

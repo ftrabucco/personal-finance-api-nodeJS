@@ -286,8 +286,9 @@ export class ExpenseScheduler {
       logger.debug('🔌 Circuit breaker enabled for this execution');
     }
 
-    // Ejecutar con configuraciones optimizadas
-    const results = await GastoGeneratorService.generateScheduledExpenses();
+    // Ejecutar con catch-up: si el proceso no corrió justo el día de una cuota,
+    // debe recuperar la cuota vencida en la siguiente ejecución automática.
+    const results = await GastoGeneratorService.generateScheduledExpenses(null, true);
 
     // Aplicar post-procesamiento según optimizaciones
     if (optimizations.retryImmediately && results.errors.length > 0) {
