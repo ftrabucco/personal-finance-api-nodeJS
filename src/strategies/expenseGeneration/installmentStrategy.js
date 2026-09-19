@@ -30,12 +30,10 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     }
 
     try {
-      const today = moment().tz('America/Argentina/Buenos_Aires');
-
       // Calcular cuál cuota corresponde
-      const cuotaActual = await this.calculateCurrentInstallment(compra);
+      const cuotaActual = compra.nextInstallmentNumber || await this.calculateCurrentInstallment(compra);
 
-      // Calcular fecha: tarjeta de crédito usa fecha de vencimiento, otros usan hoy
+      // Calcular fecha: tarjeta de crédito usa fecha de vencimiento, otros usan la fecha objetivo
       let fechaParaBD;
       const isCreditCard = compra.tarjeta_id && compra.tarjeta?.tipo === 'credito';
       if (isCreditCard) {
@@ -43,7 +41,8 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
         const fechaVencimiento = CreditCardDateService.calculateDueDate(compra, compra.tarjeta, cuotaNumero0Based);
         fechaParaBD = fechaVencimiento.format('YYYY-MM-DD');
       } else {
-        fechaParaBD = today.format('YYYY-MM-DD');
+        fechaParaBD = compra.adjustedDate ||
+          this.calculateRegularInstallmentDate(compra, cuotaActual - 1).format('YYYY-MM-DD');
       }
 
       // 💱 Calculate installment amount in both currencies
@@ -64,7 +63,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
       });
 
       // Actualizar estado de la compra
-      await this.updateCompraStatus(compra, cuotaActual, transaction);
+      await this.updateCompraStatus(compra, cuotaActual, transaction, fechaParaBD);
 
       logger.info('Gasto generado con estrategia cuotas (multi-moneda):', {
         gasto_id: gasto.id,
@@ -105,7 +104,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
     // Para cuota única
     if (totalCuotas === 1) {
-      return this.shouldGenerateSingleInstallment(compra, today, allowCatchUp);
+      return this.shouldGenerateSingleInstallment(compra, today, allowCatchUp, cuotasGeneradas);
     }
 
     // Para múltiples cuotas
@@ -115,7 +114,7 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
   /**
    * Verifica si debe generar una cuota única
    */
-  shouldGenerateSingleInstallment(compra, today, allowCatchUp = false) {
+  shouldGenerateSingleInstallment(compra, today, allowCatchUp = false, cuotasGeneradas = 0) {
     // Si ya se generó, no generar de nuevo
     if (compra.fecha_ultima_cuota_generada) {
       return false;
@@ -129,7 +128,11 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     // Para otros medios de pago (efectivo, débito, transferencia)
     // Se genera inmediatamente (en la fecha de compra)
     const fechaCompra = moment(compra.fecha_compra);
-    return today.isSameOrAfter(fechaCompra, 'day');
+    const shouldGenerate = today.isSameOrAfter(fechaCompra, 'day');
+    if (shouldGenerate) {
+      this.setGenerationContext(compra, cuotasGeneradas, fechaCompra);
+    }
+    return shouldGenerate;
   }
 
   /**
@@ -159,19 +162,40 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     }
 
     // Para otros medios de pago (efectivo, débito, transferencia):
-    const fechaCompra = moment(compra.fecha_compra);
+    const fechaCuota = this.calculateRegularInstallmentDate(compra, cuotasGeneradas);
 
     if (cuotasGeneradas === 0) {
       // Primera cuota: generar inmediatamente (si hoy >= fecha_compra)
-      return today.isSameOrAfter(fechaCompra, 'day');
+      const shouldGenerate = today.isSameOrAfter(fechaCuota, 'day');
+      if (shouldGenerate) {
+        this.setGenerationContext(compra, cuotasGeneradas, fechaCuota);
+      }
+      return shouldGenerate;
     }
 
     // Cuotas siguientes: mismo día del mes que la fecha de compra
-    // Con catch-up: también generar si ya pasó el día este mes
-    if (allowCatchUp) {
-      return today.date() >= fechaCompra.date();
+    // Con catch-up: también generar si la fecha real de la cuota ya pasó
+    const shouldGenerate = allowCatchUp
+      ? today.isSameOrAfter(fechaCuota, 'day')
+      : today.isSame(fechaCuota, 'day');
+
+    if (shouldGenerate) {
+      this.setGenerationContext(compra, cuotasGeneradas, fechaCuota);
     }
-    return today.date() === fechaCompra.date();
+
+    return shouldGenerate;
+  }
+
+  calculateRegularInstallmentDate(compra, cuotaNumero = 0) {
+    const fechaCompra = moment(compra.fecha_compra);
+    const fechaCuota = moment(compra.fecha_compra).add(cuotaNumero, 'months');
+    fechaCuota.date(Math.min(fechaCompra.date(), fechaCuota.daysInMonth()));
+    return fechaCuota;
+  }
+
+  setGenerationContext(compra, cuotaNumero, fechaObjetivo) {
+    compra.nextInstallmentNumber = cuotaNumero + 1;
+    compra.adjustedDate = fechaObjetivo.format('YYYY-MM-DD');
   }
 
   /**
@@ -215,17 +239,21 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
         return false;
       }
 
+      const fechaVencimiento = CreditCardDateService.calculateDueDate(compra, compra.tarjeta, cuotaNumero, today);
+
       // Verificar si hoy es día de vencimiento (o ya pasó, en modo catch-up)
       const shouldGenerate = allowCatchUp
-        ? CreditCardDateService.isDueDateTodayOrPassed(compra, compra.tarjeta, cuotaNumero, today)
-        : CreditCardDateService.isDueDateToday(compra, compra.tarjeta, cuotaNumero, today);
+        ? today.isSameOrAfter(fechaVencimiento, 'day')
+        : today.isSame(fechaVencimiento, 'day');
 
       if (shouldGenerate) {
+        this.setGenerationContext(compra, cuotaNumero, fechaVencimiento);
         logger.info(`Día de vencimiento ${allowCatchUp ? '(catch-up) ' : ''}detectado para compra:`, {
           compra_id: compra.id,
           tarjeta_id: compra.tarjeta_id,
           cuotaNumero: cuotaNumero + 1,
           fecha_hoy: today.format('YYYY-MM-DD'),
+          fecha_vencimiento: fechaVencimiento.format('YYYY-MM-DD'),
           allowCatchUp
         });
       }
@@ -296,11 +324,10 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
     return gastosGenerados;
   }
 
-  async updateCompraStatus(compra, cuotaActual, transaction) {
-    const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
-
+  async updateCompraStatus(compra, cuotaActual, transaction, fechaGenerada = null) {
     const updateData = {
-      fecha_ultima_cuota_generada: today
+      fecha_ultima_cuota_generada: fechaGenerada ||
+        moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD')
     };
 
     // Si es la última cuota, marcar como completa
