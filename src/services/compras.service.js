@@ -195,6 +195,32 @@ export class ComprasService extends BaseService {
   }
 
   /**
+   * Re-fetch a compra with a row lock (SELECT ... FOR UPDATE), for use inside
+   * the same transaction that will generate its next cuota. Serializes
+   * concurrent generation attempts for the same compra.
+   *
+   * Fetched with no includes at all: Sequelize renders every `include` as a
+   * LEFT OUTER JOIN unless `required: true` is set, and Postgres rejects
+   * `FOR UPDATE` on a query where the locked table is on the nullable side of
+   * an outer join — so this fails even for associations on non-nullable FKs.
+   * Generation only reads raw FK columns (categoria_gasto_id, etc.), except
+   * for `tarjeta` (used for credit-card due-date math), which is fetched
+   * separately and attached below.
+   */
+  async lockForGeneration(id, transaction) {
+    const compra = await this.model.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (compra && compra.tarjeta_id) {
+      compra.tarjeta = await Tarjeta.findByPk(compra.tarjeta_id, { transaction });
+    }
+
+    return compra;
+  }
+
+  /**
    * Find purchases that should generate installments today
    * Used by the scheduler service
    * @param {number|null} userId - ID del usuario para filtrar (null = todos los usuarios)

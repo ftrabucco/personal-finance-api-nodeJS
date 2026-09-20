@@ -15,6 +15,38 @@ export class GastoRecurrenteService extends BaseService {
   }
 
   /**
+   * Re-fetch a gasto recurrente with a row lock (SELECT ... FOR UPDATE), for
+   * use inside the same transaction that will generate its next occurrence.
+   * Serializes concurrent generation attempts for the same source.
+   *
+   * Fetched with no includes at all: Sequelize renders every `include` as a
+   * LEFT OUTER JOIN unless `required: true` is set, and Postgres rejects
+   * `FOR UPDATE` on a query where the locked table is on the nullable side of
+   * an outer join — so this fails even for associations on non-nullable FKs
+   * like `frecuencia_gasto_id`. `shouldGenerateExpense` reads `frecuencia` as
+   * a nested object (not just its id), so it's fetched separately and
+   * attached below, along with `tarjeta` when present.
+   */
+  async lockForGeneration(id, transaction) {
+    const expense = await this.model.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (!expense) {
+      return null;
+    }
+
+    expense.frecuencia = await FrecuenciaGasto.findByPk(expense.frecuencia_gasto_id, { transaction });
+
+    if (expense.tarjeta_id) {
+      expense.tarjeta = await Tarjeta.findByPk(expense.tarjeta_id, { transaction });
+    }
+
+    return expense;
+  }
+
+  /**
    * Find all recurring expenses with related data
    * Overrides base method to include specific associations
    */

@@ -16,6 +16,38 @@ export class DebitoAutomaticoService extends BaseService {
   }
 
   /**
+   * Re-fetch a débito automático with a row lock (SELECT ... FOR UPDATE), for
+   * use inside the same transaction that will generate its next occurrence.
+   * Serializes concurrent generation attempts for the same source.
+   *
+   * Fetched with no includes at all: Sequelize renders every `include` as a
+   * LEFT OUTER JOIN unless `required: true` is set, and Postgres rejects
+   * `FOR UPDATE` on a query where the locked table is on the nullable side of
+   * an outer join — so this fails even for associations on non-nullable FKs
+   * like `frecuencia_gasto_id`. `shouldGenerateExpense` reads `frecuencia` as
+   * a nested object (not just its id), so it's fetched separately and
+   * attached below, along with `tarjeta` when present.
+   */
+  async lockForGeneration(id, transaction) {
+    const debit = await this.model.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (!debit) {
+      return null;
+    }
+
+    debit.frecuencia = await FrecuenciaGasto.findByPk(debit.frecuencia_gasto_id, { transaction });
+
+    if (debit.tarjeta_id) {
+      debit.tarjeta = await Tarjeta.findByPk(debit.tarjeta_id, { transaction });
+    }
+
+    return debit;
+  }
+
+  /**
    * Find all automatic debits with related data
    * Overrides base method to include specific associations
    */

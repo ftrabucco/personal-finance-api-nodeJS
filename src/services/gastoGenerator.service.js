@@ -27,11 +27,24 @@ export class GastoGeneratorService {
   static async generateFromGastoUnico(gastoUnico) {
     const transaction = await sequelize.transaction();
     try {
+      // Same race-prevention pattern as the scheduled generators: lock the
+      // row and re-check `procesado` under the lock before generating, so
+      // two overlapping manual-generation calls can't both process it.
+      const lockedGastoUnico = await GastoUnico.findByPk(gastoUnico.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!lockedGastoUnico || lockedGastoUnico.procesado) {
+        await transaction.commit();
+        return null;
+      }
+
       const immediateStrategy = new ImmediateExpenseStrategy();
-      const gasto = await immediateStrategy.generate(gastoUnico, transaction);
+      const gasto = await immediateStrategy.generate(lockedGastoUnico, transaction);
 
       // Marcar como procesado
-      await gastoUnico.update({ procesado: true }, { transaction });
+      await lockedGastoUnico.update({ procesado: true }, { transaction });
 
       await transaction.commit();
       logger.info('Gasto generado desde gasto único con estrategia:', {
@@ -53,32 +66,49 @@ export class GastoGeneratorService {
    * Genera un gasto real desde un gasto recurrente
    * Usa RecurringExpenseStrategy
    *
-   * IMPORTANT: This method is called AFTER findReadyForGeneration has already
-   * determined that this expense should be generated. Therefore, we don't
-   * re-check shouldGenerate here to avoid duplicate logic and ensure catch-up works.
+   * Locks the gasto recurrente row for the duration of the transaction and
+   * re-validates shouldGenerate against the freshly-locked row before
+   * generating. findReadyForGeneration's own check runs outside any
+   * transaction, so two overlapping /gastos/generate calls (e.g. a scheduled
+   * run overlapping a manual "generate now" click) could otherwise both read
+   * "not generated yet" and both insert a gasto for the same period. The row
+   * lock forces the second call to wait for the first to commit, then
+   * re-check against post-commit state.
    */
   static async generateFromGastoRecurrente(gastoRecurrente) {
     const transaction = await sequelize.transaction();
     try {
+      const lockedExpense = await this.gastoRecurrenteService.lockForGeneration(gastoRecurrente.id, transaction);
+
+      if (!lockedExpense) {
+        await transaction.commit();
+        return null;
+      }
+
+      const today = moment().tz('America/Argentina/Buenos_Aires');
+      const stillReady = await this.gastoRecurrenteService.shouldGenerateExpense(lockedExpense, today);
+
+      if (!stillReady.canGenerate) {
+        await transaction.commit();
+        logger.debug('Gasto recurrente ya no está listo para generar (carrera evitada):', {
+          gastoRecurrente_id: gastoRecurrente.id,
+          reason: stillReady.reason
+        });
+        return null;
+      }
+
       const recurringStrategy = new RecurringExpenseStrategy();
+      const targetDate = stillReady.adjustedDate || today.format('YYYY-MM-DD');
 
-      // NOTE: We skip shouldGenerate check because findReadyForGeneration
-      // already filtered expenses. This ensures catch-up logic works correctly.
-
-      // Use adjustedDate if provided by catch-up logic, otherwise use today
-      const targetDate = gastoRecurrente.adjustedDate ||
-                        moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
-
-      // Generar el gasto usando la estrategia con la fecha correcta
-      const gasto = await recurringStrategy.generateWithDate(gastoRecurrente, targetDate, transaction);
+      const gasto = await recurringStrategy.generateWithDate(lockedExpense, targetDate, transaction);
 
       await transaction.commit();
       logger.info('Gasto generado desde gasto recurrente con estrategia:', {
         gasto_id: gasto.id,
         gastoRecurrente_id: gastoRecurrente.id,
-        frecuencia: gastoRecurrente.frecuencia?.nombre_frecuencia,
+        frecuencia: lockedExpense.frecuencia?.nombre_frecuencia,
         fecha_generada: targetDate,
-        is_catchup: !!gastoRecurrente.adjustedDate
+        is_catchup: !!stillReady.adjustedDate
       });
       return gasto;
     } catch (error) {
@@ -95,25 +125,39 @@ export class GastoGeneratorService {
    * Genera un gasto real desde un débito automático
    * Usa AutomaticDebitExpenseStrategy
    *
-   * IMPORTANT: Like generateFromGastoRecurrente, this is called AFTER
-   * findReadyForGeneration has filtered expenses, so we skip shouldGenerate.
+   * Same race-prevention pattern as generateFromGastoRecurrente: locks the
+   * source row for the transaction and re-validates before generating.
    */
   static async generateFromDebitoAutomatico(debitoAutomatico) {
     const transaction = await sequelize.transaction();
     try {
+      const lockedDebito = await this.debitoAutomaticoService.lockForGeneration(debitoAutomatico.id, transaction);
+
+      if (!lockedDebito) {
+        await transaction.commit();
+        return null;
+      }
+
+      const today = moment().tz('America/Argentina/Buenos_Aires');
+      const stillReady = await this.debitoAutomaticoService.shouldGenerateExpense(lockedDebito, today);
+
+      if (!stillReady.should) {
+        await transaction.commit();
+        logger.debug('Débito automático ya no está listo para generar (carrera evitada):', {
+          debitoAutomatico_id: debitoAutomatico.id,
+          reason: stillReady.reason
+        });
+        return null;
+      }
+
       const automaticDebitStrategy = new AutomaticDebitExpenseStrategy();
-
-      // NOTE: We skip shouldGenerate check because findReadyForGeneration
-      // already filtered expenses. This ensures catch-up logic works correctly.
-
-      // Generar el gasto usando la estrategia
-      const gasto = await automaticDebitStrategy.generate(debitoAutomatico, transaction);
+      const gasto = await automaticDebitStrategy.generate(lockedDebito, transaction);
 
       await transaction.commit();
       logger.info('Gasto generado desde débito automático con estrategia:', {
         gasto_id: gasto.id,
         debitoAutomatico_id: debitoAutomatico.id,
-        frecuencia: debitoAutomatico.frecuencia?.nombre_frecuencia
+        frecuencia: lockedDebito.frecuencia?.nombre_frecuencia
       });
       return gasto;
     } catch (error) {
@@ -130,14 +174,34 @@ export class GastoGeneratorService {
    * Genera un gasto real desde una compra (cuotas)
    * Usa InstallmentExpenseStrategy
    *
-   * IMPORTANT: Like other generators, this is called AFTER findReadyForGeneration
-   * has already filtered purchases, so we skip shouldGenerate to ensure catch-up works.
+   * Same race-prevention pattern as generateFromGastoRecurrente/
+   * generateFromDebitoAutomatico: locks the compra row for the transaction
+   * and re-runs shouldGenerate against the freshly-locked row (which also
+   * recomputes nextInstallmentNumber/adjustedDate) before generating.
    */
-  static async generateFromCompra(compra) {
+  static async generateFromCompra(compra, allowCatchUp = true) {
     const transaction = await sequelize.transaction();
     try {
+      const lockedCompra = await this.comprasService.lockForGeneration(compra.id, transaction);
+
+      if (!lockedCompra) {
+        await transaction.commit();
+        return null;
+      }
+
+      const installmentStrategy = new InstallmentExpenseStrategy();
+      const stillReady = await installmentStrategy.shouldGenerate(lockedCompra, allowCatchUp);
+
+      if (!stillReady) {
+        await transaction.commit();
+        logger.debug('Compra ya no está lista para generar cuota (carrera evitada):', {
+          compra_id: compra.id
+        });
+        return null;
+      }
+
       // Validar foreign keys requeridos
-      const missingKeys = this.validateCompraForeignKeys(compra);
+      const missingKeys = this.validateCompraForeignKeys(lockedCompra);
       if (missingKeys.length > 0) {
         await transaction.rollback();
         const error = new Error(`Missing required foreign keys: ${missingKeys.join(', ')}`);
@@ -148,13 +212,7 @@ export class GastoGeneratorService {
         throw error;
       }
 
-      const installmentStrategy = new InstallmentExpenseStrategy();
-
-      // NOTE: We skip shouldGenerate check because findReadyForGeneration
-      // already filtered purchases. This ensures catch-up logic works correctly.
-
-      // Generar el gasto usando la estrategia
-      const gasto = await installmentStrategy.generate(compra, transaction);
+      const gasto = await installmentStrategy.generate(lockedCompra, transaction);
 
       await transaction.commit();
 
@@ -260,7 +318,7 @@ export class GastoGeneratorService {
       await this.processExpensesBatch(
         compras,
         'compra',
-        this.generateFromCompra,
+        (expense) => this.generateFromCompra(expense, allowCatchUp),
         results
       );
 
