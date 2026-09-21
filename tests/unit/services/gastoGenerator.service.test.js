@@ -3,7 +3,8 @@ import { describe, it, expect, beforeEach, jest, afterEach } from '@jest/globals
 // Mock sequelize
 const mockTransaction = {
   commit: jest.fn().mockResolvedValue(),
-  rollback: jest.fn().mockResolvedValue()
+  rollback: jest.fn().mockResolvedValue(),
+  LOCK: { UPDATE: 'UPDATE' }
 };
 
 jest.unstable_mockModule('../../../src/db/postgres.js', () => ({
@@ -58,31 +59,45 @@ jest.unstable_mockModule('../../../src/strategies/expenseGeneration/installmentS
 const mockFindReadyRecurrentes = jest.fn().mockResolvedValue([]);
 const mockFindReadyDebitos = jest.fn().mockResolvedValue([]);
 const mockFindReadyCompras = jest.fn().mockResolvedValue([]);
+// findById/shouldGenerateExpense back the row-lock + re-check race-prevention
+// pattern: generateFromX re-fetches (locked) and re-validates before generating.
+const mockLockForGenerationRecurrente = jest.fn();
+const mockShouldGenerateExpenseRecurrente = jest.fn();
+const mockLockForGenerationDebito = jest.fn();
+const mockShouldGenerateExpenseDebito = jest.fn();
+const mockLockForGenerationCompra = jest.fn();
 
 jest.unstable_mockModule('../../../src/services/gastoRecurrente.service.js', () => ({
   GastoRecurrenteService: class {
     findReadyForGeneration = mockFindReadyRecurrentes;
+    lockForGeneration = mockLockForGenerationRecurrente;
+    shouldGenerateExpense = mockShouldGenerateExpenseRecurrente;
   }
 }));
 
 jest.unstable_mockModule('../../../src/services/debitoAutomatico.service.js', () => ({
   DebitoAutomaticoService: class {
     findReadyForGeneration = mockFindReadyDebitos;
+    lockForGeneration = mockLockForGenerationDebito;
+    shouldGenerateExpense = mockShouldGenerateExpenseDebito;
   }
 }));
 
 jest.unstable_mockModule('../../../src/services/compras.service.js', () => ({
   ComprasService: class {
     findReadyForGeneration = mockFindReadyCompras;
+    lockForGeneration = mockLockForGenerationCompra;
   }
 }));
 
 // Mock models
 const mockGastoUnicoFindAll = jest.fn().mockResolvedValue([]);
+const mockGastoUnicoFindByPk = jest.fn();
 
 jest.unstable_mockModule('../../../src/models/index.js', () => ({
   GastoUnico: {
-    findAll: mockGastoUnicoFindAll
+    findAll: mockGastoUnicoFindAll,
+    findByPk: mockGastoUnicoFindByPk
   },
   CategoriaGasto: {},
   ImportanciaGasto: {},
@@ -154,6 +169,7 @@ describe('GastoGeneratorService', () => {
     const mockGastoUnico = {
       id: 1,
       descripcion: 'Test gasto unico',
+      procesado: false,
       update: jest.fn().mockResolvedValue()
     };
 
@@ -164,6 +180,9 @@ describe('GastoGeneratorService', () => {
 
     beforeEach(() => {
       mockGastoUnico.update.mockResolvedValue();
+      // Simulates the row-lock re-fetch: findByPk returns the same
+      // (still-unprocessed) row under lock.
+      mockGastoUnicoFindByPk.mockResolvedValue(mockGastoUnico);
     });
 
     it('should generate gasto from gasto unico successfully', async () => {
@@ -172,8 +191,22 @@ describe('GastoGeneratorService', () => {
       const result = await GastoGeneratorService.generateFromGastoUnico(mockGastoUnico);
 
       expect(result).toEqual(mockGeneratedGasto);
+      expect(mockGastoUnicoFindByPk).toHaveBeenCalledWith(mockGastoUnico.id, {
+        transaction: mockTransaction,
+        lock: mockTransaction.LOCK.UPDATE
+      });
       expect(mockImmediateGenerate).toHaveBeenCalledWith(mockGastoUnico, mockTransaction);
       expect(mockGastoUnico.update).toHaveBeenCalledWith({ procesado: true }, { transaction: mockTransaction });
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('should skip (return null) when a concurrent call already processed it under the lock', async () => {
+      mockGastoUnicoFindByPk.mockResolvedValue({ ...mockGastoUnico, procesado: true });
+
+      const result = await GastoGeneratorService.generateFromGastoUnico(mockGastoUnico);
+
+      expect(result).toBeNull();
+      expect(mockImmediateGenerate).not.toHaveBeenCalled();
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
@@ -200,30 +233,56 @@ describe('GastoGeneratorService', () => {
       monto_ars: 2000
     };
 
+    beforeEach(() => {
+      // Simulates the row-lock re-fetch returning the same, still-ready row.
+      mockLockForGenerationRecurrente.mockResolvedValue(mockGastoRecurrente);
+      mockShouldGenerateExpenseRecurrente.mockResolvedValue({
+        canGenerate: true,
+        reason: 'Monthly frequency - exact match',
+        adjustedDate: null
+      });
+    });
+
     it('should generate gasto from gasto recurrente successfully', async () => {
       mockRecurringGenerateWithDate.mockResolvedValue(mockGeneratedGasto);
 
       const result = await GastoGeneratorService.generateFromGastoRecurrente(mockGastoRecurrente);
 
       expect(result).toEqual(mockGeneratedGasto);
+      expect(mockLockForGenerationRecurrente).toHaveBeenCalledWith(mockGastoRecurrente.id, mockTransaction);
       expect(mockRecurringGenerateWithDate).toHaveBeenCalled();
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
-    it('should use adjustedDate if provided', async () => {
-      const gastoConFechaAjustada = {
-        ...mockGastoRecurrente,
+    it('should use the re-checked adjustedDate if provided', async () => {
+      mockShouldGenerateExpenseRecurrente.mockResolvedValue({
+        canGenerate: true,
+        reason: 'Monthly frequency - catch-up',
         adjustedDate: '2024-06-15'
-      };
+      });
       mockRecurringGenerateWithDate.mockResolvedValue(mockGeneratedGasto);
 
-      await GastoGeneratorService.generateFromGastoRecurrente(gastoConFechaAjustada);
+      await GastoGeneratorService.generateFromGastoRecurrente(mockGastoRecurrente);
 
       expect(mockRecurringGenerateWithDate).toHaveBeenCalledWith(
-        gastoConFechaAjustada,
+        mockGastoRecurrente,
         '2024-06-15',
         mockTransaction
       );
+    });
+
+    it('should skip (return null) when a concurrent call already generated it under the lock', async () => {
+      mockShouldGenerateExpenseRecurrente.mockResolvedValue({
+        canGenerate: false,
+        reason: 'Already generated this month',
+        adjustedDate: null
+      });
+
+      const result = await GastoGeneratorService.generateFromGastoRecurrente(mockGastoRecurrente);
+
+      expect(result).toBeNull();
+      expect(mockRecurringGenerateWithDate).not.toHaveBeenCalled();
+      expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
     it('should rollback transaction on error', async () => {
@@ -248,13 +307,37 @@ describe('GastoGeneratorService', () => {
       monto_ars: 3000
     };
 
+    beforeEach(() => {
+      mockLockForGenerationDebito.mockResolvedValue(mockDebitoAutomatico);
+      mockShouldGenerateExpenseDebito.mockResolvedValue({
+        should: true,
+        reason: 'Monthly frequency - exact match',
+        adjustedDate: null
+      });
+    });
+
     it('should generate gasto from debito automatico successfully', async () => {
       mockAutomaticDebitGenerate.mockResolvedValue(mockGeneratedGasto);
 
       const result = await GastoGeneratorService.generateFromDebitoAutomatico(mockDebitoAutomatico);
 
       expect(result).toEqual(mockGeneratedGasto);
+      expect(mockLockForGenerationDebito).toHaveBeenCalledWith(mockDebitoAutomatico.id, mockTransaction);
       expect(mockAutomaticDebitGenerate).toHaveBeenCalledWith(mockDebitoAutomatico, mockTransaction);
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('should skip (return null) when a concurrent call already generated it under the lock', async () => {
+      mockShouldGenerateExpenseDebito.mockResolvedValue({
+        should: false,
+        reason: 'Already generated this month',
+        adjustedDate: null
+      });
+
+      const result = await GastoGeneratorService.generateFromDebitoAutomatico(mockDebitoAutomatico);
+
+      expect(result).toBeNull();
+      expect(mockAutomaticDebitGenerate).not.toHaveBeenCalled();
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
@@ -282,14 +365,38 @@ describe('GastoGeneratorService', () => {
       monto_ars: 500
     };
 
-    it('should generate gasto from compra directly (shouldGenerate handled by findReadyForGeneration)', async () => {
+    beforeEach(() => {
+      mockLockForGenerationCompra.mockResolvedValue(mockCompra);
+      mockInstallmentShouldGenerate.mockResolvedValue(true);
+    });
+
+    it('should generate gasto from compra after re-validating shouldGenerate under the lock', async () => {
       mockInstallmentGenerate.mockResolvedValue(mockGeneratedGasto);
 
       const result = await GastoGeneratorService.generateFromCompra(mockCompra);
 
       expect(result).toEqual(mockGeneratedGasto);
-      expect(mockInstallmentShouldGenerate).not.toHaveBeenCalled();
+      expect(mockLockForGenerationCompra).toHaveBeenCalledWith(mockCompra.id, mockTransaction);
+      expect(mockInstallmentShouldGenerate).toHaveBeenCalledWith(mockCompra, true);
       expect(mockInstallmentGenerate).toHaveBeenCalledWith(mockCompra, mockTransaction);
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('should pass allowCatchUp through to the re-check', async () => {
+      mockInstallmentGenerate.mockResolvedValue(mockGeneratedGasto);
+
+      await GastoGeneratorService.generateFromCompra(mockCompra, false);
+
+      expect(mockInstallmentShouldGenerate).toHaveBeenCalledWith(mockCompra, false);
+    });
+
+    it('should skip (return null) when a concurrent call already generated this cuota under the lock', async () => {
+      mockInstallmentShouldGenerate.mockResolvedValue(false);
+
+      const result = await GastoGeneratorService.generateFromCompra(mockCompra);
+
+      expect(result).toBeNull();
+      expect(mockInstallmentGenerate).not.toHaveBeenCalled();
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
@@ -307,6 +414,7 @@ describe('GastoGeneratorService', () => {
         id: 5,
         descripcion: 'Compra sin claves'
       };
+      mockLockForGenerationCompra.mockResolvedValue(compraInvalida);
 
       await expect(GastoGeneratorService.generateFromCompra(compraInvalida))
         .rejects.toThrow('Missing required foreign keys');
@@ -370,6 +478,12 @@ describe('GastoGeneratorService', () => {
         frecuencia: { nombre_frecuencia: 'Mensual' }
       };
       mockFindReadyRecurrentes.mockResolvedValue([mockRecurringExpense]);
+      mockLockForGenerationRecurrente.mockResolvedValue(mockRecurringExpense);
+      mockShouldGenerateExpenseRecurrente.mockResolvedValue({
+        canGenerate: true,
+        reason: 'Monthly frequency - exact match',
+        adjustedDate: null
+      });
       mockRecurringGenerateWithDate.mockResolvedValue({ id: 1000, monto_ars: 500 });
 
       const result = await GastoGeneratorService.generateScheduledExpenses();
@@ -527,11 +641,13 @@ describe('GastoGeneratorService', () => {
       const mockGastoUnico = {
         id: 50,
         descripcion: 'Test unico',
+        procesado: false,
         update: jest.fn().mockResolvedValue()
       };
       const mockGeneratedGasto = { id: 500, monto_ars: 100 };
 
       mockGastoUnicoFindAll.mockResolvedValue([mockGastoUnico]);
+      mockGastoUnicoFindByPk.mockResolvedValue(mockGastoUnico);
       mockImmediateGenerate.mockResolvedValue(mockGeneratedGasto);
 
       const result = await GastoGeneratorService.generatePendingExpenses(123);
@@ -547,10 +663,12 @@ describe('GastoGeneratorService', () => {
       const mockGastoUnico = {
         id: 50,
         descripcion: 'Test unico error',
+        procesado: false,
         update: jest.fn().mockResolvedValue()
       };
 
       mockGastoUnicoFindAll.mockResolvedValue([mockGastoUnico]);
+      mockGastoUnicoFindByPk.mockResolvedValue(mockGastoUnico);
       mockImmediateGenerate.mockRejectedValue(new Error('Unico generation error'));
 
       const result = await GastoGeneratorService.generatePendingExpenses(123);
