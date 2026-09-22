@@ -450,6 +450,43 @@ export class DebitoAutomaticoService extends BaseService {
       };
     }
     case 'mensual': {
+      const validDay = this.getValidMonthlyDate(today, diaConfigurido);
+
+      // CATCH-UP: never generated before and the payment day already passed
+      // this month (beyond the few-day weekend/holiday tolerance below) —
+      // generate now anyway, dated with the real payment day rather than
+      // today. Mirrors GastoRecurrenteService.checkMonthlyFrequency's
+      // equivalent branch, which débitos automáticos were missing entirely:
+      // without it, a débito created after its payment day had passed this
+      // month simply never generated until next month's payment day came
+      // around.
+      //
+      // Unlike gastos recurrentes, this doesn't gate on fecha_inicio: the
+      // create endpoint doesn't accept fecha_inicio for débitos at all (the
+      // validation schema rejects it), so it's always today's date at
+      // creation time — gating catch-up on it would just block same-month
+      // catch-up unconditionally, which is exactly the scenario this exists
+      // to support.
+      if (!debit.ultima_fecha_generado && today.date() > validDay) {
+        // moment.tz({...}, zone) interprets the given fields as wall-clock
+        // time already in that zone; moment({...}).tz(zone) would instead
+        // construct in the process's default timezone and then convert the
+        // resulting instant, which is off by a day whenever the process
+        // doesn't default to America/Argentina/Buenos_Aires (e.g. CI, or any
+        // server without TZ set) — the same class of bug fixed elsewhere in
+        // this codebase (see personal-finance-api-nodeJS PR #38).
+        const adjustedDate = moment.tz(
+          { year: today.year(), month: today.month(), date: validDay },
+          'America/Argentina/Buenos_Aires',
+        );
+
+        return {
+          matches: true,
+          reason: `Monthly frequency - catch-up for day ${diaConfigurido} (never generated before, currently day ${today.date()})`,
+          adjustedDate: adjustedDate.format('YYYY-MM-DD')
+        };
+      }
+
       const monthlyTolerance = this.calculateDateTolerance(today, 'mensual');
       const monthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, monthlyTolerance);
       return {

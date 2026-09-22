@@ -323,7 +323,7 @@ describe('GastoGeneratorService', () => {
 
       expect(result).toEqual(mockGeneratedGasto);
       expect(mockLockForGenerationDebito).toHaveBeenCalledWith(mockDebitoAutomatico.id, mockTransaction);
-      expect(mockAutomaticDebitGenerate).toHaveBeenCalledWith(mockDebitoAutomatico, mockTransaction);
+      expect(mockAutomaticDebitGenerate).toHaveBeenCalledWith(mockDebitoAutomatico, mockTransaction, null);
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 

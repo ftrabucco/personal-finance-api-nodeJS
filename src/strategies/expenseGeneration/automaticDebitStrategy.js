@@ -20,7 +20,14 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
     this.Gasto = Gasto;
   }
 
-  async generate(debitoAutomatico, transaction = null) {
+  /**
+   * @param {Object} debitoAutomatico - The automatic debit source
+   * @param {Transaction} transaction - Database transaction
+   * @param {string|null} targetDate - Target date (YYYY-MM-DD) for catch-up;
+   *   defaults to today when not provided (e.g. an exact-day match, where the
+   *   target date and today are the same anyway).
+   */
+  async generate(debitoAutomatico, transaction = null, targetDate = null) {
     if (!this.validateSource(debitoAutomatico)) {
       logger.error('Invalid automatic debit source', {
         debitoAutomatico_id: debitoAutomatico.id
@@ -30,11 +37,12 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
 
     try {
       const today = moment().tz('America/Argentina/Buenos_Aires');
-      const fechaParaBD = today.format('YYYY-MM-DD');
+      const fechaParaBD = targetDate || today.format('YYYY-MM-DD');
+      const fechaMoment = moment.tz(fechaParaBD, 'America/Argentina/Buenos_Aires');
 
       // Check for existing expense in the same month to prevent duplicates
-      const startOfMonth = today.clone().startOf('month').format('YYYY-MM-DD');
-      const endOfMonth = today.clone().endOf('month').format('YYYY-MM-DD');
+      const startOfMonth = fechaMoment.clone().startOf('month').format('YYYY-MM-DD');
+      const endOfMonth = fechaMoment.clone().endOf('month').format('YYYY-MM-DD');
 
       const existingExpense = await Gasto.findOne({
         where: {

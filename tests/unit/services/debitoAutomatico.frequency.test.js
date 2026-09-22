@@ -184,4 +184,64 @@ describe('DebitoAutomaticoService - duplicate prevention for long-period frequen
       expect(result.should).toBe(true);
     });
   });
+
+  // ─── MENSUAL: CATCH-UP FOR NEVER-GENERATED, DAY ALREADY PASSED ────────────
+  //
+  // Regression coverage: unlike GastoRecurrenteService, this service had no
+  // catch-up branch for a débito created after its payment day had already
+  // passed this month — it would silently wait for next month's payment day
+  // instead of generating immediately. See scheduledGeneration.destructive.spec.ts
+  // CF-SCH-GEN-009 in personal-finance-test-automation for the E2E regression test.
+
+  describe('mensual - catch-up for never-generated, day already passed', () => {
+    it('catches up when never generated and the payment day already passed this month, well beyond tolerance', async () => {
+      const today = moment.tz('2026-04-20', TZ);
+      const debit = makeDebit({
+        frecuencia: 'mensual',
+        dia_de_pago: 5,
+        ultima_fecha_generado: null,
+      });
+      const result = await service.shouldGenerateExpense(debit, today);
+      expect(result.should).toBe(true);
+      expect(result.adjustedDate).toBe('2026-04-05');
+    });
+
+    it('does not catch up once it has already been generated at least once', async () => {
+      const today = moment.tz('2026-04-20', TZ);
+      const debit = makeDebit({
+        frecuencia: 'mensual',
+        dia_de_pago: 5,
+        ultima_fecha_generado: '2026-03-05',
+      });
+      const result = await service.shouldGenerateExpense(debit, today);
+      expect(result.should).toBe(false);
+    });
+
+    it('does not generate when the payment day has not arrived yet this month', async () => {
+      const today = moment.tz('2026-04-10', TZ);
+      const debit = makeDebit({
+        frecuencia: 'mensual',
+        dia_de_pago: 20,
+        ultima_fecha_generado: null,
+      });
+      const result = await service.shouldGenerateExpense(debit, today);
+      expect(result.should).toBe(false);
+    });
+
+    it('is an exact match (not catch-up) on the last day of a shorter month when the configured day does not exist (e.g. 31 in a 30-day month)', async () => {
+      // validDay clamps to the month's last day, which is also the highest
+      // possible value for today.date() within that month — so "today past
+      // the clamped day" can never happen; the day it does exist can only
+      // ever be an exact match.
+      const today = moment.tz('2026-04-30', TZ);
+      const debit = makeDebit({
+        frecuencia: 'mensual',
+        dia_de_pago: 31,
+        ultima_fecha_generado: null,
+      });
+      const result = await service.shouldGenerateExpense(debit, today);
+      expect(result.should).toBe(true);
+      expect(result.adjustedDate).toBe('2026-04-30');
+    });
+  });
 });

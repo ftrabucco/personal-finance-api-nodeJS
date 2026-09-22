@@ -151,7 +151,7 @@ export class GastoGeneratorService {
       }
 
       const automaticDebitStrategy = new AutomaticDebitExpenseStrategy();
-      const gasto = await automaticDebitStrategy.generate(lockedDebito, transaction);
+      const gasto = await automaticDebitStrategy.generate(lockedDebito, transaction, stillReady.adjustedDate);
 
       await transaction.commit();
       logger.info('Gasto generado desde débito automático con estrategia:', {
