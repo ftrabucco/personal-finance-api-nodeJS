@@ -477,7 +477,7 @@ export class DebitoAutomaticoService extends BaseService {
         // this codebase (see personal-finance-api-nodeJS PR #38).
         const adjustedDate = moment.tz(
           { year: today.year(), month: today.month(), date: validDay },
-          'America/Argentina/Buenos_Aires',
+          'America/Argentina/Buenos_Aires'
         );
 
         return {
