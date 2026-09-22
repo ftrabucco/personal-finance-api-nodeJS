@@ -286,56 +286,7 @@ npm run test:coverage
 
 ## 🚀 Deployment
 
-**📖 Guías de deployment disponibles:**
-
-- **[DEPLOYMENT_RENDER.md](./DEPLOYMENT_RENDER.md)** - ⭐ **RECOMENDADO** - Deployment en Render con Node.js nativo
-- **[DEPLOYMENT_RENDER_DOCKER.md](./DEPLOYMENT_RENDER_DOCKER.md)** - Deployment en Render con Docker (avanzado)
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Guía general para cualquier plataforma
-
-### Quick Start - Render (Recomendado)
-
-#### 1. Generar secretos seguros
-
-```bash
-npm run generate-secrets
-```
-
-#### 2. Crear PostgreSQL Database en Render
-
-- New + → PostgreSQL → Name: `finanzas-db`
-
-#### 3. Crear Web Service en Render
-
-- New + → Web Service → Conecta repo
-- Build: `npm ci --only=production`
-- Start: `npm start`
-
-#### 4. Configurar Environment Variables
-
-En Render Dashboard, agrega:
-- `DATABASE_URL` (Internal DB URL)
-- `JWT_SECRET` y `SESSION_SECRET` (del paso 1)
-- `CORS_ORIGIN=https://tu-frontend.com`
-- `NODE_ENV=production`
-
-#### 5. Setup BD (una sola vez desde tu máquina)
-
-```bash
-# Ejecutar migraciones
-npm run db:migrate:multi-currency
-
-# Seed data
-npm run seed-db
-
-# Tipo de cambio inicial
-curl -X POST https://tu-api.onrender.com/api/tipo-cambio/actualizar
-```
-
-**✅ Listo!** API live en `https://tu-servicio.onrender.com`
-
----
-
-**📖 Guía completa**: [DEPLOYMENT_RENDER.md](./DEPLOYMENT_RENDER.md)
+**📖 Guía de deployment**: [DEPLOYMENT.md](./DEPLOYMENT.md) - Guía general para cualquier plataforma
 
 ## 🤝 Contributing
 
