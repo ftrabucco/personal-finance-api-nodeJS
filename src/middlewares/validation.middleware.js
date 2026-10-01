@@ -63,7 +63,7 @@ const compraSchema = Joi.object({
       'number.positive': 'El monto total debe ser positivo',
       'any.required': 'El monto total es requerido'
     }),
-  fecha_compra: Joi.date().iso().max('now').required()
+  fecha_compra: Joi.date().iso().raw().max('now').required()
     .messages({
       'date.base': 'La fecha de compra debe ser una fecha válida',
       'date.format': 'La fecha de compra debe estar en formato ISO',
@@ -119,7 +119,7 @@ const gastoRecurrenteSchema = Joi.object({
       'number.positive': 'La frecuencia debe ser un ID válido',
       'any.required': 'La frecuencia es requerida'
     }),
-  fecha_inicio: Joi.date().iso().optional()
+  fecha_inicio: Joi.date().iso().raw().optional()
     .messages({
       'date.base': 'La fecha de inicio debe ser una fecha válida',
       'date.format': 'La fecha de inicio debe estar en formato ISO'
@@ -177,7 +177,7 @@ const gastoUnicoSchema = Joi.object({
   importancia_gasto_id: baseGastoSchema.importancia_gasto_id,
   tipo_pago_id: baseGastoSchema.tipo_pago_id,
   tarjeta_id: baseGastoSchema.tarjeta_id,
-  fecha: Joi.date().iso().max('now').required()
+  fecha: Joi.date().iso().raw().max('now').required()
     .messages({
       'date.base': 'La fecha debe ser una fecha válida',
       'date.format': 'La fecha debe estar en formato ISO',
@@ -196,8 +196,8 @@ const gastoUnicoFiltersSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive().optional(),
   tipo_pago_id: Joi.number().integer().positive().optional(),
   tarjeta_id: Joi.number().integer().positive().optional(),
-  fecha_desde: Joi.date().iso().optional(),
-  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  fecha_desde: Joi.date().iso().raw().optional(),
+  fecha_hasta: Joi.date().iso().raw().min(Joi.ref('fecha_desde')).optional(),
   monto_min: Joi.number().positive().optional(),
   monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
   procesado: Joi.boolean().optional(),
@@ -212,8 +212,8 @@ const compraFiltersSchema = Joi.object({
   importancia_gasto_id: Joi.number().integer().positive().optional(),
   tipo_pago_id: Joi.number().integer().positive().optional(),
   tarjeta_id: Joi.number().integer().positive().optional(),
-  fecha_desde: Joi.date().iso().optional(),
-  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  fecha_desde: Joi.date().iso().raw().optional(),
+  fecha_hasta: Joi.date().iso().raw().min(Joi.ref('fecha_desde')).optional(),
   monto_min: Joi.number().positive().optional(),
   monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
   pendiente_cuotas: Joi.boolean().optional(),
@@ -260,7 +260,7 @@ const debitoAutomaticoFiltersSchema = Joi.object({
 }).unknown(false);
 
 const gastoSchema = Joi.object({
-  fecha: Joi.date().iso().max('now').required()
+  fecha: Joi.date().iso().raw().max('now').required()
     .messages({
       'date.base': 'La fecha debe ser una fecha válida',
       'date.format': 'La fecha debe estar en formato ISO',
@@ -342,8 +342,8 @@ const gastoFiltersSchema = Joi.object({
   frecuencia_gasto_id: Joi.number().integer().positive().optional(),
   tipo_pago_id: Joi.number().integer().positive().optional(),
   tarjeta_id: Joi.number().integer().positive().optional(),
-  fecha_desde: Joi.date().iso().optional(),
-  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  fecha_desde: Joi.date().iso().raw().optional(),
+  fecha_hasta: Joi.date().iso().raw().min(Joi.ref('fecha_desde')).optional(),
   monto_min_ars: Joi.number().positive().optional(),
   monto_max_ars: Joi.number().positive().min(Joi.ref('monto_min_ars')).optional(),
   monto_min_usd: Joi.number().positive().optional(),
@@ -609,7 +609,7 @@ const ingresoUnicoSchema = Joi.object({
   descripcion: baseIngresoSchema.descripcion,
   monto: baseIngresoSchema.monto,
   fuente_ingreso_id: baseIngresoSchema.fuente_ingreso_id,
-  fecha: Joi.date().iso().max('now').required()
+  fecha: Joi.date().iso().raw().max('now').required()
     .messages({
       'date.base': 'La fecha debe ser una fecha válida',
       'date.format': 'La fecha debe estar en formato ISO',
@@ -625,8 +625,8 @@ const ingresoUnicoSchema = Joi.object({
 
 const ingresoUnicoFiltersSchema = Joi.object({
   fuente_ingreso_id: Joi.number().integer().positive().optional(),
-  fecha_desde: Joi.date().iso().optional(),
-  fecha_hasta: Joi.date().iso().min(Joi.ref('fecha_desde')).optional(),
+  fecha_desde: Joi.date().iso().raw().optional(),
+  fecha_hasta: Joi.date().iso().raw().min(Joi.ref('fecha_desde')).optional(),
   monto_min: Joi.number().positive().optional(),
   monto_max: Joi.number().positive().min(Joi.ref('monto_min')).optional(),
   limit: Joi.number().integer().min(1).max(1000).optional(),
@@ -662,12 +662,12 @@ const ingresoRecurrenteSchema = Joi.object({
       'number.positive': 'La frecuencia debe ser un ID válido',
       'any.required': 'La frecuencia es requerida'
     }),
-  fecha_inicio: Joi.date().iso().optional().allow(null)
+  fecha_inicio: Joi.date().iso().raw().optional().allow(null)
     .messages({
       'date.base': 'La fecha de inicio debe ser una fecha válida',
       'date.format': 'La fecha de inicio debe estar en formato ISO'
     }),
-  fecha_fin: Joi.date().iso().optional().allow(null)
+  fecha_fin: Joi.date().iso().raw().optional().allow(null)
     .messages({
       'date.base': 'La fecha de fin debe ser una fecha válida',
       'date.format': 'La fecha de fin debe estar en formato ISO'

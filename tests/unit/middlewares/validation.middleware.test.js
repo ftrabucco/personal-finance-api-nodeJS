@@ -70,6 +70,25 @@ describe('Validation Middleware', () => {
       expect(mockSendValidationError).not.toHaveBeenCalled();
     });
 
+    it('should keep fecha_compra as the original string, not convert it to a Date object', () => {
+      // Joi's `convert: true` (createValidationMiddleware) turns Joi.date()
+      // fields into native Date objects by default. That Date then reaches
+      // Sequelize's DATEONLY column, which stringifies it using the
+      // server process's LOCAL timezone -- shifting the stored calendar
+      // date by a day on any negative-UTC-offset server (e.g. Argentina).
+      // `.raw()` on the schema keeps the original validated string instead,
+      // which is what DATEONLY expects. This assertion is timezone-
+      // independent: it fails if fecha_compra becomes a Date object at all,
+      // regardless of which day it would shift to on this machine.
+      mockReq.body = { ...validCompra, fecha_compra: '2024-01-15' };
+
+      validateCreateCompra(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(typeof mockReq.body.fecha_compra).toBe('string');
+      expect(mockReq.body.fecha_compra).toBe('2024-01-15');
+    });
+
     it('should fail when monto_total is missing', () => {
       mockReq.body = {
         ...validCompra,
