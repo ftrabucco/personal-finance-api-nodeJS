@@ -50,6 +50,41 @@ GROUP BY tipo_origen;
 
 Antes de la corrección, `debito_automatico` tiene `sin_tipo_cambio = total`.
 
+### Ingresos recurrentes en USD: el equivalente en ARS queda desactualizado y no hay historial por mes
+
+- **Detectado**: 2026-10-04, analizando el ahorro de un usuario que cobra su sueldo en dólares.
+- **Estado**: abierto, sin corregir.
+
+**Síntoma**
+
+Un ingreso recurrente en USD (ej. sueldo de USD 3.100) se muestra siempre con el mismo equivalente en ARS en `/balance/evolucion`. En producción figuraba como $4.309.000 todos los meses (USD 3.100 × 1.390, el tipo de cambio del día en que se creó), mientras el dólar ya estaba en 1.560. El ahorro en pesos sale subvaluado (unos $527 mil por mes en ese caso).
+
+**Causas**
+
+1. `ExchangeRateScheduler` actualiza a diario `GastoRecurrente` (`updateRecurringExpensesCurrency`), `DebitoAutomatico` (`updateAutomaticDebitsCurrency`) y `Compra` (`updatePendingInstallmentsCurrency`), pero no `IngresoRecurrente`. El `tipo_cambio_referencia` y el `monto_ars` quedan fijos desde `IngresoRecurrenteService.create`.
+2. No existe un generador que materialice los ingresos recurrentes como filas, a diferencia de los gastos. `balance.service.js` (líneas 116-131) suma `rec.monto_ars` de la plantilla recurrente por cada mes que aplica. Aunque la plantilla se actualizara a diario, todos los meses pasados mostrarían el valor de hoy.
+
+**Comportamiento deseado**
+
+El día de pago (`dia_de_pago`) se guarda un registro con el equivalente en ARS usando el tipo de cambio de ese día. Con el tiempo se ve cada mes en pesos y en dólares con su cotización histórica.
+
+**Cómo corregirlo (propuesta)**
+
+1. Crear un generador de ingresos recurrentes con el mismo patrón idempotente de los gastos (índice único `tipo_origen + id_origen + fecha`), ejecutado por el scheduler en `dia_de_pago`. Cada ejecución crea una fila de `ingresos_unico` con `tipo_cambio_usado` del día.
+2. Hacer que `balance.service.js` use esas filas para los meses ya generados y la plantilla solo para proyectar meses futuros.
+3. Definir qué cotización usar (hoy la app usa el dólar oficial de venta; si el usuario convierte por MEP o blue, el equivalente en pesos es otro).
+4. Backfill: los meses anteriores a la corrección no tienen cotización diaria. Decidir si se completan con el tipo de cambio histórico de `tipos_cambio`.
+
+**Cómo verificarlo en datos**
+
+```sql
+SELECT descripcion, moneda_origen, monto_usd, monto_ars, tipo_cambio_referencia, fecha_inicio
+FROM finanzas.ingresos_recurrentes
+WHERE activo = true AND moneda_origen = 'USD';
+```
+
+Si `monto_ars / monto_usd` coincide con `tipo_cambio_referencia` de la fecha de creación y no con la cotización actual, el problema está presente.
+
 ## Resueltos
 
 _(ninguno todavía)_
