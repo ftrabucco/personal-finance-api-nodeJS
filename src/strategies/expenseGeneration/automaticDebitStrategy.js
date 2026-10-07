@@ -72,6 +72,8 @@ export class AutomaticDebitExpenseStrategy extends BaseRecurringStrategy {
         fecha: fechaParaBD,
         monto_ars: debitoAutomatico.monto_ars || debitoAutomatico.monto, // Backward compatibility
         monto_usd: debitoAutomatico.monto_usd || null,
+        moneda_origen: debitoAutomatico.moneda_origen || 'ARS',
+        tipo_cambio_usado: debitoAutomatico.tipo_cambio_referencia || null,
         descripcion: debitoAutomatico.descripcion,
         frecuencia_gasto_id: debitoAutomatico.frecuencia_gasto_id
       });
