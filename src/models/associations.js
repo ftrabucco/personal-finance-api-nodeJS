@@ -131,6 +131,9 @@ export function setupAssociations(models) {
   IngresoRecurrente.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(IngresoRecurrente, { foreignKey: 'usuario_id', as: 'ingresosRecurrentes' });
 
+  IngresoRecurrente.hasMany(IngresoUnico, { foreignKey: 'ingreso_recurrente_id', as: 'ocurrenciasGeneradas' });
+  IngresoUnico.belongsTo(IngresoRecurrente, { foreignKey: 'ingreso_recurrente_id', as: 'ingresoRecurrente' });
+
   // Cuenta Bancaria
   CuentaBancaria.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Usuario.hasMany(CuentaBancaria, { foreignKey: 'usuario_id', as: 'cuentasBancarias' });

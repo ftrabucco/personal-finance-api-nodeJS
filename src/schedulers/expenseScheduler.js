@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { GastoGeneratorService } from '../services/gastoGenerator.service.js';
+import { IngresoGeneratorService } from '../services/ingresoGenerator.service.js';
 import logger from '../utils/logger.js';
 import config from '../config/environment.js';
 import moment from 'moment-timezone';
@@ -289,6 +290,13 @@ export class ExpenseScheduler {
     // Ejecutar con catch-up: si el proceso no corrió justo el día de una cuota,
     // debe recuperar la cuota vencida en la siguiente ejecución automática.
     const results = await GastoGeneratorService.generateScheduledExpenses(null, true);
+
+    // Mismo criterio de catch-up para ingresos recurrentes (ver
+    // docs/architecture/known-issues.md): si el scheduler no corrió el día
+    // de pago, recupera el/los mes(es) atrasado(s) en la siguiente corrida.
+    const incomeResults = await IngresoGeneratorService.generateScheduledIncomes(null, true);
+    results.success.push(...incomeResults.success);
+    results.errors.push(...incomeResults.errors);
 
     // Aplicar post-procesamiento según optimizaciones
     if (optimizations.retryImmediately && results.errors.length > 0) {

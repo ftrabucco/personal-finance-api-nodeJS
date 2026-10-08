@@ -1,4 +1,3 @@
-import { IngresoRecurrente } from '../models/index.js';
 import { sequelize } from '../models/index.js';
 import { QueryTypes } from 'sequelize';
 import { getOrCreatePreferencias } from './preferenciasUsuario.service.js';
@@ -34,13 +33,13 @@ export async function getEvolucionMensual(usuarioId, desde, hasta) {
     type: QueryTypes.SELECT
   });
 
-  // Ingresos recurrentes previos al rango también contribuyen al saldo previo
-  const ingresosRecurrentesPrevios = await calcularIngresosRecurrentesPrevios(
-    usuarioId, fechaDesde
-  );
-
-  const saldoPrevioArs = parseFloat(saldoPrevio?.saldo_previo_ars || 0) + ingresosRecurrentesPrevios.ars;
-  const saldoPrevioUsd = parseFloat(saldoPrevio?.saldo_previo_usd || 0) + ingresosRecurrentesPrevios.usd;
+  // Los ingresos recurrentes ya no se suman aparte: el generador de
+  // ingresos (ver docs/architecture/known-issues.md e
+  // IngresoGeneratorService) materializa cada ocurrencia mensual como una
+  // fila real en ingresos_unico con la cotización histórica de su propia
+  // fecha, así que Query 0 (arriba) ya los incluye correctamente.
+  const saldoPrevioArs = parseFloat(saldoPrevio?.saldo_previo_ars || 0);
+  const saldoPrevioUsd = parseFloat(saldoPrevio?.saldo_previo_usd || 0);
 
   // Query 1: Gastos agrupados por mes
   const gastosPorMes = await sequelize.query(`
@@ -76,15 +75,6 @@ export async function getEvolucionMensual(usuarioId, desde, hasta) {
     type: QueryTypes.SELECT
   });
 
-  // Query 3: Ingresos recurrentes activos
-  const ingresosRecurrentes = await IngresoRecurrente.findAll({
-    where: {
-      usuario_id: usuarioId,
-      activo: true
-    },
-    raw: true
-  });
-
   // Generar todos los meses del rango
   const meses = generarMeses(desde, hasta);
 
@@ -113,24 +103,12 @@ export async function getEvolucionMensual(usuarioId, desde, hasta) {
     const gastos = gastosMap.get(mes) || { total_ars: 0, total_usd: 0 };
     const ingresosU = ingresosUnicosMap.get(mes) || { total_ars: 0, total_usd: 0 };
 
-    // Calcular ingresos recurrentes para este mes
-    const inicioMesStr = `${mes}-01`;
-    const finMesStr = getLastDayOfMonth(mes);
-
-    let ingresosRecArs = 0;
-    let ingresosRecUsd = 0;
-
-    ingresosRecurrentes.forEach(rec => {
-      // Verificar si el recurrente aplica en este mes
-      if (rec.fecha_inicio && rec.fecha_inicio > finMesStr) return;
-      if (rec.fecha_fin && rec.fecha_fin < inicioMesStr) return;
-
-      ingresosRecArs += parseFloat(rec.monto_ars || 0);
-      ingresosRecUsd += parseFloat(rec.monto_usd || 0);
-    });
-
-    const totalIngresosArs = parseFloat(ingresosU.total_ars) + ingresosRecArs;
-    const totalIngresosUsd = parseFloat(ingresosU.total_usd) + ingresosRecUsd;
+    // Los ingresos recurrentes ya están incluidos en ingresosUnicosPorMes:
+    // cada ocurrencia mensual generada vive como una fila real en
+    // ingresos_unico (ver IngresoGeneratorService), con la cotización
+    // histórica de su propia fecha.
+    const totalIngresosArs = parseFloat(ingresosU.total_ars);
+    const totalIngresosUsd = parseFloat(ingresosU.total_usd);
     const totalGastosArs = parseFloat(gastos.total_ars);
     const totalGastosUsd = parseFloat(gastos.total_usd);
 
@@ -160,65 +138,6 @@ export async function getEvolucionMensual(usuarioId, desde, hasta) {
     balance_actual_ars: evolucion.length > 0 ? evolucion[evolucion.length - 1].acumulado_ars : balanceInicial,
     balance_actual_usd: evolucion.length > 0 ? evolucion[evolucion.length - 1].acumulado_usd : 0
   };
-}
-
-/**
- * Calcula la suma de ingresos recurrentes para todos los meses previos al rango
- * @param {number} usuarioId
- * @param {string} fechaDesde - Fecha inicio del rango (YYYY-MM-DD)
- * @returns {Promise<{ars: number, usd: number}>}
- */
-async function calcularIngresosRecurrentesPrevios(usuarioId, fechaDesde) {
-  const recurrentes = await IngresoRecurrente.findAll({
-    where: { usuario_id: usuarioId, activo: true },
-    raw: true
-  });
-
-  if (recurrentes.length === 0) return { ars: 0, usd: 0 };
-
-  // Encontrar el mes más antiguo con datos del usuario
-  const [oldest] = await sequelize.query(`
-    SELECT MIN(fecha) as min_fecha FROM (
-      SELECT MIN(fecha) as fecha FROM finanzas.gastos WHERE usuario_id = :usuarioId
-      UNION ALL
-      SELECT MIN(fecha) as fecha FROM finanzas.ingresos_unico WHERE usuario_id = :usuarioId
-    ) t
-  `, { replacements: { usuarioId }, type: QueryTypes.SELECT });
-
-  if (!oldest?.min_fecha) return { ars: 0, usd: 0 };
-
-  const primerMes = oldest.min_fecha.slice(0, 7);
-  const mesAntesDel = fechaDesde.slice(0, 7);
-
-  // Si no hay meses previos, retornar 0
-  if (primerMes >= mesAntesDel) return { ars: 0, usd: 0 };
-
-  const mesesPrevios = generarMeses(primerMes, getPreviousMonth(mesAntesDel));
-  let totalArs = 0;
-  let totalUsd = 0;
-
-  mesesPrevios.forEach(mes => {
-    const inicioMesStr = `${mes}-01`;
-    const finMesStr = getLastDayOfMonth(mes);
-
-    recurrentes.forEach(rec => {
-      if (rec.fecha_inicio && rec.fecha_inicio > finMesStr) return;
-      if (rec.fecha_fin && rec.fecha_fin < inicioMesStr) return;
-      totalArs += parseFloat(rec.monto_ars || 0);
-      totalUsd += parseFloat(rec.monto_usd || 0);
-    });
-  });
-
-  return { ars: totalArs, usd: totalUsd };
-}
-
-/**
- * Obtiene el mes anterior a un mes dado (YYYY-MM)
- */
-function getPreviousMonth(mesStr) {
-  const [anio, mes] = mesStr.split('-').map(Number);
-  if (mes === 1) return `${anio - 1}-12`;
-  return `${anio}-${String(mes - 1).padStart(2, '0')}`;
 }
 
 /**
