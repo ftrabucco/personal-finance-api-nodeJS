@@ -126,10 +126,13 @@ jobs:
                 console.log('Synced: ' + name);
               }
 
-              // Then sync tables that depend on all the above
+              // Then sync tables that depend on all the above.
+              // IngresoRecurrente must sync before IngresoUnico: since
+              // PR #47, ingresos_unico.ingreso_recurrente_id references
+              // ingresos_recurrentes(id).
               const dependentModels = [
                 'Gasto', 'GastoUnico', 'GastoRecurrente',
-                'DebitoAutomatico', 'Compra', 'IngresoUnico', 'IngresoRecurrente'
+                'DebitoAutomatico', 'Compra', 'IngresoRecurrente', 'IngresoUnico'
               ];
               for (const name of dependentModels) {
                 await models[name].sync();
