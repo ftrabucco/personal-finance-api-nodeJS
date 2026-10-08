@@ -62,6 +62,11 @@ export function defineIngresoRecurrente(sequelize) {
       allowNull: true,
       comment: 'Fecha hasta la cual está activo (null = indefinido)'
     },
+    ultima_fecha_generado: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Última fecha en que se generó un ingreso único a partir de este ingreso recurrente'
+    },
     // 💱 Multi-currency fields
     moneda_origen: {
       type: DataTypes.ENUM('ARS', 'USD'),

@@ -6,16 +6,11 @@ const mockSequelize = {
   query: jest.fn()
 };
 
-const mockIngresoRecurrente = {
-  findAll: jest.fn()
-};
-
 const mockGetOrCreatePreferencias = jest.fn();
 const mockGetRateForDate = jest.fn();
 
 jest.unstable_mockModule('../../../src/models/index.js', () => ({
   sequelize: mockSequelize,
-  IngresoRecurrente: mockIngresoRecurrente,
 }));
 
 jest.unstable_mockModule('../../../src/services/preferenciasUsuario.service.js', () => ({
@@ -37,44 +32,25 @@ const {
 
 /**
  * Helper to set up all mocks for getEvolucionMensual.
- * The function now makes these calls in order:
- *   1. getOrCreatePreferencias (set in beforeEach)
- *   2. sequelize.query — saldo previo (Query 0)
- *   3. sequelize.query — gastos por mes
- *   4. sequelize.query — ingresos únicos por mes
- *   5. IngresoRecurrente.findAll — recurrentes for main calculation
- *   6. IngresoRecurrente.findAll — recurrentes for calcularIngresosRecurrentesPrevios
- *   7. sequelize.query — oldest date (inside calcularIngresosRecurrentesPrevios)
+ * The function makes these sequelize.query calls in order:
+ *   1. saldo previo (Query 0)
+ *   2. gastos por mes (Query 1)
+ *   3. ingresos únicos por mes (Query 2)
+ *
+ * Recurring incomes are no longer queried/summed separately here — once
+ * IngresoGeneratorService materializes each occurrence as a real
+ * ingresos_unico row, they already flow through Query 0/2 above. See the
+ * income-generation tests for coverage of that path.
  */
 function setupMocks({
   saldoPrevio = { saldo_previo_ars: '0', saldo_previo_usd: '0' },
   gastosPorMes = [],
   ingresosUnicosPorMes = [],
-  recurrentes = [],
-  oldestDate = null,
 } = {}) {
-  // Call order in getEvolucionMensual:
-  //   1. sequelize.query — saldo previo (Query 0)
-  //   2. calcularIngresosRecurrentesPrevios:
-  //      2a. IngresoRecurrente.findAll (1st findAll)
-  //      2b. sequelize.query — oldest date (ONLY if recurrentes.length > 0)
-  //   3. sequelize.query — gastos
-  //   4. sequelize.query — ingresos únicos
-  //   5. IngresoRecurrente.findAll — main recurrentes (2nd findAll)
-  const queryChain = mockSequelize.query
-    .mockResolvedValueOnce([saldoPrevio]);              // 1. saldo previo
-
-  if (recurrentes.length > 0) {
-    queryChain.mockResolvedValueOnce([{ min_fecha: oldestDate }]); // 2b. oldest date
-  }
-
-  queryChain
-    .mockResolvedValueOnce(gastosPorMes)                // 3. gastos
-    .mockResolvedValueOnce(ingresosUnicosPorMes);       // 4. ingresos únicos
-
-  mockIngresoRecurrente.findAll
-    .mockResolvedValueOnce(recurrentes)  // 2a. calcularIngresosRecurrentesPrevios
-    .mockResolvedValueOnce(recurrentes); // 5. main recurrentes
+  mockSequelize.query
+    .mockResolvedValueOnce([saldoPrevio])        // 1. saldo previo
+    .mockResolvedValueOnce(gastosPorMes)         // 2. gastos
+    .mockResolvedValueOnce(ingresosUnicosPorMes); // 3. ingresos únicos
 }
 
 describe('Balance Service', () => {
@@ -231,43 +207,19 @@ describe('Balance Service', () => {
       });
     });
 
-    it('should include recurring income in calculations', async () => {
-      const recurrentes = [
-        {
-          monto_ars: '100000',
-          monto_usd: '80',
-          activo: true,
-          fecha_inicio: null,
-          fecha_fin: null
-        }
-      ];
-      setupMocks({ recurrentes });
-
-      const result = await getEvolucionMensual(usuarioId, '2026-04', '2026-04');
-
-      expect(result.meses[0].ingresos_ars).toBe(100000);
-      expect(result.meses[0].acumulado_ars).toBe(600000);
-    });
-
-    it('should respect fecha_inicio and fecha_fin of recurring income', async () => {
-      const recurrentes = [
-        {
-          monto_ars: '100000',
-          monto_usd: '0',
-          activo: true,
-          fecha_inicio: '2026-02-01',
-          fecha_fin: '2026-02-28'
-        }
-      ];
-      setupMocks({ recurrentes });
-
-      const result = await getEvolucionMensual(usuarioId, '2026-01', '2026-03');
-
-      // Only February should have the recurring income
-      expect(result.meses[0].ingresos_ars).toBe(0);     // Jan
-      expect(result.meses[1].ingresos_ars).toBe(100000); // Feb
-      expect(result.meses[2].ingresos_ars).toBe(0);     // Mar
-    });
+    // Recurring-income-specific scenarios ("should include recurring income
+    // in calculations", "should respect fecha_inicio/fecha_fin of recurring
+    // income", "should include recurring income from months before the
+    // range in saldo previo") used to live here, asserting that the
+    // recurring *template* got summed directly every month. That was
+    // exactly the bug described in docs/architecture/known-issues.md
+    // ("Ingresos recurrentes en USD..."): it ignored each month's own
+    // exchange rate. Fixed by removing that summation entirely — recurring
+    // incomes now flow through ingresosUnicosPorMes like any other ingreso
+    // único, via IngresoGeneratorService (see
+    // tests/unit/strategies/recurringIncomeStrategy.test.js and
+    // tests/unit/services/ingresoRecurrente.service.test.js for coverage
+    // of that generation path).
 
     it('should handle balance_inicial = 0', async () => {
       mockGetOrCreatePreferencias.mockResolvedValue({ balance_inicial: '0' });
@@ -302,30 +254,6 @@ describe('Balance Service', () => {
       // acumulado = balance_inicial(500k) + saldo_previo(200k) + saldo_mes(0) = 700k
       expect(result.meses[0].acumulado_ars).toBe(700000);
       expect(result.meses[0].acumulado_usd).toBe(100);
-    });
-
-    it('should include recurring income from months before the range in saldo previo', async () => {
-      const recurrentes = [
-        {
-          monto_ars: '50000',
-          monto_usd: '0',
-          activo: true,
-          fecha_inicio: null,
-          fecha_fin: null
-        }
-      ];
-      // Oldest date is 3 months before the range start
-      setupMocks({
-        recurrentes,
-        oldestDate: '2026-01-15',
-      });
-
-      const result = await getEvolucionMensual(usuarioId, '2026-04', '2026-04');
-
-      // Recurring income of 50k for Jan, Feb, Mar (3 months before Apr) = 150k previo
-      // Plus 50k recurring in April itself
-      // acumulado = 500k + 150k (saldo previo recurrentes) + 50k (recurrente in Apr) = 700k
-      expect(result.meses[0].acumulado_ars).toBe(700000);
     });
 
     // ─── tipo_cambio_mes ────────────────────────────────────────────────────────

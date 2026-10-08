@@ -6,6 +6,7 @@ import { InstallmentExpenseStrategy } from '../strategies/expenseGeneration/inst
 import { GastoRecurrenteService } from './gastoRecurrente.service.js';
 import { DebitoAutomaticoService } from './debitoAutomatico.service.js';
 import { ComprasService } from './compras.service.js';
+import { IngresoGeneratorService } from './ingresoGenerator.service.js';
 import sequelize from '../db/postgres.js';
 import logger from '../utils/logger.js';
 import moment from 'moment-timezone';
@@ -496,14 +497,22 @@ export class GastoGeneratorService {
         }
       }
 
-      logger.info('Generación completa de gastos completada (incluye únicos)', {
+      // Procesar ingresos recurrentes pendientes, con catch-up habilitado
+      // (ver docs/architecture/known-issues.md) — mismo criterio que
+      // allowCatchUp: true para gastos en este endpoint manual.
+      const incomeResults = await IngresoGeneratorService.generateScheduledIncomes(userId, true);
+      results.success.push(...incomeResults.success);
+      results.errors.push(...incomeResults.errors);
+
+      logger.info('Generación completa de gastos completada (incluye únicos e ingresos recurrentes)', {
         total_success: results.success.length,
         total_errors: results.errors.length,
         breakdown: {
           recurrentes: results.success.filter(r => r.type === 'recurrente').length,
           debitos: results.success.filter(r => r.type === 'debito').length,
           compras: results.success.filter(r => r.type === 'compra').length,
-          unicos: results.success.filter(r => r.type === 'unico').length
+          unicos: results.success.filter(r => r.type === 'unico').length,
+          ingresos_recurrentes: results.success.filter(r => r.type === 'ingreso_recurrente').length
         }
       });
       return results;

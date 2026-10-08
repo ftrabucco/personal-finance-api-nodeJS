@@ -90,6 +90,17 @@ jest.unstable_mockModule('../../../src/services/compras.service.js', () => ({
   }
 }));
 
+// Mock the income generator so this file doesn't need to pull in its real
+// transitive chain (ingresoRecurrente.service -> exchangeRate.service ->
+// TipoCambio), which isn't part of this suite's models mock below.
+const mockGenerateScheduledIncomes = jest.fn().mockResolvedValue({ success: [], errors: [] });
+
+jest.unstable_mockModule('../../../src/services/ingresoGenerator.service.js', () => ({
+  IngresoGeneratorService: {
+    generateScheduledIncomes: mockGenerateScheduledIncomes
+  }
+}));
+
 // Mock models
 const mockGastoUnicoFindAll = jest.fn().mockResolvedValue([]);
 const mockGastoUnicoFindByPk = jest.fn();
@@ -615,6 +626,7 @@ describe('GastoGeneratorService', () => {
       mockFindReadyDebitos.mockResolvedValue([]);
       mockFindReadyCompras.mockResolvedValue([]);
       mockGastoUnicoFindAll.mockResolvedValue([]);
+      mockGenerateScheduledIncomes.mockResolvedValue({ success: [], errors: [] });
     });
 
     it('should return combined results from scheduled and unique expenses', async () => {

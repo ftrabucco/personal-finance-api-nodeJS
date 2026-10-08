@@ -45,6 +45,12 @@ export function defineIngresoUnico(sequelize) {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       comment: 'Tipo de cambio usado para la conversión (snapshot)'
+    },
+    ingreso_recurrente_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: 'ingresos_recurrentes', key: 'id' },
+      comment: 'NULL si es un ingreso único manual; si no, marca esta fila como la ocurrencia generada de ese ingreso recurrente para su fecha'
     }
   }, {
     tableName: 'ingresos_unico',
