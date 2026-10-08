@@ -5,6 +5,7 @@ import logger from '../../utils/logger.js';
 import { sendError, sendSuccess, sendPaginatedSuccess, sendValidationError } from '../../utils/responseHelper.js';
 import { FilterBuilder, buildQueryOptions, buildPagination } from '../../utils/filterBuilder.js';
 import { buildDateRangeWhere, buildResumen, GASTOS_AGRUPACIONES } from '../../utils/aggregationHelper.js';
+import { getService } from '../../middlewares/container.middleware.js';
 
 export class GastoController extends BaseController {
   constructor() {
@@ -133,8 +134,20 @@ export class GastoController extends BaseController {
         return sendError(res, 404, `${this.modelName} no encontrado`);
       }
 
-      await item.destroy();
-      logger.info(`${this.modelName} eliminado:`, { id: req.params.id });
+      // A gasto único has a 1:1 relationship with its originating GastoUnico
+      // row (unlike recurrentes/débitos/compras, which generate many gastos
+      // from one definition) — deleting only this consolidated row would
+      // orphan the GastoUnico permanently, since it has no other generated
+      // occurrence to represent it. Delegate to the service that deletes
+      // both sides in one transaction instead of destroying `item` directly.
+      if (item.tipo_origen === 'unico' && item.id_origen) {
+        const gastoUnicoService = getService(req, 'gastoUnicoService');
+        await gastoUnicoService.deleteWithAssociatedGasto(item.id_origen);
+      } else {
+        await item.destroy();
+      }
+
+      logger.info(`${this.modelName} eliminado:`, { id: req.params.id, tipo_origen: item.tipo_origen });
 
       return sendSuccess(res, { message: `${this.modelName} eliminado correctamente` });
     } catch (error) {
