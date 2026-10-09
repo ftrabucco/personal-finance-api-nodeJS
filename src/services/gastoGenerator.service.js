@@ -123,6 +123,51 @@ export class GastoGeneratorService {
   }
 
   /**
+   * Force-generates this month's occurrence for a manual "Procesar" click
+   * (GastoRecurrenteController.procesarMesActual), skipping
+   * shouldGenerateExpense's day-of-month floor entirely. That check exists
+   * for the unattended scheduler — it shouldn't fire a month early/late on
+   * its own — but a manual click is an explicit, deliberate user decision;
+   * gating it on dia_de_pago defeats the endpoint's whole purpose (its own
+   * docstring: "útil cuando se crea un gasto después del día de pago del
+   * mes"). Still goes through the lock and the strategy's own
+   * existing-this-month duplicate check, so it can't double up a month
+   * that already has a gasto. Always dates the gasto as today (not the
+   * configured dia_de_pago), since backdating to a day in the future
+   * relative to today would trip the "fecha no puede ser futura"
+   * validation when forcing an occurrence ahead of its usual date.
+   */
+  static async generateFromGastoRecurrenteForced(gastoRecurrente) {
+    const transaction = await sequelize.transaction();
+    try {
+      const lockedExpense = await this.gastoRecurrenteService.lockForGeneration(gastoRecurrente.id, transaction);
+
+      if (!lockedExpense) {
+        await transaction.commit();
+        return null;
+      }
+
+      const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
+      const recurringStrategy = new RecurringExpenseStrategy();
+      const gasto = await recurringStrategy.generateWithDate(lockedExpense, today, transaction);
+
+      await transaction.commit();
+      logger.info('Gasto recurrente procesado manualmente (forzado):', {
+        gasto_id: gasto?.id,
+        gastoRecurrente_id: gastoRecurrente.id
+      });
+      return gasto;
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Error al forzar generación de gasto recurrente:', {
+        error: error.message,
+        gastoRecurrente_id: gastoRecurrente.id
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Genera un gasto real desde un débito automático
    * Usa AutomaticDebitExpenseStrategy
    *
@@ -164,6 +209,44 @@ export class GastoGeneratorService {
     } catch (error) {
       await transaction.rollback();
       logger.error('Error al generar gasto desde débito automático:', {
+        error: error.message,
+        debitoAutomatico_id: debitoAutomatico.id
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Force-generates this month's occurrence for a manual "Procesar" click
+   * (DebitoAutomaticoController.procesarMesActual). Same reasoning as
+   * generateFromGastoRecurrenteForced: skips the day-of-month floor
+   * meant for the unattended scheduler, keeps the lock + the strategy's
+   * own existing-this-month duplicate check, and always dates the gasto
+   * as today rather than the configured dia_de_pago.
+   */
+  static async generateFromDebitoAutomaticoForced(debitoAutomatico) {
+    const transaction = await sequelize.transaction();
+    try {
+      const lockedDebito = await this.debitoAutomaticoService.lockForGeneration(debitoAutomatico.id, transaction);
+
+      if (!lockedDebito) {
+        await transaction.commit();
+        return null;
+      }
+
+      const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
+      const automaticDebitStrategy = new AutomaticDebitExpenseStrategy();
+      const gasto = await automaticDebitStrategy.generate(lockedDebito, transaction, today);
+
+      await transaction.commit();
+      logger.info('Débito automático procesado manualmente (forzado):', {
+        gasto_id: gasto?.id,
+        debitoAutomatico_id: debitoAutomatico.id
+      });
+      return gasto;
+    } catch (error) {
+      await transaction.rollback();
+      logger.error('Error al forzar generación de débito automático:', {
         error: error.message,
         debitoAutomatico_id: debitoAutomatico.id
       });

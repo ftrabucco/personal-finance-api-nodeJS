@@ -223,4 +223,66 @@ describe('GastoRecurrenteService - frequency checks', () => {
       expect(result.canGenerate).toBe(true);
     });
   });
+
+  // ─── MENSUAL: CATCH-UP ONCE THE PAYMENT DAY HAS PASSED (FLOOR, NOT A WINDOW) ──
+  //
+  // checkMonthlyFrequency used to fall back to a narrow ±3-day tolerance
+  // window once a gasto recurrente had generated at least once — a missed
+  // scheduler run that wasn't caught within those 3 days left it stuck
+  // until next month's window came back around. Mirrors the identical fix
+  // in DebitoAutomaticoService (see debitoAutomatico.frequency.test.js),
+  // confirmed against the same real production bug.
+
+  describe('checkMonthlyFrequency', () => {
+    it('matches exactly on the configured day', () => {
+      const today = moment.tz('2026-04-15', TZ);
+      const expense = makeExpense({ frecuencia: 'mensual', dia_de_pago: 15 });
+      const result = service.checkMonthlyFrequency(expense, today, 15);
+      expect(result.matches).toBe(true);
+      expect(result.reason).toMatch(/exact match/);
+      expect(result.adjustedDate).toBe('2026-04-15');
+    });
+
+    it('does not match when the payment day has not arrived yet this month', () => {
+      const today = moment.tz('2026-04-10', TZ);
+      const expense = makeExpense({ frecuencia: 'mensual', dia_de_pago: 20 });
+      const result = service.checkMonthlyFrequency(expense, today, 10);
+      expect(result.matches).toBe(false);
+    });
+
+    it('catches up well past the old ±3-day tolerance, even when already generated before (the real-world bug)', () => {
+      const today = moment.tz('2026-04-20', TZ);
+      const expense = makeExpense({
+        frecuencia: 'mensual',
+        dia_de_pago: 5,
+        ultima_fecha_generado: '2026-03-05',
+        fecha_inicio: '2026-01-05',
+      });
+      const result = service.checkMonthlyFrequency(expense, today, 20);
+      expect(result.matches).toBe(true);
+      expect(result.adjustedDate).toBe('2026-04-05');
+    });
+
+    it('does not generate a phantom occurrence dated before fecha_inicio', () => {
+      // dia_de_pago is 5, but the expense only started on the 15th — this
+      // month's "day 5" predates the recurring expense itself.
+      const today = moment.tz('2026-04-20', TZ);
+      const expense = makeExpense({
+        frecuencia: 'mensual',
+        dia_de_pago: 5,
+        fecha_inicio: '2026-04-15',
+      });
+      const result = service.checkMonthlyFrequency(expense, today, 20);
+      expect(result.matches).toBe(false);
+      expect(result.reason).toMatch(/before fecha_inicio/);
+    });
+
+    it('clamps to the last valid day in a shorter month (e.g. day 31 in April)', () => {
+      const today = moment.tz('2026-04-30', TZ);
+      const expense = makeExpense({ frecuencia: 'mensual', dia_de_pago: 31 });
+      const result = service.checkMonthlyFrequency(expense, today, 30);
+      expect(result.matches).toBe(true);
+      expect(result.adjustedDate).toBe('2026-04-30');
+    });
+  });
 });

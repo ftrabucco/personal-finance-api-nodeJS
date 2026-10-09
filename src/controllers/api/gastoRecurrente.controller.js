@@ -439,8 +439,10 @@ export class GastoRecurrenteController extends BaseController {
         }
       }
 
-      // Generar el gasto para el mes actual
-      const gasto = await GastoGeneratorService.generateFromGastoRecurrente(gastoRecurrente);
+      // Generar el gasto para el mes actual — versión "forzada": salta el
+      // chequeo de día/tolerancia (pensado para el scheduler automático),
+      // ya que este es un click manual explícito del usuario.
+      const gasto = await GastoGeneratorService.generateFromGastoRecurrenteForced(gastoRecurrente);
 
       await transaction.commit();
 
