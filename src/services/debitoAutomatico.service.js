@@ -452,47 +452,41 @@ export class DebitoAutomaticoService extends BaseService {
     case 'mensual': {
       const validDay = this.getValidMonthlyDate(today, diaConfigurido);
 
-      // CATCH-UP: never generated before and the payment day already passed
-      // this month (beyond the few-day weekend/holiday tolerance below) —
-      // generate now anyway, dated with the real payment day rather than
-      // today. Mirrors GastoRecurrenteService.checkMonthlyFrequency's
-      // equivalent branch, which débitos automáticos were missing entirely:
-      // without it, a débito created after its payment day had passed this
-      // month simply never generated until next month's payment day came
-      // around.
-      //
-      // Unlike gastos recurrentes, this doesn't gate on fecha_inicio: the
-      // create endpoint doesn't accept fecha_inicio for débitos at all (the
-      // validation schema rejects it), so it's always today's date at
-      // creation time — gating catch-up on it would just block same-month
-      // catch-up unconditionally, which is exactly the scenario this exists
-      // to support.
-      if (!debit.ultima_fecha_generado && today.date() > validDay) {
-        // moment.tz({...}, zone) interprets the given fields as wall-clock
-        // time already in that zone; moment({...}).tz(zone) would instead
-        // construct in the process's default timezone and then convert the
-        // resulting instant, which is off by a day whenever the process
-        // doesn't default to America/Argentina/Buenos_Aires (e.g. CI, or any
-        // server without TZ set) — the same class of bug fixed elsewhere in
-        // this codebase (see personal-finance-api-nodeJS PR #38).
-        const adjustedDate = moment.tz(
-          { year: today.year(), month: today.month(), date: validDay },
-          'America/Argentina/Buenos_Aires'
-        );
-
+      // Floor, not a window: once the payment day has arrived (today's day
+      // of month >= the configured day, clamped for short months), it's
+      // due — generate regardless of how many days late. The real
+      // duplicate guard already lives upstream in shouldGenerateExpense's
+      // "already generated this month" check (line ~295), so there's no
+      // need for an upper tolerance here; a narrow ±N-day window around
+      // dia_de_pago just left débitos permanently stuck once the real bank
+      // charge day drifted (which it does, in practice) past the window,
+      // with the scheduler never catching up and no recovery short of
+      // editing dia_de_pago by hand every time it drifted.
+      if (today.date() < validDay) {
         return {
-          matches: true,
-          reason: `Monthly frequency - catch-up for day ${diaConfigurido} (never generated before, currently day ${today.date()})`,
-          adjustedDate: adjustedDate.format('YYYY-MM-DD')
+          matches: false,
+          reason: `Monthly frequency - payment day ${diaConfigurido} (day ${validDay} this month) hasn't arrived yet, today is day ${today.date()}`
         };
       }
 
-      const monthlyTolerance = this.calculateDateTolerance(today, 'mensual');
-      const monthlyCheck = this.checkDayWithTolerance(today, diaConfigurido, monthlyTolerance);
+      // moment.tz({...}, zone) interprets the given fields as wall-clock
+      // time already in that zone; moment({...}).tz(zone) would instead
+      // construct in the process's default timezone and then convert the
+      // resulting instant, which is off by a day whenever the process
+      // doesn't default to America/Argentina/Buenos_Aires (e.g. CI, or any
+      // server without TZ set) — the same class of bug fixed elsewhere in
+      // this codebase (see personal-finance-api-nodeJS PR #38).
+      const adjustedDate = moment.tz(
+        { year: today.year(), month: today.month(), date: validDay },
+        'America/Argentina/Buenos_Aires'
+      );
+
       return {
-        matches: monthlyCheck.matches,
-        reason: monthlyCheck.matches ? 'Monthly frequency matches' : monthlyCheck.reason,
-        adjustedDate: monthlyCheck.adjustedDate
+        matches: true,
+        reason: today.date() === validDay
+          ? `Monthly frequency - exact match on day ${validDay}`
+          : `Monthly frequency - payment day ${diaConfigurido} (day ${validDay}) already passed, catching up on day ${today.date()}`,
+        adjustedDate: adjustedDate.format('YYYY-MM-DD')
       };
     }
     case 'bimestral':

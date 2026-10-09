@@ -509,54 +509,43 @@ export class GastoRecurrenteService extends BaseService {
     const adjustedDate = this.getValidMonthlyDate(today, targetDay);
     const adjustedDay = adjustedDate.date();
 
-    if (diaActual === adjustedDay) {
+    // Floor, not a window: once the payment day has arrived this month
+    // (today's day of month >= the configured day, clamped for short
+    // months), it's due — generate regardless of how many days late. The
+    // real duplicate guard already lives upstream in shouldGenerateExpense's
+    // "already generated this month" check, so there's no need for an
+    // upper tolerance here; a narrow ±3-day window just left recurring
+    // expenses permanently stuck whenever a scheduler run was missed by
+    // more than a few days, with no way to catch up short of waiting for
+    // next month's window to come back around.
+    if (diaActual < adjustedDay) {
       return {
-        matches: true,
-        reason: `Monthly frequency - exact match on day ${adjustedDay}`,
-        adjustedDate: adjustedDate.format('YYYY-MM-DD')
+        matches: false,
+        reason: `Monthly frequency - target day ${targetDay} (adjusted to ${adjustedDay}) hasn't arrived yet, current ${diaActual}`,
+        adjustedDate: null
       };
     }
 
-    // CATCH-UP LOGIC: If never generated before and target day has passed this month
-    // BUT only if the target day this month is ON or AFTER fecha_inicio
-    if (!expense.ultima_fecha_generado && diaActual > adjustedDay) {
-      // If there's a fecha_inicio, check if the target day this month was after fecha_inicio
-      if (expense.fecha_inicio) {
-        const fechaInicio = moment(expense.fecha_inicio);
-        // The adjusted date (target day this month) must be on or after fecha_inicio
-        // Otherwise, the first generation should be next month
-        if (adjustedDate.isBefore(fechaInicio, 'day')) {
-          return {
-            matches: false,
-            reason: `Monthly frequency - target day ${targetDay} this month (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
-            adjustedDate: null
-          };
-        }
-      }
-      return {
-        matches: true,
-        reason: `Monthly frequency - catch-up for day ${targetDay} (never generated before, currently day ${diaActual})`,
-        adjustedDate: adjustedDate.format('YYYY-MM-DD')
-      };
-    }
-
-    // Regular tolerance for missed dates (3 days)
-    // Only apply tolerance if already generated before (not for first-time generation)
-    if (expense.ultima_fecha_generado) {
-      const tolerance = this.calculateDateTolerance(diaActual, [adjustedDay]);
-      if (tolerance.withinTolerance) {
+    // Don't generate a phantom occurrence dated before the definition's own
+    // start date — e.g. fecha_inicio falls on the 15th, dia_de_pago is 5:
+    // this month's "day 5" occurrence predates the recurring expense itself.
+    if (expense.fecha_inicio) {
+      const fechaInicio = moment(expense.fecha_inicio);
+      if (adjustedDate.isBefore(fechaInicio, 'day')) {
         return {
-          matches: true,
-          reason: `Monthly frequency - tolerance applied for day ${targetDay} (adjusted to ${adjustedDay})`,
-          adjustedDate: adjustedDate.format('YYYY-MM-DD') // Use target date, not today
+          matches: false,
+          reason: `Monthly frequency - target day ${targetDay} this month (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+          adjustedDate: null
         };
       }
     }
 
     return {
-      matches: false,
-      reason: `Monthly frequency - target day ${targetDay} (adjusted to ${adjustedDay}), current ${diaActual}`,
-      adjustedDate: null
+      matches: true,
+      reason: diaActual === adjustedDay
+        ? `Monthly frequency - exact match on day ${adjustedDay}`
+        : `Monthly frequency - target day ${targetDay} (adjusted to ${adjustedDay}) already passed, catching up on day ${diaActual}`,
+      adjustedDate: adjustedDate.format('YYYY-MM-DD')
     };
   }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, jest, afterEach } from '@jest/globals';
+import moment from 'moment-timezone';
 
 // Mock sequelize
 const mockTransaction = {
@@ -306,6 +307,69 @@ describe('GastoGeneratorService', () => {
     });
   });
 
+  describe('generateFromGastoRecurrenteForced', () => {
+    const mockGastoRecurrente = {
+      id: 2,
+      descripcion: 'Test gasto recurrente'
+    };
+
+    const mockGeneratedGasto = {
+      id: 101,
+      monto_ars: 2000
+    };
+
+    beforeEach(() => {
+      mockLockForGenerationRecurrente.mockResolvedValue(mockGastoRecurrente);
+    });
+
+    it('generates without consulting shouldGenerateExpense at all', async () => {
+      mockRecurringGenerateWithDate.mockResolvedValue(mockGeneratedGasto);
+
+      const result = await GastoGeneratorService.generateFromGastoRecurrenteForced(mockGastoRecurrente);
+
+      expect(result).toEqual(mockGeneratedGasto);
+      expect(mockShouldGenerateExpenseRecurrente).not.toHaveBeenCalled();
+      expect(mockLockForGenerationRecurrente).toHaveBeenCalledWith(mockGastoRecurrente.id, mockTransaction);
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it("dates the gasto as today, not a backdated dia_de_pago", async () => {
+      mockRecurringGenerateWithDate.mockResolvedValue(mockGeneratedGasto);
+
+      await GastoGeneratorService.generateFromGastoRecurrenteForced(mockGastoRecurrente);
+
+      const [, targetDate] = mockRecurringGenerateWithDate.mock.calls[0];
+      expect(targetDate).toBe(moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD'));
+    });
+
+    it('still relies on the strategy to skip a true duplicate (null result)', async () => {
+      mockRecurringGenerateWithDate.mockResolvedValue(null);
+
+      const result = await GastoGeneratorService.generateFromGastoRecurrenteForced(mockGastoRecurrente);
+
+      expect(result).toBeNull();
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('returns null without generating when the lock finds nothing', async () => {
+      mockLockForGenerationRecurrente.mockResolvedValue(null);
+
+      const result = await GastoGeneratorService.generateFromGastoRecurrenteForced(mockGastoRecurrente);
+
+      expect(result).toBeNull();
+      expect(mockRecurringGenerateWithDate).not.toHaveBeenCalled();
+    });
+
+    it('rolls back on error', async () => {
+      mockRecurringGenerateWithDate.mockRejectedValue(new Error('Forced recurring error'));
+
+      await expect(GastoGeneratorService.generateFromGastoRecurrenteForced(mockGastoRecurrente))
+        .rejects.toThrow('Forced recurring error');
+
+      expect(mockTransaction.rollback).toHaveBeenCalled();
+    });
+  });
+
   describe('generateFromDebitoAutomatico', () => {
     const mockDebitoAutomatico = {
       id: 3,
@@ -357,6 +421,69 @@ describe('GastoGeneratorService', () => {
 
       await expect(GastoGeneratorService.generateFromDebitoAutomatico(mockDebitoAutomatico))
         .rejects.toThrow('Debit error');
+
+      expect(mockTransaction.rollback).toHaveBeenCalled();
+    });
+  });
+
+  describe('generateFromDebitoAutomaticoForced', () => {
+    const mockDebitoAutomatico = {
+      id: 3,
+      descripcion: 'Test debito'
+    };
+
+    const mockGeneratedGasto = {
+      id: 102,
+      monto_ars: 3000
+    };
+
+    beforeEach(() => {
+      mockLockForGenerationDebito.mockResolvedValue(mockDebitoAutomatico);
+    });
+
+    it('generates without consulting shouldGenerateExpense at all', async () => {
+      mockAutomaticDebitGenerate.mockResolvedValue(mockGeneratedGasto);
+
+      const result = await GastoGeneratorService.generateFromDebitoAutomaticoForced(mockDebitoAutomatico);
+
+      expect(result).toEqual(mockGeneratedGasto);
+      expect(mockShouldGenerateExpenseDebito).not.toHaveBeenCalled();
+      expect(mockLockForGenerationDebito).toHaveBeenCalledWith(mockDebitoAutomatico.id, mockTransaction);
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('dates the gasto as today, not a backdated dia_de_pago', async () => {
+      mockAutomaticDebitGenerate.mockResolvedValue(mockGeneratedGasto);
+
+      await GastoGeneratorService.generateFromDebitoAutomaticoForced(mockDebitoAutomatico);
+
+      const today = moment().tz('America/Argentina/Buenos_Aires').format('YYYY-MM-DD');
+      expect(mockAutomaticDebitGenerate).toHaveBeenCalledWith(mockDebitoAutomatico, mockTransaction, today);
+    });
+
+    it('still relies on the strategy to skip a true duplicate (null result)', async () => {
+      mockAutomaticDebitGenerate.mockResolvedValue(null);
+
+      const result = await GastoGeneratorService.generateFromDebitoAutomaticoForced(mockDebitoAutomatico);
+
+      expect(result).toBeNull();
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('returns null without generating when the lock finds nothing', async () => {
+      mockLockForGenerationDebito.mockResolvedValue(null);
+
+      const result = await GastoGeneratorService.generateFromDebitoAutomaticoForced(mockDebitoAutomatico);
+
+      expect(result).toBeNull();
+      expect(mockAutomaticDebitGenerate).not.toHaveBeenCalled();
+    });
+
+    it('rolls back on error', async () => {
+      mockAutomaticDebitGenerate.mockRejectedValue(new Error('Forced debit error'));
+
+      await expect(GastoGeneratorService.generateFromDebitoAutomaticoForced(mockDebitoAutomatico))
+        .rejects.toThrow('Forced debit error');
 
       expect(mockTransaction.rollback).toHaveBeenCalled();
     });

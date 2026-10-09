@@ -372,8 +372,10 @@ export class DebitoAutomaticoController extends BaseController {
         }
       }
 
-      // Generar el gasto para el mes actual
-      const gasto = await GastoGeneratorService.generateFromDebitoAutomatico(debitoAutomatico);
+      // Generar el gasto para el mes actual — versión "forzada": salta el
+      // chequeo de día/tolerancia (pensado para el scheduler automático),
+      // ya que este es un click manual explícito del usuario.
+      const gasto = await GastoGeneratorService.generateFromDebitoAutomaticoForced(debitoAutomatico);
 
       await transaction.commit();
 

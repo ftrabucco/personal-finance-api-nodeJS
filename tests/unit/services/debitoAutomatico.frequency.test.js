@@ -185,16 +185,30 @@ describe('DebitoAutomaticoService - duplicate prevention for long-period frequen
     });
   });
 
-  // ─── MENSUAL: CATCH-UP FOR NEVER-GENERATED, DAY ALREADY PASSED ────────────
+  // ─── MENSUAL: CATCH-UP ONCE THE PAYMENT DAY HAS PASSED (FLOOR, NOT A WINDOW) ──
   //
-  // Regression coverage: unlike GastoRecurrenteService, this service had no
-  // catch-up branch for a débito created after its payment day had already
-  // passed this month — it would silently wait for next month's payment day
-  // instead of generating immediately. See scheduledGeneration.destructive.spec.ts
-  // CF-SCH-GEN-009 in personal-finance-test-automation for the E2E regression test.
+  // Regression coverage: this used to be a narrow ±2-3 day tolerance window
+  // around dia_de_pago (checkDayWithTolerance), which only ever let a débito
+  // catch up on its very first-ever generation (see the "never generated"
+  // case below). Once it had generated at least once, any month where the
+  // real bank charge day drifted more than a couple of days from the
+  // configured dia_de_pago left it permanently stuck — neither the
+  // scheduler nor the manual "Procesar" button (which re-validates through
+  // the same check) could ever pick it up again, with no recovery short of
+  // editing dia_de_pago by hand. Confirmed against real production data
+  // (personal-finance-api-nodeJS, débitos "Mercadopago - Disney+" and
+  // "Seguro de hogar - La segunda seguros", October 2026).
+  //
+  // Fixed by replacing the window with a floor: once dia_de_pago has
+  // arrived or passed this month, it's due — generate regardless of how
+  // many days late, relying on shouldGenerateExpense's own "already
+  // generated this month" check (above) as the real duplicate guard. See
+  // also scheduledGeneration.destructive.spec.ts CF-SCH-GEN-009 in
+  // personal-finance-test-automation for the original "never generated"
+  // E2E regression test, which this generalizes.
 
-  describe('mensual - catch-up for never-generated, day already passed', () => {
-    it('catches up when never generated and the payment day already passed this month, well beyond tolerance', async () => {
+  describe('mensual - catch-up once the payment day has passed', () => {
+    it('catches up when never generated and the payment day already passed this month', async () => {
       const today = moment.tz('2026-04-20', TZ);
       const debit = makeDebit({
         frecuencia: 'mensual',
@@ -206,7 +220,7 @@ describe('DebitoAutomaticoService - duplicate prevention for long-period frequen
       expect(result.adjustedDate).toBe('2026-04-05');
     });
 
-    it('does not catch up once it has already been generated at least once', async () => {
+    it('also catches up when it HAS already generated before, just not this month (the real-world bug)', async () => {
       const today = moment.tz('2026-04-20', TZ);
       const debit = makeDebit({
         frecuencia: 'mensual',
@@ -214,7 +228,8 @@ describe('DebitoAutomaticoService - duplicate prevention for long-period frequen
         ultima_fecha_generado: '2026-03-05',
       });
       const result = await service.shouldGenerateExpense(debit, today);
-      expect(result.should).toBe(false);
+      expect(result.should).toBe(true);
+      expect(result.adjustedDate).toBe('2026-04-05');
     });
 
     it('does not generate when the payment day has not arrived yet this month', async () => {
