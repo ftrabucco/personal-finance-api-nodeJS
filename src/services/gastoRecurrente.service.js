@@ -502,26 +502,34 @@ export class GastoRecurrenteService extends BaseService {
   /**
    * Check monthly frequency with date adjustment for invalid dates
    */
-  checkMonthlyFrequency(expense, today, diaActual) {
+  checkMonthlyFrequency(expense, today, _diaActual) {
     const targetDay = expense.dia_de_pago;
 
-    // Handle edge cases like day 31 in months with fewer days
-    const adjustedDate = this.getValidMonthlyDate(today, targetDay);
-    const adjustedDay = adjustedDate.date();
+    // Anchor the next-due occurrence to the month AFTER the last one
+    // actually generated, not to today's calendar month. Comparing against
+    // "today's month" collapses any backlog of more than one missed month
+    // into just the current one — e.g. a débito whose scheduler was down
+    // for two months would jump straight from "last generated in July" to
+    // "today's October occurrence is due", silently dropping August and
+    // September forever, with nothing short of a manual DB backfill able
+    // to recover them. Anchoring to ultima_fecha_generado instead makes
+    // each scheduler tick advance exactly one real historical occurrence
+    // at a time (same cost as before: one date comparison, no loop), so a
+    // backlog self-heals over consecutive daily runs instead of losing
+    // whatever was skipped in between.
+    const anchor = expense.ultima_fecha_generado
+      ? moment(expense.ultima_fecha_generado).add(1, 'month')
+      : today;
+    const adjustedDate = this.getValidMonthlyDate(anchor, targetDay);
 
-    // Floor, not a window: once the payment day has arrived this month
-    // (today's day of month >= the configured day, clamped for short
-    // months), it's due — generate regardless of how many days late. The
-    // real duplicate guard already lives upstream in shouldGenerateExpense's
-    // "already generated this month" check, so there's no need for an
-    // upper tolerance here; a narrow ±3-day window just left recurring
-    // expenses permanently stuck whenever a scheduler run was missed by
-    // more than a few days, with no way to catch up short of waiting for
-    // next month's window to come back around.
-    if (diaActual < adjustedDay) {
+    // Floor, not a window: once the next-due date has arrived or passed,
+    // it's due — generate regardless of how many days (or months) late.
+    // The real duplicate guard already lives upstream in
+    // shouldGenerateExpense's "already generated this month" check.
+    if (today.isBefore(adjustedDate, 'day')) {
       return {
         matches: false,
-        reason: `Monthly frequency - target day ${targetDay} (adjusted to ${adjustedDay}) hasn't arrived yet, current ${diaActual}`,
+        reason: `Monthly frequency - next occurrence (${adjustedDate.format('YYYY-MM-DD')}) hasn't arrived yet, today is ${today.format('YYYY-MM-DD')}`,
         adjustedDate: null
       };
     }
@@ -534,7 +542,7 @@ export class GastoRecurrenteService extends BaseService {
       if (adjustedDate.isBefore(fechaInicio, 'day')) {
         return {
           matches: false,
-          reason: `Monthly frequency - target day ${targetDay} this month (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
+          reason: `Monthly frequency - next occurrence (${adjustedDate.format('YYYY-MM-DD')}) is before fecha_inicio (${fechaInicio.format('YYYY-MM-DD')})`,
           adjustedDate: null
         };
       }
@@ -542,9 +550,9 @@ export class GastoRecurrenteService extends BaseService {
 
     return {
       matches: true,
-      reason: diaActual === adjustedDay
-        ? `Monthly frequency - exact match on day ${adjustedDay}`
-        : `Monthly frequency - target day ${targetDay} (adjusted to ${adjustedDay}) already passed, catching up on day ${diaActual}`,
+      reason: today.isSame(adjustedDate, 'day')
+        ? `Monthly frequency - exact match on day ${adjustedDate.date()}`
+        : `Monthly frequency - next occurrence (${adjustedDate.format('YYYY-MM-DD')}) already passed, catching up`,
       adjustedDate: adjustedDate.format('YYYY-MM-DD')
     };
   }

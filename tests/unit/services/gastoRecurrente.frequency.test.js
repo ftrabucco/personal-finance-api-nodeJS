@@ -285,4 +285,43 @@ describe('GastoRecurrenteService - frequency checks', () => {
       expect(result.adjustedDate).toBe('2026-04-30');
     });
   });
+
+  // ─── MENSUAL: BACKLOG OF 2+ FULLY SKIPPED MONTHS ANCHORS TO THE OLDEST ───
+  //
+  // The floor-fix above compares the payment day against TODAY's calendar
+  // month, which collapses a backlog of more than one missed month into
+  // just "today's month is due" — silently dropping whatever was skipped
+  // in between. Fixed by anchoring the next-due date to the month AFTER
+  // ultima_fecha_generado instead of to today's month, mirroring the
+  // identical fix in DebitoAutomaticoService.
+
+  describe('checkMonthlyFrequency - backlog of 2+ fully skipped months', () => {
+    it('generates the oldest missing month first, not the current one', () => {
+      const today = moment.tz('2026-10-12', TZ);
+      const expense = makeExpense({
+        frecuencia: 'mensual',
+        dia_de_pago: 15,
+        ultima_fecha_generado: '2026-07-17',
+        fecha_inicio: '2026-01-15',
+      });
+      const result = service.checkMonthlyFrequency(expense, today, 12);
+      expect(result.matches).toBe(true);
+      expect(result.adjustedDate).toBe('2026-08-15');
+    });
+
+    it('advances one real month per call, eventually reaching the current month without skipping any', () => {
+      const today = moment.tz('2026-10-12', TZ);
+      const makeStep = (ultima_fecha_generado) =>
+        makeExpense({ frecuencia: 'mensual', dia_de_pago: 15, ultima_fecha_generado, fecha_inicio: '2026-01-15' });
+
+      const step1 = service.checkMonthlyFrequency(makeStep('2026-07-17'), today, 12);
+      expect(step1.adjustedDate).toBe('2026-08-15');
+
+      const step2 = service.checkMonthlyFrequency(makeStep(step1.adjustedDate), today, 12);
+      expect(step2.adjustedDate).toBe('2026-09-15');
+
+      const step3 = service.checkMonthlyFrequency(makeStep(step2.adjustedDate), today, 12);
+      expect(step3.matches).toBe(false); // October 15 hasn't arrived yet (today is the 12th)
+    });
+  });
 });

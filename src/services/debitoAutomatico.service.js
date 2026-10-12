@@ -450,24 +450,23 @@ export class DebitoAutomaticoService extends BaseService {
       };
     }
     case 'mensual': {
-      const validDay = this.getValidMonthlyDate(today, diaConfigurido);
-
-      // Floor, not a window: once the payment day has arrived (today's day
-      // of month >= the configured day, clamped for short months), it's
-      // due — generate regardless of how many days late. The real
-      // duplicate guard already lives upstream in shouldGenerateExpense's
-      // "already generated this month" check (line ~295), so there's no
-      // need for an upper tolerance here; a narrow ±N-day window around
-      // dia_de_pago just left débitos permanently stuck once the real bank
-      // charge day drifted (which it does, in practice) past the window,
-      // with the scheduler never catching up and no recovery short of
-      // editing dia_de_pago by hand every time it drifted.
-      if (today.date() < validDay) {
-        return {
-          matches: false,
-          reason: `Monthly frequency - payment day ${diaConfigurido} (day ${validDay} this month) hasn't arrived yet, today is day ${today.date()}`
-        };
-      }
+      // Anchor the next-due occurrence to the month AFTER the last one
+      // actually generated, not to today's calendar month. Comparing
+      // against "today's month" collapses any backlog of more than one
+      // missed month into just the current one — e.g. a débito whose
+      // scheduler was down for two months would jump straight from "last
+      // generated in July" to "today's October occurrence is due",
+      // silently dropping August and September forever, with nothing
+      // short of a manual DB backfill able to recover them. Anchoring to
+      // ultima_fecha_generado instead makes each scheduler tick advance
+      // exactly one real historical occurrence at a time (same cost as
+      // before: one date comparison, no loop), so a backlog self-heals
+      // over consecutive daily runs instead of losing whatever was
+      // skipped in between.
+      const anchor = debit.ultima_fecha_generado
+        ? moment(debit.ultima_fecha_generado).tz('America/Argentina/Buenos_Aires').add(1, 'month')
+        : today;
+      const validDay = this.getValidMonthlyDate(anchor, diaConfigurido);
 
       // moment.tz({...}, zone) interprets the given fields as wall-clock
       // time already in that zone; moment({...}).tz(zone) would instead
@@ -477,15 +476,27 @@ export class DebitoAutomaticoService extends BaseService {
       // server without TZ set) — the same class of bug fixed elsewhere in
       // this codebase (see personal-finance-api-nodeJS PR #38).
       const adjustedDate = moment.tz(
-        { year: today.year(), month: today.month(), date: validDay },
+        { year: anchor.year(), month: anchor.month(), date: validDay },
         'America/Argentina/Buenos_Aires'
       );
 
+      // Floor, not a window: once the next-due date has arrived or
+      // passed, it's due — generate regardless of how many days (or
+      // months) late. The real duplicate guard already lives upstream in
+      // shouldGenerateExpense's "already generated this month" check
+      // (line ~295).
+      if (today.isBefore(adjustedDate, 'day')) {
+        return {
+          matches: false,
+          reason: `Monthly frequency - next occurrence (${adjustedDate.format('YYYY-MM-DD')}) hasn't arrived yet, today is ${today.format('YYYY-MM-DD')}`
+        };
+      }
+
       return {
         matches: true,
-        reason: today.date() === validDay
+        reason: today.isSame(adjustedDate, 'day')
           ? `Monthly frequency - exact match on day ${validDay}`
-          : `Monthly frequency - payment day ${diaConfigurido} (day ${validDay}) already passed, catching up on day ${today.date()}`,
+          : `Monthly frequency - next occurrence (${adjustedDate.format('YYYY-MM-DD')}) already passed, catching up`,
         adjustedDate: adjustedDate.format('YYYY-MM-DD')
       };
     }
