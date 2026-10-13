@@ -517,8 +517,14 @@ export class GastoRecurrenteService extends BaseService {
     // at a time (same cost as before: one date comparison, no loop), so a
     // backlog self-heals over consecutive daily runs instead of losing
     // whatever was skipped in between.
+    // moment.tz(dateString, zone) parses the date-only string as wall-clock
+    // time already in that zone; moment(dateString).tz(zone) would instead
+    // parse it in the process's default timezone and then convert the
+    // resulting instant, which is off by a day whenever the process
+    // doesn't default to America/Argentina/Buenos_Aires (e.g. CI) — the
+    // same class of bug fixed elsewhere in this codebase (see PR #38).
     const anchor = expense.ultima_fecha_generado
-      ? moment(expense.ultima_fecha_generado).add(1, 'month')
+      ? moment.tz(expense.ultima_fecha_generado, 'America/Argentina/Buenos_Aires').add(1, 'month')
       : today;
     const adjustedDate = this.getValidMonthlyDate(anchor, targetDay);
 
@@ -748,12 +754,18 @@ export class GastoRecurrenteService extends BaseService {
     const year = today.year();
     const month = today.month(); // 0-based
 
-    // Create date with target day
-    const targetDate = moment({ year, month, date: targetDay });
+    // moment.tz({...}, zone) interprets the given fields as wall-clock time
+    // already in that zone; bare moment({...}) would construct in the
+    // process's default timezone instead, which callers that now compare
+    // the result via instant-based isBefore/isSame (not just .date()) need
+    // to match today's own ART-anchored zone, or the comparison silently
+    // breaks whenever the process doesn't default to
+    // America/Argentina/Buenos_Aires (e.g. CI) — see PR #38.
+    const targetDate = moment.tz({ year, month, date: targetDay }, 'America/Argentina/Buenos_Aires');
 
     // If the date is invalid (e.g., Feb 31), get last day of month
     if (!targetDate.isValid() || targetDate.date() !== targetDay) {
-      return moment({ year, month }).endOf('month');
+      return moment.tz({ year, month }, 'America/Argentina/Buenos_Aires').endOf('month');
     }
 
     return targetDate;

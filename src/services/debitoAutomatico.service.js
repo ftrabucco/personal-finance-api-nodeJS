@@ -464,7 +464,7 @@ export class DebitoAutomaticoService extends BaseService {
       // over consecutive daily runs instead of losing whatever was
       // skipped in between.
       const anchor = debit.ultima_fecha_generado
-        ? moment(debit.ultima_fecha_generado).tz('America/Argentina/Buenos_Aires').add(1, 'month')
+        ? moment.tz(debit.ultima_fecha_generado, 'America/Argentina/Buenos_Aires').add(1, 'month')
         : today;
       const validDay = this.getValidMonthlyDate(anchor, diaConfigurido);
 
