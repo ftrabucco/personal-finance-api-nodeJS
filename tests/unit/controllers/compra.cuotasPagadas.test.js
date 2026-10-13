@@ -385,7 +385,7 @@ describe('CompraController - cuotas_pagadas', () => {
       mockGastoCreate.mockImplementation((data) => Promise.resolve({ id: Math.random(), ...data }));
     });
 
-    it('should not generate a regular installment after its date unless catch-up is enabled', () => {
+    it('generates a regular installment once its date has passed, regardless of allowCatchUp (floor, not exact-day match)', () => {
       const compra = {
         id: 10,
         descripcion: 'Compra mensual',
@@ -399,13 +399,16 @@ describe('CompraController - cuotas_pagadas', () => {
       };
       const today = moment.tz('2026-05-19', 'America/Argentina/Buenos_Aires');
 
-      expect(strategy.shouldGenerateMultipleInstallment(compra, today, 1, false)).toBe(false);
-      expect(strategy.shouldGenerateMultipleInstallment(compra, today, 1, true)).toBe(true);
+      // allowCatchUp no longer gates this: fechaCuota is already anchored to
+      // the real next cuota (via cuotasGeneradas), so once it's arrived or
+      // passed it's due either way — a scheduler run missed on the exact
+      // day must not leave the cuota permanently stuck.
+      expect(strategy.shouldGenerateMultipleInstallment(compra, today, 1, false)).toBe(true);
       expect(compra.adjustedDate).toBe('2026-05-10');
       expect(compra.nextInstallmentNumber).toBe(2);
     });
 
-    it('should catch up a missed credit-card due date and remember the real due date', () => {
+    it('generates a missed credit-card due date regardless of allowCatchUp, remembering the real due date', () => {
       const compra = {
         id: 11,
         descripcion: 'Compra tarjeta',
@@ -418,8 +421,7 @@ describe('CompraController - cuotas_pagadas', () => {
       };
       const today = moment.tz('2026-05-19', 'America/Argentina/Buenos_Aires');
 
-      expect(strategy.shouldGenerateOnCreditCardDueDate(compra, today, 0, false)).toBe(false);
-      expect(strategy.shouldGenerateOnCreditCardDueDate(compra, today, 0, true)).toBe(true);
+      expect(strategy.shouldGenerateOnCreditCardDueDate(compra, today, 0, false)).toBe(true);
       expect(compra.adjustedDate).toBe('2026-05-10');
       expect(compra.nextInstallmentNumber).toBe(1);
     });

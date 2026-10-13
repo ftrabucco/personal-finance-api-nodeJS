@@ -173,11 +173,14 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
       return shouldGenerate;
     }
 
-    // Cuotas siguientes: mismo día del mes que la fecha de compra
-    // Con catch-up: también generar si la fecha real de la cuota ya pasó
-    const shouldGenerate = allowCatchUp
-      ? today.isSameOrAfter(fechaCuota, 'day')
-      : today.isSame(fechaCuota, 'day');
+    // Cuotas siguientes: mismo día del mes que la fecha de compra.
+    // Floor, not exact-day match: fechaCuota is already anchored to the
+    // actual next un-generated cuota (via cuotasGeneradas), not to today's
+    // calendar month, so once it's arrived or passed it's due regardless
+    // of allowCatchUp — a scheduler run missed on the exact day otherwise
+    // left the cuota permanently stuck until a manual catch-up (confirmed
+    // in prod: 7 of 10 pending compras were each exactly one cuota behind).
+    const shouldGenerate = today.isSameOrAfter(fechaCuota, 'day');
 
     if (shouldGenerate) {
       this.setGenerationContext(compra, cuotasGeneradas, fechaCuota);
@@ -241,10 +244,12 @@ export class InstallmentExpenseStrategy extends BaseExpenseGenerationStrategy {
 
       const fechaVencimiento = CreditCardDateService.calculateDueDate(compra, compra.tarjeta, cuotaNumero, today);
 
-      // Verificar si hoy es día de vencimiento (o ya pasó, en modo catch-up)
-      const shouldGenerate = allowCatchUp
-        ? today.isSameOrAfter(fechaVencimiento, 'day')
-        : today.isSame(fechaVencimiento, 'day');
+      // Floor, not exact-day match: fechaVencimiento is anchored to the
+      // card's real billing cycle for this cuota (via cuotaNumero), not to
+      // today's calendar month, so once it's arrived or passed it's due
+      // regardless of allowCatchUp — see shouldGenerateMultipleInstallment
+      // for the full rationale.
+      const shouldGenerate = today.isSameOrAfter(fechaVencimiento, 'day');
 
       if (shouldGenerate) {
         this.setGenerationContext(compra, cuotaNumero, fechaVencimiento);

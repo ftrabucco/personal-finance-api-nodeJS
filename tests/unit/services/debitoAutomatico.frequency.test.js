@@ -259,4 +259,58 @@ describe('DebitoAutomaticoService - duplicate prevention for long-period frequen
       expect(result.adjustedDate).toBe('2026-04-30');
     });
   });
+
+  // ─── MENSUAL: BACKLOG OF 2+ FULLY SKIPPED MONTHS ANCHORS TO THE OLDEST ───
+  //
+  // Regression coverage for a bug the floor-fix above (PR #48) didn't catch:
+  // it compared the payment day against TODAY's calendar month, which
+  // collapses any backlog of more than one missed month into just "today's
+  // month is due" — silently dropping whatever was skipped in between, with
+  // no recovery short of a manual DB backfill. Confirmed against real
+  // production data: débito "Netflix" (dia_de_pago 15) last generated
+  // 2026-07-17, and with the scheduler outage lasting into October, the old
+  // logic would generate October's occurrence and call it caught up —
+  // permanently losing August and September. Fixed by anchoring the next-due
+  // date to the month AFTER ultima_fecha_generado instead of to today's
+  // month, so each tick advances exactly one real historical occurrence.
+  describe('mensual - backlog of 2+ fully skipped months anchors to the oldest, not today\'s month', () => {
+    it('generates the oldest missing month first, not the current one, when 2+ months were skipped entirely', async () => {
+      const today = moment.tz('2026-10-12', TZ);
+      const debit = makeDebit({
+        frecuencia: 'mensual',
+        dia_de_pago: 15,
+        ultima_fecha_generado: '2026-07-17', // August and September never generated
+      });
+      const result = await service.shouldGenerateExpense(debit, today);
+      expect(result.should).toBe(true);
+      expect(result.adjustedDate).toBe('2026-08-15');
+    });
+
+    it('still anchors to the oldest missing month even once the current month\'s own day has also passed', async () => {
+      const today = moment.tz('2026-10-20', TZ); // past October 15 too
+      const debit = makeDebit({
+        frecuencia: 'mensual',
+        dia_de_pago: 15,
+        ultima_fecha_generado: '2026-07-17',
+      });
+      const result = await service.shouldGenerateExpense(debit, today);
+      expect(result.should).toBe(true);
+      expect(result.adjustedDate).toBe('2026-08-15');
+    });
+
+    it('advances one real month per call as ultima_fecha_generado moves forward, eventually reaching the current month without skipping any', async () => {
+      const today = moment.tz('2026-10-12', TZ);
+      const makeDay = (dia_de_pago, ultima_fecha_generado) =>
+        makeDebit({ frecuencia: 'mensual', dia_de_pago, ultima_fecha_generado });
+
+      const step1 = await service.shouldGenerateExpense(makeDay(15, '2026-07-17'), today);
+      expect(step1.adjustedDate).toBe('2026-08-15');
+
+      const step2 = await service.shouldGenerateExpense(makeDay(15, step1.adjustedDate), today);
+      expect(step2.adjustedDate).toBe('2026-09-15');
+
+      const step3 = await service.shouldGenerateExpense(makeDay(15, step2.adjustedDate), today);
+      expect(step3.should).toBe(false); // October 15 hasn't arrived yet (today is the 12th)
+    });
+  });
 });
